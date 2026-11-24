@@ -32,6 +32,7 @@ import {
 import { api } from "@/lib/api/client";
 import { ImageManager } from "./image-manager";
 import { STATUS_TONE } from "./products-screen";
+import { RelatedLinks } from "@/components/desk/related-links";
 
 type Draft = {
   name: string;
@@ -184,6 +185,13 @@ export function ProductEditor({ id }: { id: string }) {
         eyebrow={p.candidate_title && p.candidate_title !== p.name ? `Từ ứng viên: ${p.candidate_title}` : "Sản phẩm"}
         backHref="/desk/san-pham"
         actions={<Badge tone={STATUS_TONE[p.status]}>{PRODUCT_STATUS_LABELS[p.status]}</Badge>}
+      />
+      <RelatedLinks
+        links={[
+          { href: `/desk/noi-dung/san-pham/${p.id}`, label: "Bài các kênh" },
+          p.candidate_id && { href: `/desk/san-hang/ung-vien/${p.candidate_id}`, label: "Hồ sơ thẩm định" },
+          p.status === "published" && { href: `/san-pham/${p.slug}`, label: "Xem trên web" },
+        ]}
       />
 
       {warnings.length ? (

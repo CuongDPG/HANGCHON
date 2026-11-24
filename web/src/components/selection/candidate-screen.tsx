@@ -29,6 +29,7 @@ import { NoteComposer } from "./note-composer";
 import { NoteItem } from "./note-item";
 import { ReasonsCard } from "./reasons-card";
 import { RejectSheet } from "./reject-sheet";
+import { RelatedLinks } from "@/components/desk/related-links";
 
 /** Một món trên bàn chọn: thông tin nguồn, nhật ký thử (c2), lý do chọn (c3) / loại (c4), chuyển cột (c1). */
 export function CandidateScreen({ id }: { id: string }) {
@@ -99,6 +100,7 @@ export function CandidateScreen({ id }: { id: string }) {
         eyebrow={`${STAGE_LABELS[card.stage].toUpperCase()} · ${PLATFORM_LABELS[card.source_platform] ?? card.source_platform}`}
         backHref={`/desk/ban-chon?tab=${card.stage}`}
       />
+      <RelatedLinks links={[{ href: `/desk/san-hang/ung-vien/${card.id}`, label: "Hồ sơ thẩm định" }, { href: `/desk/nguon-cung/gia-von/${card.id}`, label: "Giá vốn" }]} />
 
       <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
         <div className="flex gap-3 md:flex-col">

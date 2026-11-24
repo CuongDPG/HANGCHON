@@ -2,6 +2,7 @@
 
 import { ChevronDown, History, RotateCcw, RotateCw, ShieldCheck } from "lucide-react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { useState } from "react";
 import {
   Badge,
@@ -203,6 +204,11 @@ function ActivityItem({ a }: { a: Activity }) {
           >
             Căn cứ <ChevronDown className={open ? "size-4 rotate-180 transition-transform" : "size-4 transition-transform"} aria-hidden />
           </button>
+        ) : null}
+        {a.href ? (
+          <Link href={a.href} className="inline-flex h-8 items-center text-[14px] font-semibold text-accent">
+            Mở chi tiết →
+          </Link>
         ) : null}
         <span className="flex-1" />
         {a.undone_at ? (

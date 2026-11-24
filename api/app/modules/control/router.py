@@ -17,7 +17,7 @@ from app.core.pagination import Page, Paginated, paginate
 from app.core.security import create_access_token, hash_password, verify_password
 from app.core.timeutil import VN_TZ, now_utc
 from app.integrations.base import KINDS, driver_name
-from app.modules.control import service
+from app.modules.control import links, service
 from app.modules.control.models import (
     ActivityMode,
     AIActivity,
@@ -158,7 +158,9 @@ router = APIRouter(prefix="/api/desk/control", tags=["control"])
 
 @router.get("/today", response_model=TodayOut, summary="Hôm nay (i1)")
 async def get_today(_: CurrentUser, db: DbSession) -> dict:
-    return await service.today(db)
+    out = await service.today(db)
+    await links.attach(db, out["pending"]["items"])
+    return out
 
 
 # hàng chờ duyệt (i2)
@@ -183,7 +185,9 @@ async def list_approvals(
     order = (ApprovalItem.priority.desc(), ApprovalItem.created_at.asc())
     if statuses != [ApprovalStatus.PENDING]:
         order = (ApprovalItem.updated_at.desc(),)  # type: ignore[assignment]
-    return await paginate(db, q.order_by(*order), page, ApprovalItemOut)
+    res = await paginate(db, q.order_by(*order), page, ApprovalItemOut)
+    await links.attach(db, res.items)
+    return res
 
 
 @router.get("/approvals/groups", response_model=list[ApprovalGroupOut], summary="Việc chờ theo loại")
@@ -200,7 +204,9 @@ async def approve_batch(body: BatchApproveIn, user: OwnerUser, db: DbSession) ->
 
 @router.get("/approvals/{item_id}", response_model=ApprovalItemOut)
 async def get_approval(item_id: uuid.UUID, _: CurrentUser, db: DbSession) -> ApprovalItem:
-    return await service.get_item(db, item_id)
+    item = await service.get_item(db, item_id)
+    await links.attach(db, [item])
+    return item
 
 
 @router.post("/approvals/{item_id}/approve", response_model=ApprovalItemOut, summary="Duyệt / sửa rồi duyệt")
@@ -243,7 +249,9 @@ async def list_activity(
     ):
         if val is not None:
             q = q.where(col == val)
-    return await paginate(db, q.order_by(AIActivity.created_at.desc()), page, ActivityOut)
+    res = await paginate(db, q.order_by(AIActivity.created_at.desc()), page, ActivityOut)
+    await links.attach(db, res.items)
+    return res
 
 
 @router.post("/activity/{activity_id}/undo", response_model=ActivityOut, summary="Hoàn tác")

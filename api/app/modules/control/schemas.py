@@ -92,6 +92,7 @@ class ApprovalItemOut(ORM):
     attempts: int
     created_at: datetime
     updated_at: datetime
+    href: str | None = Field(default=None, description="Màn hình của đối tượng liên quan (để bấm tới)")
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -168,6 +169,7 @@ class ActivityOut(ORM):
     undone_at: datetime | None
     undone_by_id: uuid.UUID | None
     created_at: datetime
+    href: str | None = Field(default=None, description="Màn hình của đối tượng liên quan")
 
     @computed_field  # type: ignore[prop-decorator]
     @property
