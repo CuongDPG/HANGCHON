@@ -43,3 +43,17 @@ def test_prod_refuses_default_jwt_secret() -> None:
             Settings(app_env="prod", jwt_secret=bad, _env_file=None)
     assert Settings(app_env="prod", jwt_secret="x" * 40, _env_file=None).jwt_secret == "x" * 40
     assert Settings(app_env="dev", jwt_secret="ngan", _env_file=None).app_env == "dev"
+
+
+def test_blank_env_values_fall_back_to_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+    """docker-compose.prod.yml truyền `${KEY:-}` → chuỗi rỗng; không được làm API từ chối khởi động."""
+    for k in ("GHN_ENV", "GHTK_ENV", "ZALO_OA_BROADCAST", "CONTENT_FFMPEG", "SMTP_PORT"):
+        monkeypatch.setenv(k, "")
+    s = Settings(_env_file=None)
+    assert (s.ghn_env, s.ghtk_env, s.zalo_oa_broadcast, s.content_ffmpeg, s.smtp_port) == (
+        "prod",
+        "prod",
+        False,
+        True,
+        587,
+    )

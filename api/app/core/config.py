@@ -168,11 +168,14 @@ class Settings(BaseSettings):
     @field_validator("*", mode="before")
     @classmethod
     def _blank_is_none(cls, v: Any, info: Any) -> Any:
-        """Biến môi trường để trống (`KEY=`) với trường tuỳ chọn → None."""
+        """Biến môi trường để trống (`KEY=`, hay gặp trong compose `${KEY:-}`): trường tuỳ chọn → None,
+        trường khác → giá trị mặc định."""
         if v == "" and info.field_name in cls.model_fields:
-            ann = cls.model_fields[info.field_name].annotation
-            if type(None) in getattr(ann, "__args__", ()):
+            field = cls.model_fields[info.field_name]
+            if type(None) in getattr(field.annotation, "__args__", ()):
                 return None
+            if not field.is_required() and field.annotation is not str:
+                return field.get_default(call_default_factory=True)
         return v
 
     @field_validator("ai_pricing", mode="before")
