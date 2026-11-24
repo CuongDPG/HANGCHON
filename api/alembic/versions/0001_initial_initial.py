@@ -1,8 +1,8 @@
-"""initial schema
+"""initial
 
 Revision ID: 0001_initial
 Revises: 
-Create Date: 2026-11-24 18:41:00.960982+00:00
+Create Date: 2026-11-24 19:59:00.155945+00:00
 """
 
 from collections.abc import Sequence
@@ -369,7 +369,7 @@ def upgrade() -> None:
     op.create_table('sourcing_briefs',
     sa.Column('title', sa.String(length=200), nullable=False),
     sa.Column('raw_text', sa.Text(), nullable=False, comment='Nguyên văn chị nói/gõ'),
-    sa.Column('input_mode', sa.Enum('text', 'voice', name='briefinputmode', native_enum=False, length=40), nullable=False),
+    sa.Column('input_mode', sa.Enum('text', 'voice', 'image', 'trend', 'demand', name='briefinputmode', native_enum=False, length=40), nullable=False),
     sa.Column('voice_storage_key', sa.String(length=300), nullable=True),
     sa.Column('status', sa.Enum('draft', 'active', 'paused', 'done', 'archived', name='briefstatus', native_enum=False, length=40), nullable=False),
     sa.Column('interpretation', sa.Text(), nullable=True, comment='AI diễn giải lại để chị xem nó hiểu thế nào'),
@@ -586,6 +586,20 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_broadcasts_channel_account_id'), 'broadcasts', ['channel_account_id'], unique=False)
     op.create_index(op.f('ix_broadcasts_drop_id'), 'broadcasts', ['drop_id'], unique=False)
+    op.create_table('drop_reminders',
+    sa.Column('drop_id', sa.UUID(), nullable=False),
+    sa.Column('contact', sa.String(length=200), nullable=False, comment='SĐT hoặc Zalo khách để lại'),
+    sa.Column('contact_key', sa.String(length=64), nullable=False, comment='Băm liên hệ đã chuẩn hoá (chống trùng)'),
+    sa.Column('channel', sa.String(length=20), server_default='zalo', nullable=False),
+    sa.Column('notified_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['drop_id'], ['drops.id'], name=op.f('fk_drop_reminders_drop_id_drops'), ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id', name=op.f('pk_drop_reminders')),
+    sa.UniqueConstraint('drop_id', 'contact_key', name='uq_drop_reminders_contact')
+    )
+    op.create_index(op.f('ix_drop_reminders_created_at'), 'drop_reminders', ['created_at'], unique=False)
+    op.create_index(op.f('ix_drop_reminders_drop_id'), 'drop_reminders', ['drop_id'], unique=False)
     op.create_table('livestream_scripts',
     sa.Column('title', sa.String(length=200), nullable=False),
     sa.Column('scheduled_for', sa.DateTime(timezone=True), nullable=True),
@@ -775,6 +789,7 @@ def upgrade() -> None:
     sa.Column('reason_selected', sa.Text(), nullable=True),
     sa.Column('not_satisfied', sa.Text(), nullable=True),
     sa.Column('rejected_alternatives', postgresql.JSONB(astext_type=sa.Text()), server_default=sa.text("'[]'::jsonb"), nullable=False, comment='Ảnh chụp các món đã loại: [{"title","reason","image_url"}]'),
+    sa.Column('dossier', postgresql.JSONB(astext_type=sa.Text()), server_default=sa.text("'{}'::jsonb"), nullable=False, comment='Ảnh chụp dải số sàng lọc + nhóm lý do loại (e2): {"funnel":{viewed,compared,tried,selected},"reject_groups":[{key,label,count}],"reviews_read","review_languages","built_at"}'),
     sa.Column('weight_grams', sa.Integer(), nullable=True),
     sa.Column('dimensions_cm', postgresql.JSONB(astext_type=sa.Text()), server_default=sa.text("'{}'::jsonb"), nullable=False),
     sa.Column('origin_country', sa.String(length=2), nullable=True),
@@ -1048,6 +1063,7 @@ def upgrade() -> None:
     sa.Column('brief_id', sa.UUID(), nullable=True),
     sa.Column('product_id', sa.UUID(), nullable=True, comment='Món đã tìm được'),
     sa.Column('moderation_note', sa.Text(), nullable=True),
+    sa.Column('submitter_key', sa.String(length=64), nullable=True, comment='Băm thiết bị gửi (chống spam)'),
     sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
@@ -1061,6 +1077,7 @@ def upgrade() -> None:
     op.create_index(op.f('ix_find_requests_customer_id'), 'find_requests', ['customer_id'], unique=False)
     op.create_index(op.f('ix_find_requests_product_id'), 'find_requests', ['product_id'], unique=False)
     op.create_index(op.f('ix_find_requests_status'), 'find_requests', ['status'], unique=False)
+    op.create_index(op.f('ix_find_requests_submitter_key'), 'find_requests', ['submitter_key'], unique=False)
     op.create_table('inbound_shipments',
     sa.Column('purchase_order_id', sa.UUID(), nullable=True),
     sa.Column('code', sa.String(length=60), nullable=True, comment='Mã lô / mã kiện bên mua hộ'),
@@ -1522,7 +1539,7 @@ def upgrade() -> None:
     sa.Column('status', sa.Enum('open', 'needs_owner', 'waiting_customer', 'ai_handled', 'closed', 'spam', name='threadstatus', native_enum=False, length=40), nullable=False),
     sa.Column('needs_owner', sa.Boolean(), server_default=sa.text('false'), nullable=False),
     sa.Column('escalation_reason', sa.Enum('complaint', 'defect', 'health', 'refund', 'low_confidence', 'other', name='escalationreason', native_enum=False, length=40), nullable=True),
-    sa.Column('last_intent', sa.Enum('ask_price', 'ask_stock', 'ask_shipping', 'ask_product', 'purchase', 'order_status', 'complaint', 'find_request', 'small_talk', 'other', name='intent', native_enum=False, length=40), nullable=True),
+    sa.Column('last_intent', sa.Enum('ask_price', 'ask_stock', 'ask_shipping', 'ask_arrival', 'ask_product', 'purchase', 'order_status', 'complaint', 'health_safety', 'find_request', 'small_talk', 'other', name='intent', native_enum=False, length=40), nullable=True),
     sa.Column('snippet', sa.String(length=300), nullable=True),
     sa.Column('last_message_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('last_inbound_at', sa.DateTime(timezone=True), nullable=True),
@@ -1602,7 +1619,7 @@ def upgrade() -> None:
     sa.Column('attachments', postgresql.JSONB(astext_type=sa.Text()), server_default=sa.text("'[]'::jsonb"), nullable=False),
     sa.Column('sent_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('status', sa.Enum('received', 'queued', 'sent', 'failed', name='messagestatus', native_enum=False, length=40), nullable=False),
-    sa.Column('intent', sa.Enum('ask_price', 'ask_stock', 'ask_shipping', 'ask_product', 'purchase', 'order_status', 'complaint', 'find_request', 'small_talk', 'other', name='intent', native_enum=False, length=40), nullable=True),
+    sa.Column('intent', sa.Enum('ask_price', 'ask_stock', 'ask_shipping', 'ask_arrival', 'ask_product', 'purchase', 'order_status', 'complaint', 'health_safety', 'find_request', 'small_talk', 'other', name='intent', native_enum=False, length=40), nullable=True),
     sa.Column('intent_confidence', sa.Numeric(precision=3, scale=2), nullable=True),
     sa.Column('extracted', postgresql.JSONB(astext_type=sa.Text()), server_default=sa.text("'{}'::jsonb"), nullable=False, comment='Thông tin rút được: món, số lượng, SĐT, địa chỉ (g6)'),
     sa.Column('ai_generated', sa.Boolean(), server_default=sa.text('false'), nullable=False),
@@ -1815,8 +1832,8 @@ def upgrade() -> None:
     op.create_table('reply_drafts',
     sa.Column('thread_id', sa.UUID(), nullable=False),
     sa.Column('reply_to_message_id', sa.UUID(), nullable=True),
-    sa.Column('kind', sa.Enum('instant', 'draft', name='replykind', native_enum=False, length=40), nullable=False),
-    sa.Column('intent', sa.Enum('ask_price', 'ask_stock', 'ask_shipping', 'ask_product', 'purchase', 'order_status', 'complaint', 'find_request', 'small_talk', 'other', name='intent', native_enum=False, length=40), nullable=True),
+    sa.Column('kind', sa.Enum('instant', 'draft', 'escalation', name='replykind', native_enum=False, length=40), nullable=False),
+    sa.Column('intent', sa.Enum('ask_price', 'ask_stock', 'ask_shipping', 'ask_arrival', 'ask_product', 'purchase', 'order_status', 'complaint', 'health_safety', 'find_request', 'small_talk', 'other', name='intent', native_enum=False, length=40), nullable=True),
     sa.Column('body', sa.Text(), nullable=False),
     sa.Column('status', sa.Enum('pending_review', 'approved', 'sent', 'auto_sent', 'rejected', 'superseded', name='replystatus', native_enum=False, length=40), nullable=False),
     sa.Column('confidence', sa.Numeric(precision=3, scale=2), nullable=True),
@@ -2060,8 +2077,8 @@ def upgrade() -> None:
     op.create_index(op.f('ix_shipment_events_shipment_id'), 'shipment_events', ['shipment_id'], unique=False)
     op.create_foreign_key(op.f('fk_demand_signals_find_request_id_find_requests'), 'demand_signals', 'find_requests', ['find_request_id'], ['id'], ondelete='SET NULL')
     op.create_foreign_key(op.f('fk_demand_signals_product_id_products'), 'demand_signals', 'products', ['product_id'], ['id'], ondelete='SET NULL')
-    op.create_foreign_key(op.f('fk_sourcing_briefs_find_request_id_find_requests'), 'sourcing_briefs', 'find_requests', ['find_request_id'], ['id'], ondelete='SET NULL')
     op.create_foreign_key(op.f('fk_sourcing_briefs_demand_signal_id_demand_signals'), 'sourcing_briefs', 'demand_signals', ['demand_signal_id'], ['id'], ondelete='SET NULL')
+    op.create_foreign_key(op.f('fk_sourcing_briefs_find_request_id_find_requests'), 'sourcing_briefs', 'find_requests', ['find_request_id'], ['id'], ondelete='SET NULL')
     op.create_foreign_key(op.f('fk_trend_signals_candidate_id_candidates'), 'trend_signals', 'candidates', ['candidate_id'], ['id'], ondelete='SET NULL')
     op.create_foreign_key(op.f('fk_threads_order_id_orders'), 'threads', 'orders', ['order_id'], ['id'], ondelete='SET NULL')
     # ### end Alembic commands ###
@@ -2071,8 +2088,8 @@ def downgrade() -> None:
     # ### commands auto generated by Alembic - please adjust! ###
     op.drop_constraint(op.f('fk_demand_signals_find_request_id_find_requests'), 'demand_signals', type_='foreignkey')
     op.drop_constraint(op.f('fk_demand_signals_product_id_products'), 'demand_signals', type_='foreignkey')
-    op.drop_constraint(op.f('fk_sourcing_briefs_find_request_id_find_requests'), 'sourcing_briefs', type_='foreignkey')
     op.drop_constraint(op.f('fk_sourcing_briefs_demand_signal_id_demand_signals'), 'sourcing_briefs', type_='foreignkey')
+    op.drop_constraint(op.f('fk_sourcing_briefs_find_request_id_find_requests'), 'sourcing_briefs', type_='foreignkey')
     op.drop_constraint(op.f('fk_trend_signals_candidate_id_candidates'), 'trend_signals', type_='foreignkey')
     op.drop_constraint(op.f('fk_threads_order_id_orders'), 'threads', type_='foreignkey')
     op.drop_index(op.f('ix_shipment_events_shipment_id'), table_name='shipment_events')
@@ -2228,6 +2245,7 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_inbound_shipments_status'), table_name='inbound_shipments')
     op.drop_index(op.f('ix_inbound_shipments_purchase_order_id'), table_name='inbound_shipments')
     op.drop_table('inbound_shipments')
+    op.drop_index(op.f('ix_find_requests_submitter_key'), table_name='find_requests')
     op.drop_index(op.f('ix_find_requests_status'), table_name='find_requests')
     op.drop_index(op.f('ix_find_requests_product_id'), table_name='find_requests')
     op.drop_index(op.f('ix_find_requests_customer_id'), table_name='find_requests')
@@ -2289,6 +2307,9 @@ def downgrade() -> None:
     op.drop_table('trend_signals')
     op.drop_index(op.f('ix_livestream_scripts_drop_id'), table_name='livestream_scripts')
     op.drop_table('livestream_scripts')
+    op.drop_index(op.f('ix_drop_reminders_drop_id'), table_name='drop_reminders')
+    op.drop_index(op.f('ix_drop_reminders_created_at'), table_name='drop_reminders')
+    op.drop_table('drop_reminders')
     op.drop_index(op.f('ix_broadcasts_drop_id'), table_name='broadcasts')
     op.drop_index(op.f('ix_broadcasts_channel_account_id'), table_name='broadcasts')
     op.drop_table('broadcasts')
