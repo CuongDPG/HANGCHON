@@ -1,15 +1,85 @@
+import type { Metadata } from "next";
 import { Hourglass } from "lucide-react";
-import { StorePlaceholder } from "@/components/store/store-placeholder";
+import { Suspense } from "react";
+import { ArrivedDropRow, OpenDropCard, UpcomingDropRow } from "@/components/catalog/drop-card";
+import { ButtonLink } from "@/components/ui/button";
+import { SectionLabel } from "@/components/ui/card";
+import { EmptyState, Skeleton } from "@/components/ui/feedback";
+import { PageHeader } from "@/components/ui/page-header";
+import { catalogApi } from "@/lib/api/catalog";
+import { errorMessage } from "@/lib/api/client";
 
-/** Đợt gom đơn (e3): đợt đang mở, sắp mở, đã về. */
+export const metadata: Metadata = {
+  title: "Đợt gom đơn",
+  description: "Hàng được gom đơn theo đợt: có hạn chót, số suất và ngày hàng về dự kiến nói rõ từ đầu.",
+  alternates: { canonical: "/dot" },
+};
+
+/** Đợt gom đơn (e3): đợt đang mở, sắp mở («Nhắc mình»), đã về kèm đánh giá. */
 export default function DropsPage() {
   return (
-    <StorePlaceholder
-      title="Đợt gom đơn"
-      description="Đặt trong đợt, hết hạn chót thì chị đặt hàng một lần cho cả nhóm."
-      icon={<Hourglass />}
-      emptyTitle="Chưa có đợt nào đang mở"
-      emptyDescription="Mỗi đợt có hạn chót, số suất và ngày hàng về dự kiến. Đợt đầu tiên sẽ hiện ở đây."
-    />
+    <div className="flex flex-col gap-6">
+      <PageHeader title="Đợt gom đơn" description="Gom đủ suất thì chị đặt một lô. Hạn chót, số suất và ngày hàng về nói rõ từ đầu." />
+      <Suspense fallback={<Skeleton className="h-96 w-full" />}>
+        <DropsBody />
+      </Suspense>
+    </div>
+  );
+}
+
+async function DropsBody() {
+  let data;
+  try {
+    data = await catalogApi.drops();
+  } catch (err) {
+    return <EmptyState tone="error" title="Chưa tải được các đợt" description={errorMessage(err)} />;
+  }
+  const empty = !data.open.length && !data.upcoming.length && !data.arrived.length;
+  if (empty) {
+    return (
+      <EmptyState
+        icon={<Hourglass />}
+        title="Chưa có đợt nào đang mở"
+        description="Đợt đầu tiên sẽ mở khi chị thử xong vài món. Trong lúc chờ, bạn xem kệ hàng nhé."
+        action={<ButtonLink href="/">Xem kệ hàng</ButtonLink>}
+      />
+    );
+  }
+  return (
+    <div className="grid gap-8 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] md:items-start">
+      <div className="flex flex-col gap-4">
+        {data.open.length ? (
+          data.open.map((d) => <OpenDropCard key={d.id} d={d} />)
+        ) : (
+          <EmptyState icon={<Hourglass />} title="Chưa có đợt đang mở" description="Bấm «Nhắc mình» ở đợt sắp mở để được báo." />
+        )}
+      </div>
+      <div className="flex flex-col gap-6">
+        {data.upcoming.length ? (
+          <section aria-labelledby="sap-mo">
+            <SectionLabel>
+              <span id="sap-mo">Sắp mở</span>
+            </SectionLabel>
+            <div className="divide-y divide-line">
+              {data.upcoming.map((d) => (
+                <UpcomingDropRow key={d.id} d={d} />
+              ))}
+            </div>
+          </section>
+        ) : null}
+        {data.arrived.length ? (
+          <section aria-labelledby="da-ve">
+            <SectionLabel>
+              <span id="da-ve">Đã về</span>
+            </SectionLabel>
+            <div className="divide-y divide-line">
+              {data.arrived.map((d) => (
+                <ArrivedDropRow key={d.id} d={d} />
+              ))}
+            </div>
+          </section>
+        ) : null}
+      </div>
+    </div>
   );
 }

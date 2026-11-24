@@ -1,17 +1,50 @@
-import { MessagesSquare } from "lucide-react";
-import { StorePlaceholder } from "@/components/store/store-placeholder";
+import type { Metadata } from "next";
+import { Suspense } from "react";
+import { AskBox } from "@/components/assistant/ask-box";
+import { Skeleton } from "@/components/ui/feedback";
+import { PageHeader } from "@/components/ui/page-header";
+import { catalogApi } from "@/lib/api/catalog";
 
-export const metadata = { title: "Hỏi trợ lý" };
+export const metadata: Metadata = {
+  title: "Hỏi trợ lý",
+  description: "Trợ lý AI trả lời từ hồ sơ thẩm định của người chọn, có dẫn nguồn. Không biết thì chuyển cho chị.",
+  alternates: { canonical: "/hoi" },
+};
 
-/** Hỏi trợ lý (e7): AI trả lời từ hồ sơ thẩm định, có dẫn nguồn; không biết thì chuyển chị. */
-export default function AssistantPage() {
+const SUGGESTIONS = ["Có bình giữ nhiệt nào nhẹ không?", "Món nào dùng được cho bé?", "Đợt này bao giờ hàng về?"];
+
+/** Hỏi trợ lý (e7). `?mon=<slug>` → hỏi về đúng một món. */
+export default function AskPage({ searchParams }: PageProps<"/hoi">) {
   return (
-    <StorePlaceholder
-      title="Hỏi trợ lý"
-      description="Trợ lý là AI, trả lời dựa trên hồ sơ thẩm định. Câu nào chưa chắc sẽ được chuyển cho chị."
-      icon={<MessagesSquare />}
-      emptyTitle="Trợ lý chưa sẵn sàng"
-      emptyDescription="Khi có món trên kệ, bạn hỏi về món nào trợ lý sẽ trả lời kèm nguồn."
-    />
+    <div className="flex flex-col gap-5 md:mx-auto md:w-full md:max-w-[40rem]">
+      <Suspense fallback={<PageHeader title="Hỏi trợ lý" />}>
+        <AskBody searchParams={searchParams} />
+      </Suspense>
+    </div>
+  );
+}
+
+async function AskBody({ searchParams }: { searchParams: PageProps<"/hoi">["searchParams"] }) {
+  const sp = await searchParams;
+  const slug = typeof sp.mon === "string" ? sp.mon : null;
+  let name: string | null = null;
+  if (slug) {
+    try {
+      name = (await catalogApi.product(slug)).name;
+    } catch {
+      name = null;
+    }
+  }
+  return (
+    <>
+      <PageHeader
+        title={name ? `Hỏi về ${name}` : "Hỏi trợ lý"}
+        description="Trợ lý trả lời từ hồ sơ của chị: mô tả, thông số, ghi chú thử hàng. Câu nào chưa có dữ liệu sẽ được chuyển cho chị."
+        backHref={name && slug ? `/san-pham/${slug}` : undefined}
+      />
+      <Suspense fallback={<Skeleton className="h-40 w-full" />}>
+        <AskBox productSlug={name ? slug : null} productName={name} suggestions={name ? [] : SUGGESTIONS} />
+      </Suspense>
+    </>
   );
 }

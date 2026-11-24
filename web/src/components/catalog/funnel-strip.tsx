@@ -1,0 +1,35 @@
+import Link from "next/link";
+import { ChevronRight } from "lucide-react";
+import type { Funnel } from "@/lib/api/catalog";
+import { cn } from "@/lib/cn";
+
+const STEPS: { key: keyof Funnel; label: string }[] = [
+  { key: "viewed", label: "đã xem" },
+  { key: "compared", label: "so kỹ" },
+  { key: "tried", label: "mua thử" },
+  { key: "selected", label: "chọn" },
+];
+
+/** Dải số sàng lọc: đã xem → so kỹ → mua thử → chọn (e2). */
+export function FunnelStrip({ funnel, href, className }: { funnel: Funnel; href?: string; className?: string }) {
+  const steps = STEPS.filter((s) => funnel[s.key] !== undefined && funnel[s.key] !== null);
+  const body = (
+    <ol className="grid grid-cols-4 divide-x divide-line rounded-md border border-line bg-surface">
+      {steps.map((s, i) => (
+        <li key={s.key} className={cn("flex flex-col items-center px-1 py-2.5 text-center", i === steps.length - 1 && "text-seal")}>
+          <span className="font-display text-[22px] leading-none font-extrabold tabular-nums">{funnel[s.key]}</span>
+          <span className="mt-1 text-[12.5px] text-ink-2">{s.label}</span>
+        </li>
+      ))}
+    </ol>
+  );
+  if (!href) return <div className={className}>{body}</div>;
+  return (
+    <div className={cn("flex flex-col gap-2", className)}>
+      {body}
+      <Link href={href} className="inline-flex items-center gap-1 self-start text-[15px] font-semibold text-accent hover:underline">
+        Xem hồ sơ chọn <ChevronRight className="size-4" aria-hidden />
+      </Link>
+    </div>
+  );
+}

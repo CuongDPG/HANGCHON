@@ -1,17 +1,38 @@
-import { HandHelping } from "lucide-react";
-import { StorePlaceholder } from "@/components/store/store-placeholder";
+import type { Metadata } from "next";
+import { Suspense } from "react";
+import { FindBoard } from "@/components/catalog/find-board";
+import { EmptyState, SkeletonList } from "@/components/ui/feedback";
+import { PageHeader } from "@/components/ui/page-header";
+import type { FindRequestsPage } from "@/lib/api/catalog";
+import { errorMessage } from "@/lib/api/client";
+import { serverFetch } from "@/lib/api/server";
 
-export const metadata = { title: "Nhờ chị tìm" };
+export const metadata: Metadata = {
+  title: "Nhờ chị tìm",
+  description: "Bạn cần món gì mà chưa tìm được loại ưng? Gửi nhu cầu, người khác bấm «mình cũng cần». Đủ người, chị mở tìm.",
+  alternates: { canonical: "/nho-tim" },
+};
 
-/** Nhờ chị tìm (e9): khách gửi nhu cầu, người khác bấm «mình cũng cần». */
-export default function FindRequestsPage() {
+/** Nhờ chị tìm (e9). Danh sách đọc kèm cookie thiết bị để biết bạn đã bấm «cùng cần» món nào. */
+export default function FindPage({ searchParams }: PageProps<"/nho-tim">) {
   return (
-    <StorePlaceholder
-      title="Nhờ chị tìm"
-      description="Bạn cần món gì mà chưa tìm được loại ưng? Món nào đủ nhiều người cùng cần, chị sẽ mở tìm."
-      icon={<HandHelping />}
-      emptyTitle="Chưa có lời nhờ nào"
-      emptyDescription="Ô gửi lời nhờ và danh sách «mình cũng cần» sẽ hiện ở đây."
-    />
+    <div className="flex flex-col gap-5 md:mx-auto md:w-full md:max-w-[44rem]">
+      <PageHeader title="Bạn cần món gì mà chưa tìm được loại ưng?" description="Người khác cũng cần thì bấm «mình cũng cần». Đây là cộng đồng." />
+      <Suspense fallback={<SkeletonList rows={4} />}>
+        <FindBody searchParams={searchParams} />
+      </Suspense>
+    </div>
   );
+}
+
+async function FindBody({ searchParams }: { searchParams: PageProps<"/nho-tim">["searchParams"] }) {
+  const sp = await searchParams;
+  const prefill = typeof sp.tim === "string" ? sp.tim.slice(0, 200) : undefined;
+  let data: FindRequestsPage;
+  try {
+    data = await serverFetch<FindRequestsPage>("/api/store/catalog/finds");
+  } catch (err) {
+    return <EmptyState tone="error" title="Chưa tải được danh sách" description={errorMessage(err)} />;
+  }
+  return <FindBoard initial={data.items} threshold={data.threshold} prefill={prefill} />;
 }

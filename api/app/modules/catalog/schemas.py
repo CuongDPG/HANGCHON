@@ -9,7 +9,7 @@ import uuid
 from datetime import date, datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.modules.catalog.models import (
     DropStatus,
@@ -68,6 +68,7 @@ class ProductOut(ORM):
     reason_selected: str | None
     not_satisfied: str | None
     rejected_alternatives: list[Any]
+    dossier: dict[str, Any]
     weight_grams: int | None
     dimensions_cm: dict[str, Any]
     origin_country: str | None
@@ -247,3 +248,445 @@ class FindRequestVoteOut(ORM):
     contact: str | None
     notify: bool
     created_at: datetime
+
+
+class DropReminderOut(ORM):
+    id: uuid.UUID
+    drop_id: uuid.UUID
+    contact: str
+    channel: str
+    notified_at: datetime | None
+    created_at: datetime
+
+
+# ---- đầu vào desk ------------------------------------------------------------------------------------------------
+
+
+class SpecIn(BaseModel):
+    label: str = Field(min_length=1, max_length=80)
+    value: str = Field(min_length=1, max_length=200)
+    source: str | None = None
+
+
+class FaqIn(BaseModel):
+    q: str = Field(min_length=1, max_length=200)
+    a: str = Field(min_length=1, max_length=1000)
+    source: str | None = None
+
+
+class ProductPatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    slug: str | None = Field(default=None, max_length=160)
+    subtitle: str | None = Field(default=None, max_length=300)
+    short_description: str | None = None
+    description: str | None = None
+    specs: list[SpecIn] | None = None
+    faq: list[FaqIn] | None = None
+    price_vnd: int | None = Field(default=None, ge=0)
+    compare_at_price_vnd: int | None = Field(default=None, ge=0)
+    category_id: uuid.UUID | None = None
+    sale_mode: SaleMode | None = None
+    reason_selected: str | None = None
+    not_satisfied: str | None = None
+    trial_days: int | None = Field(default=None, ge=0, le=3650)
+    weight_grams: int | None = Field(default=None, ge=0)
+    origin_country: str | None = Field(default=None, max_length=2)
+    brand: str | None = Field(default=None, max_length=120)
+    gtin: str | None = Field(default=None, max_length=20)
+    seo_title: str | None = Field(default=None, max_length=200)
+    seo_description: str | None = Field(default=None, max_length=400)
+    feed_enabled: bool | None = None
+    is_consumable: bool | None = None
+    reorder_days: int | None = Field(default=None, ge=1)
+
+
+class FromCandidateIn(BaseModel):
+    candidate_id: uuid.UUID
+
+
+class RewriteIn(BaseModel):
+    note: str | None = Field(default=None, max_length=1000)
+
+
+class ImageOrderIn(BaseModel):
+    ids: list[uuid.UUID]
+
+
+class DropItemIn(BaseModel):
+    product_id: uuid.UUID
+    variant_id: uuid.UUID | None = None
+    price_vnd: int | None = Field(default=None, ge=0)
+    slots_total: int | None = Field(default=None, ge=1)
+    max_per_order: int | None = Field(default=None, ge=1)
+    min_total_to_order: int | None = Field(default=None, ge=1)
+
+
+class DropIn(BaseModel):
+    title: str = Field(min_length=2, max_length=200)
+    description: str | None = None
+    opens_at: datetime | None = None
+    closes_at: datetime | None = None
+    expected_arrival_date: date | None = None
+    deposit_pct: int | None = Field(default=None, ge=0, le=100)
+    items: list[DropItemIn] = Field(default_factory=list)
+
+
+class DropPatch(BaseModel):
+    title: str | None = Field(default=None, min_length=2, max_length=200)
+    description: str | None = None
+    opens_at: datetime | None = None
+    closes_at: datetime | None = None
+    expected_arrival_date: date | None = None
+    deposit_pct: int | None = Field(default=None, ge=0, le=100)
+    items: list[DropItemIn] | None = None
+
+
+class ArrivedIn(BaseModel):
+    arrived_on: date
+
+
+class ReviewReplyIn(BaseModel):
+    owner_reply: str | None = Field(default=None, max_length=1000)
+
+
+class FindStatusIn(BaseModel):
+    status: FindRequestStatus
+    product_id: uuid.UUID | None = None
+    brief_id: uuid.UUID | None = None
+    note: str | None = Field(default=None, max_length=1000)
+
+
+# ---- đầu vào của khách -------------------------------------------------------------------------------------------
+
+
+class FindRequestIn(BaseModel):
+    title: str = Field(min_length=1, max_length=400)
+    description: str | None = Field(default=None, max_length=2000)
+    budget_vnd: int | None = Field(default=None, ge=0, le=100_000_000)
+    contact_name: str | None = Field(default=None, max_length=120)
+    contact: str | None = Field(default=None, max_length=200)
+    website: str | None = Field(default=None, description="Ô bẫy chống máy gửi: người thật không thấy, để trống")
+
+
+class VoteIn(BaseModel):
+    contact: str | None = Field(default=None, max_length=200)
+
+
+class ReminderIn(BaseModel):
+    contact: str = Field(min_length=6, max_length=200)
+
+
+# ---- đầu ra công khai --------------------------------------------------------------------------------------------
+
+
+class ImageSet(BaseModel):
+    id: str
+    alt: str | None = None
+    is_primary: bool = False
+    status: str
+    src: str | None = None
+    src_large: str | None = None
+    src_small: str | None = None
+    webp: dict[str, str] = Field(default_factory=dict)
+
+
+class SealOut(BaseModel):
+    chosen: int
+    total: int | None
+
+
+class CategoryRef(BaseModel):
+    slug: str
+    name: str
+
+
+class DropRef(BaseModel):
+    slug: str
+    label: str
+    title: str
+    closes_at: datetime | None
+    expected_arrival_date: date | None
+    price_vnd: int
+    slots_total: int | None
+    slots_left: int | None
+    max_per_order: int | None
+
+
+class ProductCard(BaseModel):
+    id: str
+    slug: str
+    name: str
+    subtitle: str | None
+    price_vnd: int
+    list_price_vnd: int
+    compare_at_price_vnd: int | None
+    image: ImageSet | None
+    seal: SealOut
+    trial_days: int | None
+    origin: str | None
+    proof: str | None
+    category: CategoryRef | None
+    rating_avg: float | None
+    review_count: int
+    drop: DropRef | None
+    stock: int
+    available: bool
+
+
+class Chip(BaseModel):
+    slug: str
+    name: str
+    count: int
+
+
+class ShelfOut(BaseModel):
+    total: int
+    chips: list[Chip]
+    items: list[ProductCard]
+    query: str | None
+    category: str | None
+
+
+class ReviewPhoto(BaseModel):
+    src: str | None
+    thumb: str | None
+
+
+class PublicReview(BaseModel):
+    id: str
+    display_name: str
+    rating: int | None
+    body: str | None
+    photos: list[ReviewPhoto]
+    published_at: datetime | None
+    owner_reply: str | None
+
+
+class Funnel(BaseModel):
+    viewed: int | None = None
+    compared: int | None = None
+    tried: int | None = None
+    selected: int | None = None
+
+
+class ProductDetail(ProductCard):
+    short_description: str | None
+    description: str | None
+    specs: list[dict[str, Any]]
+    faq: list[dict[str, Any]]
+    reason_selected: list[str]
+    not_satisfied: str | None
+    images: list[ImageSet]
+    funnel: Funnel
+    weight_grams: int | None
+    brand: str | None
+    gtin: str | None
+    shipping_notes: list[Any]
+    sale_mode: str
+    seo_title: str | None
+    seo_description: str | None
+    published_at: datetime | None
+    updated_at: datetime
+    ai_generated: bool
+    reviews: list[PublicReview]
+    url: str
+
+
+class Alternative(BaseModel):
+    label: str
+    origin: str | None = None
+    price_vnd: int | None = None
+    summary: str | None = None
+    reason: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    stage: str = "compared"
+
+
+class RejectGroup(BaseModel):
+    key: str
+    label: str
+    count: int
+
+
+class DossierProduct(BaseModel):
+    slug: str
+    name: str
+    price_vnd: int
+    origin: str | None
+    summary: str
+    image: ImageSet | None
+    seal: SealOut
+    trial_days: int | None
+    reason_selected: list[str]
+    not_satisfied: str | None
+
+
+class DossierOut(BaseModel):
+    product: DossierProduct
+    funnel: Funnel
+    alternatives: list[Alternative]
+    reject_groups: list[RejectGroup]
+    screened_out: int
+    reviews_read: int
+    review_languages: list[str]
+    picker_name: str | None
+
+
+class DropSummary(BaseModel):
+    id: str
+    slug: str
+    code: str
+    label: str
+    title: str
+    description: str | None
+    status: str
+    opens_at: datetime | None
+    closes_at: datetime | None
+    expected_arrival_date: date | None
+    actual_arrival_date: date | None
+    item_count: int
+    slots_total: int | None
+    slots_reserved: int
+    cover: ImageSet | None
+    product_names: list[str]
+    order_count: int = 0
+    rating_avg: float | None = None
+    review_count: int = 0
+
+
+class DropItemCard(ProductCard):
+    slots_total: int | None
+    slots_left: int | None
+    max_per_order: int | None
+
+
+class DropDetail(DropSummary):
+    deposit_pct: int | None
+    items: list[DropItemCard]
+
+
+class DropsOverview(BaseModel):
+    open: list[DropSummary]
+    upcoming: list[DropSummary]
+    arrived: list[DropSummary]
+    closed: list[DropSummary]
+
+
+class AboutStats(BaseModel):
+    viewed: int
+    chosen: int
+    published: int
+    ratio_pct: float | None
+
+
+class AboutOut(BaseModel):
+    store_name: str
+    tagline: str
+    picker_name: str
+    intro: str
+    not_selling: str
+    not_selling_rules: list[str]
+    ai_help: str
+    how_we_choose: list[str]
+    stats: AboutStats
+
+
+class PublicStatus(BaseModel):
+    key: str
+    label: str
+
+
+class FindRequestPublic(BaseModel):
+    slug: str
+    title: str
+    description: str | None
+    budget_vnd: int | None
+    vote_count: int
+    vote_threshold: int
+    status: PublicStatus
+    voted: bool = False
+    product_slug: str | None = None
+    created_at: datetime
+
+
+class FindRequestsPage(BaseModel):
+    items: list[FindRequestPublic]
+    total: int
+    threshold: int
+
+
+class FindCreated(BaseModel):
+    request: FindRequestPublic
+    duplicate: bool
+    visible: bool
+
+
+class VoteOut(BaseModel):
+    request: FindRequestPublic
+    added: bool
+
+
+class ReminderOut(BaseModel):
+    added: bool
+
+
+class ReviewInvite(BaseModel):
+    status: ReviewStatus
+    product_name: str
+    product_slug: str
+    product_image: ImageSet | None
+    display_name: str | None
+    rating: int | None
+    body: str | None
+
+
+class SitemapEntry(BaseModel):
+    path: str
+    lastmod: datetime | None
+    priority: float
+
+
+# ---- đầu ra desk -------------------------------------------------------------------------------------------------
+
+
+class DeskProduct(ProductOut):
+    images: list[ImageSet] = Field(default_factory=list)
+    candidate_title: str | None = None
+
+
+class DeskProductRow(BaseModel):
+    id: uuid.UUID
+    slug: str
+    name: str
+    status: ProductStatus
+    price_vnd: int
+    selected_count: int
+    considered_count: int | None
+    image: ImageSet | None
+    approval_item_id: uuid.UUID | None
+    ai_generated: bool
+    review_count: int
+    rating_avg: float | None
+    updated_at: datetime
+
+
+class SelectableCandidate(BaseModel):
+    id: uuid.UUID
+    title_vi: str
+    stage_changed_at: datetime | None
+
+
+class DeskDrop(DropOut):
+    label: str
+    items: list[DropItemOut]
+    reminder_count: int = 0
+    product_names: dict[str, str] = Field(default_factory=dict)
+
+
+class DeskReview(ReviewOut):
+    product_name: str | None = None
+    photo_urls: list[str | None] = Field(default_factory=list)
+
+
+class DeskFindRequest(FindRequestOut):
+    public_status: PublicStatus
