@@ -1,0 +1,26 @@
+import { Suspense } from "react";
+import { ConversationScreen } from "@/components/inbox/conversation-screen";
+import { PageHeader, SkeletonList } from "@/components/ui";
+
+export const metadata = { title: "Hội thoại" };
+
+/** Một hội thoại trong hộp thư (h1–h3). Đọc params là dữ liệu theo request → đặt trong <Suspense>. */
+export default function ConversationPage({ params }: PageProps<"/desk/khach/hoi-thoai/[id]">) {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex flex-col gap-4">
+          <PageHeader title="Hội thoại" backHref="/desk/khach" />
+          <SkeletonList rows={3} />
+        </div>
+      }
+    >
+      <Conversation params={params} />
+    </Suspense>
+  );
+}
+
+async function Conversation({ params }: { params: PageProps<"/desk/khach/hoi-thoai/[id]">["params"] }) {
+  const { id } = await params;
+  return <ConversationScreen id={id} />;
+}

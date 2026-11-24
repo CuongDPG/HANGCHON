@@ -50,10 +50,12 @@ class Intent(StrEnum):
     ASK_PRICE = "ask_price"
     ASK_STOCK = "ask_stock"
     ASK_SHIPPING = "ask_shipping"
-    ASK_PRODUCT = "ask_product"
+    ASK_ARRIVAL = "ask_arrival"  # bao giờ hàng về (đơn trong đợt)
+    ASK_PRODUCT = "ask_product"  # cách dùng, chất liệu, hợp với ai
     PURCHASE = "purchase"  # muốn mua (g6)
     ORDER_STATUS = "order_status"
-    COMPLAINT = "complaint"
+    COMPLAINT = "complaint"  # khiếu nại, hàng lỗi (h3)
+    HEALTH_SAFETY = "health_safety"  # sức khoẻ, an toàn (h3)
     FIND_REQUEST = "find_request"  # nhờ tìm món (→ a6)
     SMALL_TALK = "small_talk"
     OTHER = "other"
@@ -74,6 +76,7 @@ class MessageStatus(StrEnum):
 class ReplyKind(StrEnum):
     INSTANT = "instant"  # câu giá / còn hàng / phí giao: AI trả lời ngay (h2)
     DRAFT = "draft"  # AI soạn nháp chờ chị
+    ESCALATION = "escalation"  # việc khó chuyển cho chị (h3): `body` là tóm tắt; phương án nằm ở preview việc chờ
 
 
 class ReplyStatus(StrEnum):

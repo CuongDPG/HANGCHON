@@ -8,9 +8,9 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.enums import Actor, Channel
 from app.modules.inbox.models import (
@@ -115,3 +115,124 @@ class ReplyDraftOut(ORM):
     ai_run_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
+
+
+# ---- schema của màn hình hộp thư ---------------------------------------------------------------------------------
+
+
+class DraftView(BaseModel):
+    id: uuid.UUID
+    kind: ReplyKind
+    intent: Intent | None
+    intent_label: str | None
+    body: str
+    status: ReplyStatus
+    confidence: Decimal | None
+    sources: list[Any]
+    options: list[dict[str, Any]]
+    approval_item_id: uuid.UUID | None
+    created_at: datetime
+
+
+class LastMessage(BaseModel):
+    direction: Direction
+    sender: Actor
+    body: str
+    ai_generated: bool
+    sent_at: datetime
+
+
+class ThreadListItem(BaseModel):
+    id: uuid.UUID
+    channel: Channel
+    channel_label: str
+    kind: ThreadKind
+    participant_name: str | None
+    customer_id: uuid.UUID | None
+    customer_name: str | None
+    status: ThreadStatus
+    needs_owner: bool
+    escalation_reason: EscalationReason | None
+    escalation_label: str | None
+    last_intent: Intent | None
+    intent_label: str | None
+    snippet: str | None
+    last_message_at: datetime | None
+    unread_count: int
+    last_message: LastMessage | None
+    last_inbound: LastMessage | None
+    draft: DraftView | None
+
+
+class ThreadCounts(BaseModel):
+    waiting: int
+    ai: int
+    all: int
+
+
+class CustomerBrief(BaseModel):
+    id: uuid.UUID
+    name: str | None
+    phone: str | None
+    order_count: int
+    total_spent_vnd: int
+    is_regular: bool
+
+
+class ProductBrief(BaseModel):
+    id: uuid.UUID
+    name: str
+    slug: str
+    price_vnd: int
+
+
+class Capabilities(BaseModel):
+    can_reply: bool
+    reason: str | None
+    human_agent_tag: bool
+    private_reply: bool
+
+
+class ThreadDetail(ThreadListItem):
+    account_name: str | None
+    external_post_id: str | None
+    messages: list[MessageOut]
+    customer: CustomerBrief | None
+    product: ProductBrief | None
+    capabilities: Capabilities
+
+
+class ReplyIn(BaseModel):
+    body: str = Field(min_length=1, max_length=2000)
+    private: bool = False
+
+
+class SendDraftIn(BaseModel):
+    body: str | None = Field(default=None, max_length=2000, description="Câu đã sửa; bỏ trống = gửi nguyên bản nháp")
+    private: bool = False
+
+
+class RedraftIn(BaseModel):
+    note: str | None = Field(default=None, max_length=500)
+
+
+class LinkCustomerIn(BaseModel):
+    customer_id: uuid.UUID | None
+
+
+class StatusIn(BaseModel):
+    status: Literal["open", "closed", "spam"]
+
+
+class SimulateIn(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+    channel: Literal["facebook", "instagram", "zalo_oa"] = "facebook"
+    kind: Literal["comment", "direct_message"] = "direct_message"
+    author_name: str = Field(default="Khách thử nghiệm", max_length=120)
+    author_external_id: str | None = Field(default=None, max_length=120)
+    post_external_id: str | None = Field(default=None, max_length=120)
+
+
+class InboxMeta(BaseModel):
+    simulate_enabled: bool
+    accounts: list[ChannelAccountOut]
