@@ -1,19 +1,14 @@
-import { CreditCard } from "lucide-react";
-import { ButtonLink } from "@/components/ui/button";
-import { StorePlaceholder } from "@/components/store/store-placeholder";
+import { Suspense } from "react";
+import { CheckoutScreen } from "@/components/orders/checkout-screen";
+import { SkeletonList } from "@/components/ui/feedback";
 
 export const metadata = { title: "Đặt hàng" };
 
-/** Đặt hàng một trang (e4): không cần tài khoản; chuyển khoản QR tự xác nhận hoặc trả khi nhận. */
+/** Đặt hàng một trang (e4). Đọc ?dot= (đợt) nên đặt trong <Suspense>. */
 export default function CheckoutPage() {
   return (
-    <StorePlaceholder
-      title="Đặt hàng"
-      backHref="/gio-hang"
-      icon={<CreditCard />}
-      emptyTitle="Chưa có món nào để đặt"
-      emptyDescription="Trang đặt hàng chỉ cần số điện thoại, họ tên và địa chỉ. Thanh toán bằng mã QR hoặc khi nhận hàng."
-      action={<ButtonLink href="/gio-hang" variant="secondary">Về giỏ hàng</ButtonLink>}
-    />
+    <Suspense fallback={<SkeletonList rows={3} />}>
+      <CheckoutScreen />
+    </Suspense>
   );
 }

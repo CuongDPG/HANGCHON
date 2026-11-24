@@ -1,15 +1,14 @@
-import { Truck } from "lucide-react";
-import { StorePlaceholder } from "@/components/store/store-placeholder";
+import { Suspense } from "react";
+import { TrackingScreen } from "@/components/orders/tracking-screen";
+import { SkeletonList } from "@/components/ui/feedback";
 
-/** Theo dõi một đơn (e5, g5): hành trình theo mốc, hỏi về đơn, đổi địa chỉ. */
+export const metadata = { title: "Theo dõi đơn", robots: { index: false } };
+
+/** Theo dõi một đơn (e5, g5). Đọc mã đơn + ?t= (dữ liệu theo request) nên đặt trong <Suspense>. */
 export default function OrderTrackingPage() {
   return (
-    <StorePlaceholder
-      title="Theo dõi đơn"
-      backHref="/don"
-      icon={<Truck />}
-      emptyTitle="Chưa xem được đơn này"
-      emptyDescription="Trang theo dõi đơn đang được dựng. Mỗi mốc của đơn bạn cũng sẽ nhận một tin nhắn."
-    />
+    <Suspense fallback={<SkeletonList rows={3} />}>
+      <TrackingScreen />
+    </Suspense>
   );
 }

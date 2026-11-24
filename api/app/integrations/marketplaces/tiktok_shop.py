@@ -1,0 +1,147 @@
+"""TikTok Shop Partner API (bản 202309) — **khung driver**, viết theo tài liệu công khai
+(partner.tiktokshop.com/docv2), CHƯA thử thật.
+
+Đã có: ký yêu cầu, kéo đơn (orders/search), cập nhật tồn theo SKU. Chưa làm: tạo sản phẩm mới (ngành hàng, ảnh,
+thuộc tính bắt buộc), giao hàng, làm mới access token. Khoá: `TIKTOK_SHOP_APP_KEY`, `TIKTOK_SHOP_APP_SECRET`
+(config chung); `TIKTOK_SHOP_ACCESS_TOKEN`, `TIKTOK_SHOP_CIPHER` đọc từ biến môi trường hệ thống.
+`external_id` của món = `<product_id>:<sku_id>` trên TikTok Shop.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import hmac
+import json
+import os
+import time
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
+import httpx
+
+from app.core.config import settings
+from app.core.enums import Channel
+from app.integrations.base import IntegrationError, IntegrationNotConfigured
+from app.integrations.marketplaces import (
+    MarketplaceOrder,
+    MarketplaceOrderLine,
+    MarketplaceProduct,
+    MarketplacesDriver,
+)
+
+BASE = "https://open-api.tiktokglobalshop.com"
+
+
+def sign(app_secret: str, path: str, params: dict[str, Any], body: str = "") -> str:
+    """Ghép path + các cặp key+value (bỏ sign, access_token; xếp theo key) + body, bọc app_secret hai đầu, HMAC-SHA256."""
+    joined = "".join(f"{k}{params[k]}" for k in sorted(params) if k not in ("sign", "access_token"))
+    base = f"{app_secret}{path}{joined}{body}{app_secret}"
+    return hmac.new(app_secret.encode(), base.encode(), hashlib.sha256).hexdigest()
+
+
+class Driver(MarketplacesDriver):
+    name = "tiktok_shop"
+
+    def _creds(self) -> tuple[str, str, str, str]:
+        key, secret = settings.tiktok_shop_app_key, settings.tiktok_shop_app_secret
+        token, cipher = os.environ.get("TIKTOK_SHOP_ACCESS_TOKEN", ""), os.environ.get("TIKTOK_SHOP_CIPHER", "")
+        if not (key and secret and token and cipher):
+            raise IntegrationNotConfigured("Chưa đủ khoá TikTok Shop (app key/secret, access token, shop cipher).")
+        return key, secret, token, cipher
+
+    async def _call(
+        self, method: str, path: str, *, params: dict[str, Any] | None = None, body: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        key, secret, token, cipher = self._creds()
+        q: dict[str, Any] = {"app_key": key, "timestamp": int(time.time()), "shop_cipher": cipher, **(params or {})}
+        raw = json.dumps(body, separators=(",", ":"), ensure_ascii=False) if body is not None else ""
+        q["sign"] = sign(secret, path, q, raw)
+        try:
+            async with httpx.AsyncClient(timeout=20) as client:
+                r = await client.request(
+                    method, f"{BASE}{path}", params=q, content=raw or None,
+                    headers={"x-tts-access-token": token, "content-type": "application/json"},
+                )  # fmt: skip
+        except httpx.HTTPError as e:
+            raise IntegrationError("Không kết nối được TikTok Shop.") from e
+        data = r.json() if r.content else {}
+        if r.status_code != 200 or data.get("code") not in (0, None):
+            raise IntegrationError(f"TikTok Shop báo lỗi: {data.get('message') or r.status_code}")
+        return data.get("data") or {}
+
+    @staticmethod
+    def _check(mk: Channel) -> None:
+        if mk != Channel.TIKTOK_SHOP:
+            raise IntegrationNotConfigured("Driver TikTok Shop chỉ dùng cho TikTok Shop.")
+
+    async def upsert_product(self, marketplace: Channel, product: MarketplaceProduct) -> str:
+        self._check(marketplace)
+        if not product.external_id or ":" not in product.external_id:
+            raise IntegrationNotConfigured(
+                "Tạo món mới trên TikTok Shop cần ngành hàng, ảnh và thuộc tính bắt buộc. Chị tạo món với SKU "
+                f"«{product.sku}» trên TikTok Shop rồi ghi mã «product_id:sku_id» để đồng bộ giá và tồn."
+            )
+        await self.update_stock(marketplace, product.external_id, product.stock)
+        return product.external_id
+
+    async def update_stock(self, marketplace: Channel, external_id: str, stock: int) -> None:
+        self._check(marketplace)
+        product_id, sku_id = external_id.split(":", 1)
+        await self._call(
+            "POST",
+            f"/product/202309/products/{product_id}/inventory/update",
+            body={"skus": [{"id": sku_id, "inventory": [{"quantity": max(0, stock)}]}]},
+        )
+
+    async def fetch_orders(self, marketplace: Channel, since: datetime | None = None) -> list[MarketplaceOrder]:
+        self._check(marketplace)
+        start = since or datetime.now(UTC) - timedelta(days=3)
+        out: list[MarketplaceOrder] = []
+        token = ""
+        while True:
+            params: dict[str, Any] = {"page_size": 50}
+            if token:
+                params["page_token"] = token
+            data = await self._call(
+                "POST", "/order/202309/orders/search", params=params, body={"create_time_ge": int(start.timestamp())}
+            )
+            for o in data.get("orders") or []:
+                addr = o.get("recipient_address") or {}
+                pay = o.get("payment") or {}
+                districts = addr.get("district_info") or []
+                out.append(
+                    MarketplaceOrder(
+                        marketplace=Channel.TIKTOK_SHOP,
+                        external_id=str(o["id"]),
+                        status=o.get("status", ""),
+                        buyer_name=addr.get("name") or "Khách TikTok Shop",
+                        buyer_phone=addr.get("phone_number"),
+                        address_line=addr.get("full_address"),
+                        province=next(
+                            (d.get("address_name") for d in districts if d.get("address_level") == "L1"), None
+                        ),
+                        lines=[
+                            MarketplaceOrderLine(
+                                sku=li.get("seller_sku") or str(li.get("sku_id")),
+                                name=li.get("product_name", ""),
+                                quantity=int(li.get("quantity", 1)),
+                                unit_price_vnd=int(float(li.get("sale_price") or 0)),
+                            )
+                            for li in o.get("line_items") or []
+                        ],
+                        total_vnd=int(float(pay.get("total_amount") or 0)),
+                        shipping_fee_vnd=int(float(pay.get("shipping_fee") or 0)),
+                        placed_at=datetime.fromtimestamp(int(o.get("create_time", time.time())), tz=UTC),
+                        raw=o,
+                    )
+                )
+            token = data.get("next_page_token") or ""
+            if not token:
+                break
+        return out
+
+    async def update_order_status(
+        self, marketplace: Channel, external_id: str, status: str, tracking_code: str | None = None
+    ) -> None:
+        self._check(marketplace)
+        raise IntegrationNotConfigured("Giao đơn TikTok Shop chưa làm (khung driver).")
