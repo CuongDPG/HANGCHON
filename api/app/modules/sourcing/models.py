@@ -17,6 +17,9 @@ from app.core.enums import Channel, Language, SourcePlatform, StrEnum
 class BriefInputMode(StrEnum):
     TEXT = "text"
     VOICE = "voice"
+    IMAGE = "image"  # đề sinh từ ảnh (a3)
+    TREND = "trend"  # đề mở từ tín hiệu xu hướng (a5)
+    DEMAND = "demand"  # đề mở từ nhu cầu khách (a6)
 
 
 class BriefStatus(StrEnum):
