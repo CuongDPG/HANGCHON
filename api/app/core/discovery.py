@@ -4,6 +4,7 @@ Mỗi thư mục con là một module. Các tệp sau được nạp tự độn
 
     models.py    bảng SQLAlchemy (kế thừa app.core.db.Base)
     actions.py   khai báo hành động, handler, stat provider, lệnh bằng lời (control)
+    events.py    người nghe sự kiện từ module khác (app.core.events)
     ai_tasks.py  khai báo tác vụ AI và hàm giả (app.ai)
     jobs.py      việc nền / lịch (app.core.jobs)
     router.py    biến `router` (APIRouter) hoặc `routers` (list[APIRouter])
@@ -24,7 +25,7 @@ from fastapi import APIRouter
 
 log = logging.getLogger("app.discovery")
 
-MODULE_PARTS = ("models", "actions", "ai_tasks", "jobs", "router")
+MODULE_PARTS = ("models", "actions", "events", "ai_tasks", "jobs", "router")
 
 
 @dataclass

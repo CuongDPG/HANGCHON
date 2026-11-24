@@ -22,6 +22,7 @@ Máy có `VIRTUAL_ENV` của dự án khác: `unset VIRTUAL_ENV` trước `uv ru
 api/app/modules/<ten>/
   models.py    bảng (kế thừa app.core.db.Base)          ← đã có sẵn cho 12 module, KHÔNG sửa bảng của module khác
   schemas.py   Pydantic; đã có sẵn <Model>Out cho mọi bảng (sinh từ models), thêm schema tạo/sửa/công khai tuỳ ý
+  events.py    @events.on(...) nghe sự kiện module khác — xem ARCHITECTURE mục 10
   actions.py   register_action / handler / undoer / on_returned / stat_provider / intent / register_setting
   ai_tasks.py  ai.task(...) + @ai.fake(...)
   jobs.py      @job / @cron
