@@ -8,12 +8,13 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.enums import Language, SourcePlatform
 from app.modules.assessment.models import AssessmentStatus, RiskLevel, SafetyStatus, ScoreStatus
+from app.modules.sourcing.schemas import CandidateCard, CandidateDetail
 
 
 class ORM(BaseModel):
@@ -149,3 +150,110 @@ class ComparisonItemOut(ORM):
     position: int
     values: dict[str, Any]
     landed_cost_vnd: int | None
+
+
+# ---- schema tạo/sửa và schema hiển thị ---------------------------------------------------------------------------
+
+
+class CriterionDef(BaseModel):
+    key: str = Field(min_length=1, max_length=60, pattern=r"^[a-z0-9_]+$")
+    label: str = Field(min_length=1, max_length=120)
+    weight: Decimal = Field(gt=0, le=100)
+    description: str | None = Field(default=None, max_length=300)
+
+
+class ScoringProfileIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    category_id: uuid.UUID | None = None
+    criteria: list[CriterionDef]
+    pass_score: int | None = Field(default=None, ge=0, le=100)
+
+
+class ScoringProfilePatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    criteria: list[CriterionDef] | None = None
+    pass_score: int | None = Field(default=None, ge=0, le=100)
+
+
+class RunIn(BaseModel):
+    steps: list[Literal["details", "reviews", "market", "safety", "risk", "score"]] | None = None
+
+
+class OwnerScoreIn(BaseModel):
+    owner_score: Decimal | None = Field(default=None, ge=0, le=10, description="0–10; null = dùng lại điểm AI")
+    owner_note: str | None = Field(default=None, max_length=500)
+
+
+class ConfirmSafetyIn(BaseModel):
+    status: SafetyStatus | None = None
+    note: str | None = Field(default=None, max_length=500)
+
+
+class CompareRequest(BaseModel):
+    candidate_ids: list[uuid.UUID] = Field(min_length=2, max_length=5)
+    title: str | None = Field(default=None, max_length=200)
+
+
+class ScoreView(AssessmentScoreOut):
+    effective_score: Decimal | None = None
+    points: float | None = None
+
+
+class AssessmentView(AssessmentOut):
+    scores: list[ScoreView] = Field(default_factory=list)
+    pending_steps: list[str] = Field(default_factory=list)
+
+
+class CostLine(BaseModel):
+    label: str
+    amount_vnd: int
+
+
+class CostView(BaseModel):
+    source: Literal["cost_sheet", "estimate"]
+    landed_cost_vnd: int
+    lines: list[CostLine]
+    assumptions: list[str] = Field(default_factory=list)
+    note: str
+
+
+class MarketView(BaseModel):
+    count: int
+    low_vnd: int
+    high_vnd: int
+    median_vnd: int
+    suggested_price_vnd: int
+    margin_pct: float | None = None
+    captured_at: str
+    listings: list[MarketPriceOut] = Field(default_factory=list)
+
+
+class WarningItem(BaseModel):
+    level: Literal["info", "warning", "danger"]
+    kind: str
+    text: str
+
+
+class BriefRef(BaseModel):
+    id: uuid.UUID
+    title: str
+    considered_count: int
+    selected_count: int
+
+
+class ProfilePage(BaseModel):
+    """Một trang hồ sơ thẩm định cho một ứng viên (b1) — gom mọi thứ màn hình cần."""
+
+    candidate: CandidateDetail
+    brief: BriefRef | None = None
+    assessment: AssessmentView | None = None
+    review_digest: ReviewDigestOut | None = None
+    cost: CostView | None = None
+    market: MarketView | None = None
+    warnings: list[WarningItem] = Field(default_factory=list)
+    scoring_profile: ScoringProfileOut
+
+
+class ComparisonView(ComparisonOut):
+    items: list[ComparisonItemOut] = Field(default_factory=list)
+    candidates: list[CandidateCard] = Field(default_factory=list)

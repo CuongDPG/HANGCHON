@@ -10,7 +10,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
 from app.core.enums import Channel, Language, SourcePlatform
 from app.modules.sourcing.models import (
@@ -181,3 +181,121 @@ class DemandMentionOut(ORM):
     source_id: uuid.UUID | None
     text: str
     created_at: datetime
+
+
+# ---- schema tạo/sửa và schema hiển thị (viết thêm khi làm router) ------------------------------------------------
+
+
+class BriefIn(BaseModel):
+    text: str = Field(min_length=3, max_length=2000, description="Lời chị gõ hoặc nói")
+    input_mode: BriefInputMode = BriefInputMode.TEXT
+
+
+class ReinterpretIn(BaseModel):
+    text: str = Field(min_length=3, max_length=2000)
+
+
+class BriefFilters(BaseModel):
+    """Tiêu chí có cấu trúc (hiện thành chip «AI hiểu là» sửa được)."""
+
+    product_type: str | None = None
+    category: str | None = None
+    materials: list[str] = Field(default_factory=list)
+    must: list[str] = Field(default_factory=list)
+    must_not: list[str] = Field(default_factory=list)
+    prefer: list[str] = Field(default_factory=list)
+    origins: list[str] = Field(default_factory=list)
+    min_rating: float | None = Field(default=None, ge=0, le=5)
+    min_reviews: int | None = Field(default=None, ge=0)
+    unclear: list[str] = Field(default_factory=list)
+    trend_signal_id: str | None = None
+
+
+class BriefPatch(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    filters: BriefFilters | None = None
+    keywords_vi: list[str] | None = None
+    keywords_translated: dict[str, list[str]] | None = None
+    platforms: list[SourcePlatform] | None = None
+    target_landed_cost_max_vnd: int | None = Field(default=None, ge=0)
+    price_max_vnd: int | None = Field(default=None, ge=0)
+    clear_landed_cost: bool = False
+    is_scheduled: bool | None = None
+    schedule_interval_days: int | None = Field(default=None, ge=1, le=60)
+    alert_min_score: int | None = Field(default=None, ge=0, le=100)
+    status: BriefStatus | None = None
+
+    @field_validator("keywords_translated")
+    @classmethod
+    def _langs(cls, v: dict[str, list[str]] | None) -> dict[str, list[str]] | None:
+        if v is not None and set(v) - {"zh", "ja", "en", "ko"}:
+            raise ValueError("Chỉ nhận từ khoá zh, ja, en, ko")
+        return v
+
+
+class RunView(SourcingRunOut):
+    progress: dict[str, Any] = Field(default_factory=dict)
+
+
+class BriefCard(SourcingBriefOut):
+    candidate_count: int = 0
+    selected_count: int = 0
+    last_run: RunView | None = None
+
+
+class ImportLinkIn(BaseModel):
+    url: HttpUrl
+    brief_id: uuid.UUID | None = None
+
+
+class Offer(BaseModel):
+    platform: SourcePlatform
+    url: str | None = None
+    seller_name: str | None = None
+    price_amount: Decimal | None = None
+    currency: str | None = None
+    price_vnd_estimate: int | None = None
+    rating: float | None = None
+    review_count: int | None = None
+
+
+class CandidateCard(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    brief_id: uuid.UUID | None
+    origin: CandidateOrigin
+    stage: CandidateStage
+    source_platform: SourcePlatform
+    source_url: str | None
+    seller_name: str | None
+    title_vi: str
+    title_original: str | None
+    main_image_url: str | None
+    price_amount: Decimal | None
+    price_currency: str | None
+    price_vnd_estimate: int | None
+    landed_estimate_vnd: int | None = None
+    rating: Decimal | None
+    review_count: int | None
+    sales_count: int | None
+    ai_score: int | None
+    rank_reason: str | None
+    offers_count: int = 0
+    assessment_status: str | None = None
+    score_total: Decimal | None = None
+    created_at: datetime
+
+
+class CandidateDetail(CandidateOut):
+    landed_estimate_vnd: int | None = None
+    offers: list[Offer] = Field(default_factory=list)
+
+
+class TrendCard(TrendSignalOut):
+    brief_id: uuid.UUID | None = None
+
+
+class DemandView(DemandSignalOut):
+    mentions: list[DemandMentionOut] = Field(default_factory=list)
+    brief_id: uuid.UUID | None = None
