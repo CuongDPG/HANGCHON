@@ -80,6 +80,8 @@ export type CheckoutInput = AddressFields & {
   note?: string | null;
   client_ref?: string;
   marketing_opt_in?: boolean;
+  src?: string;
+  referral_code?: string;
 };
 
 export type PaymentInfo = {

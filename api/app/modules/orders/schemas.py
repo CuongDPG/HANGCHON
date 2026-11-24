@@ -325,6 +325,8 @@ class CheckoutIn(AddressFields):
     note: str | None = Field(default=None, max_length=500)
     client_ref: str | None = Field(default=None, max_length=64, description="Chống bấm đặt hai lần")
     marketing_opt_in: bool = False
+    src: str | None = Field(default=None, max_length=40, description="Mã bài dẫn khách tới (?src= trong link bài đăng)")
+    referral_code: str | None = Field(default=None, max_length=30, description="Mã giới thiệu (?ref=)")
 
 
 class DropBrief(BaseModel):

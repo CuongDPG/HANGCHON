@@ -1,5 +1,6 @@
 "use client";
 
+import { attributionFields } from "@/lib/attribution";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CircleAlert, Hourglass, ShoppingBag } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -71,6 +72,7 @@ export function CheckoutScreen() {
       const order = await storeOrdersApi.checkout({
         items: lines, name: v.name, phone: v.phone, address_line: v.address_line, ward: v.ward || null, district: v.district || null,
         province: v.province, note: v.note || null, payment_method: v.payment_method, client_ref: clientRef,
+        ...attributionFields(),
       });
       rememberOrder({ code: order.code, token: order.token, placedAt: order.placed_at });
       clearCart(items.map((i) => i.key));

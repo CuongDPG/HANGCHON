@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { AttributionTracker } from "@/components/store/attribution-tracker";
 import { StoreFooter } from "@/components/store/store-footer";
 import { StoreHeader } from "@/components/store/store-header";
 import { StoreTabBar } from "@/components/store/store-tab-bar";
@@ -14,6 +16,9 @@ export default function StoreLayout({ children }: LayoutProps<"/">) {
       {/* Chừa chỗ cho thanh điều hướng dưới trên điện thoại */}
       <div aria-hidden className="h-[calc(var(--spacing-tabbar)+env(safe-area-inset-bottom,0px))] md:hidden" />
       <StoreTabBar />
+      <Suspense fallback={null}>
+        <AttributionTracker />
+      </Suspense>
     </>
   );
 }

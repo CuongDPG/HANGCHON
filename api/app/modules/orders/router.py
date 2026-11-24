@@ -156,13 +156,20 @@ async def quote(body: QuoteIn, db: DbSession) -> QuoteOut:
     )  # fmt: skip
 
 
+def _attribution(src: str | None) -> dict[str, str] | None:
+    """f7: mã bài trong link (`?src=`) lưu ở `orders.raw["src"]` để content đếm đơn theo bài."""
+    clean = "".join(ch for ch in (src or "").strip().lower() if ch.isalnum() or ch in "-_")[:40]
+    return {"src": clean} if clean else None
+
+
 @store.post("", response_model=PublicOrderOut, status_code=status.HTTP_201_CREATED)
 async def checkout(body: CheckoutIn, db: DbSession) -> PublicOrderOut:
     """e4: đặt hàng một trang, không cần tài khoản. Giữ suất/tồn ngay trong giao dịch; phát `order.created`."""
     res = await service.create_order(
         db, lines=body.items, name=body.name, phone=body.phone, address=_address(body),
         payment_method=PaymentMethod(body.payment_method), channel=Channel.WEB, customer_note=body.note,
-        client_ref=body.client_ref, actor=Actor.CUSTOMER,
+        client_ref=body.client_ref, actor=Actor.CUSTOMER, raw=_attribution(body.src),
+        referral_code=(body.referral_code or "").strip().upper() or None,
     )  # fmt: skip
     if res.created and body.marketing_opt_in and res.order.customer_id:
         from app.modules.orders.models import Customer
