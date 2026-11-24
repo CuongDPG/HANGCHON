@@ -3,6 +3,8 @@
 Hàng Chọn là công cụ cho **một người bán** (gọi là «chị», vai trò `owner`): chị chọn hàng, AI làm phần còn lại
 dưới sự giám sát của chị. Tài liệu này là hợp đồng chung cho mọi phần code. Danh mục 73 chức năng:
 [features.md](features.md). Wireframe và phân tích: mở [design/ban-thiet-ke.html](design/ban-thiet-ke.html).
+Nền móng backend: giao diện lập trình và các quyết định khác tài liệu này ở [backend-guide.md](backend-guide.md);
+từng bảng ở [data-model.md](data-model.md).
 
 ## 1. Quyết định đã chốt (25/11/2026)
 

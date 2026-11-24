@@ -5,7 +5,8 @@ Nền tảng bán hàng cá nhân: một người chọn hàng, AI làm phần c
 - **Website cho khách** (`/`): kệ hàng đã chọn, hồ sơ chọn của từng món, mở bán theo đợt, đặt hàng, theo dõi đơn.
 - **Bàn làm việc** (`/desk`): săn hàng, thẩm định, bàn chọn, nội dung và lịch đăng, hộp thư, đơn hàng, giám sát AI.
 
-Tài liệu: [kiến trúc](docs/ARCHITECTURE.md) · [danh mục chức năng](docs/features.md) · [bản thiết kế và wireframe](docs/design/ban-thiet-ke.html).
+Tài liệu: [kiến trúc](docs/ARCHITECTURE.md) · [danh mục chức năng](docs/features.md) · [mô hình dữ liệu](docs/data-model.md) ·
+[hướng dẫn backend](docs/backend-guide.md) · [bản thiết kế và wireframe](docs/design/ban-thiet-ke.html).
 
 ## Chạy trên máy
 
