@@ -55,7 +55,7 @@ async def emit(name: str, payload: dict[str, Any], *, db: AsyncSession) -> int:
             async with db.begin_nested():
                 await fn(db, payload)
             ok += 1
-        except Exception:  # noqa: BLE001 - người nghe lỗi không được làm hỏng việc của người phát
+        except Exception:
             log.exception("Người nghe %s.%s lỗi khi xử lý sự kiện %s", fn.__module__, fn.__name__, name)
     return ok
 
