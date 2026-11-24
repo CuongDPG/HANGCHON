@@ -139,7 +139,8 @@ export function NoteComposer({
           setText(e.target.value);
           setError(null);
         }}
-        readOnly={speech.listening}
+        // đang lưu thì khoá ô: chữ gõ trong lúc chờ sẽ bị xoá khi lưu xong
+        readOnly={speech.listening || create.isPending}
         rows={compact ? 3 : 2}
         error={error ?? speech.error}
       />
