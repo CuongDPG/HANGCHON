@@ -1,7 +1,7 @@
-import { DeskPlaceholder } from "@/components/desk/desk-placeholder";
+import { ProductsScreen } from "@/components/catalog/desk/products-screen";
 
 export const metadata = { title: "Sản phẩm" };
 
 export default function DeskProductsPage() {
-  return <DeskPlaceholder navKey="products" />;
+  return <ProductsScreen />;
 }

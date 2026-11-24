@@ -146,6 +146,10 @@ class Product(UUIDPk, Timestamps, Base):
     rejected_alternatives: Mapped[list[Any]] = json_list(
         comment='Ảnh chụp các món đã loại: [{"title","reason","image_url"}]'
     )
+    dossier: Mapped[dict[str, Any]] = json_obj(
+        comment='Ảnh chụp dải số sàng lọc + nhóm lý do loại (e2): {"funnel":{viewed,compared,tried,selected},'
+        '"reject_groups":[{key,label,count}],"reviews_read","review_languages","built_at"}'
+    )
     # vận chuyển / an toàn
     weight_grams: Mapped[int | None] = mapped_column(Integer)
     dimensions_cm: Mapped[dict[str, Any]] = json_obj()
@@ -260,6 +264,19 @@ class DropItem(UUIDPk, Timestamps, Base):
     drop: Mapped[Drop] = relationship(back_populates="items", lazy="raise")
 
 
+class DropReminder(UUIDPk, CreatedAt, Base):
+    """«Nhắc mình» ở đợt sắp mở (e3): khách để lại SĐT/Zalo, đợt mở thì báo một lần."""
+
+    __tablename__ = "drop_reminders"
+    __table_args__ = (UniqueConstraint("drop_id", "contact_key", name="uq_drop_reminders_contact"),)
+
+    drop_id: Mapped[uuid.UUID] = fk("drops", ondelete="CASCADE", nullable=False)
+    contact: Mapped[str] = mapped_column(String(200), comment="SĐT hoặc Zalo khách để lại")
+    contact_key: Mapped[str] = mapped_column(String(64), comment="Băm liên hệ đã chuẩn hoá (chống trùng)")
+    channel: Mapped[str] = mapped_column(String(20), default="zalo", server_default="zalo")
+    notified_at: Mapped[datetime | None]
+
+
 class InventoryItem(UUIDPk, Timestamps, Base):
     """Tồn kho nhỏ (g8): số lượng các món giữ sẵn, báo khi sắp hết."""
 
@@ -348,6 +365,7 @@ class FindRequest(UUIDPk, Timestamps, Base):
     brief_id: Mapped[uuid.UUID | None] = fk("sourcing_briefs")
     product_id: Mapped[uuid.UUID | None] = fk("products", comment="Món đã tìm được")
     moderation_note: Mapped[str | None] = mapped_column(Text)
+    submitter_key: Mapped[str | None] = mapped_column(String(64), index=True, comment="Băm thiết bị gửi (chống spam)")
 
 
 class FindRequestVote(UUIDPk, CreatedAt, Base):

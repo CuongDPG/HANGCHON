@@ -10,7 +10,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.modules.assistant.models import AnswerBasis, AssistantRole, ConversationStatus, Feedback
 
@@ -49,3 +49,54 @@ class AssistantMessageOut(ORM):
     feedback: Feedback | None
     ai_run_id: uuid.UUID | None
     created_at: datetime
+
+
+# ---- công khai ---------------------------------------------------------------------------------------------------
+
+
+class AskIn(BaseModel):
+    question: str = Field(min_length=1, max_length=1000)
+    product_slug: str | None = Field(default=None, max_length=160)
+    conversation_id: uuid.UUID | None = None
+    page_path: str | None = Field(default=None, max_length=300)
+
+
+class Citation(BaseModel):
+    type: str
+    id: str
+    ref: str
+    label: str
+    quote: str | None = None
+
+
+class PublicMessage(BaseModel):
+    id: uuid.UUID
+    role: AssistantRole
+    content: str
+    citations: list[Citation]
+    unknown: bool
+    feedback: Feedback | None
+    created_at: datetime
+
+
+class PublicConversation(BaseModel):
+    id: uuid.UUID
+    status: ConversationStatus
+    product_id: uuid.UUID | None
+    contact_saved: bool
+    messages: list[PublicMessage]
+
+
+class AskOut(BaseModel):
+    conversation: PublicConversation
+    answer: PublicMessage
+    handed_off: bool
+
+
+class ContactIn(BaseModel):
+    contact: str = Field(min_length=6, max_length=200)
+
+
+class FeedbackIn(BaseModel):
+    message_id: uuid.UUID
+    value: Feedback
