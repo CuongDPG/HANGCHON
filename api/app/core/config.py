@@ -7,7 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 API_DIR = Path(__file__).resolve().parents[2]
@@ -20,6 +20,13 @@ DEFAULT_AI_PRICING: dict[str, dict[str, float]] = {
     "claude-sonnet-5-5": {"input": 2.0, "output": 10.0, "cache_read": 0.2, "cache_write": 2.5},
     "claude-haiku-5-5": {"input": 0.10, "output": 0.50, "cache_read": 0.01, "cache_write": 0.125},
     "fake": {"input": 0.0, "output": 0.0, "cache_read": 0.0, "cache_write": 0.0},
+}
+
+
+# Khoá ký phiên nằm công khai trong repo (mặc định + api/.env.example) → production từ chối khởi động.
+INSECURE_JWT_SECRETS = {
+    "dev-only-change-me-please-32-bytes-min",
+    "doi-chuoi-nay-thanh-chuoi-ngau-nhien-dai-it-nhat-32-ky-tu",
 }
 
 
@@ -172,9 +179,25 @@ class Settings(BaseSettings):
             return json.loads(v) if v.strip() else {}
         return v
 
+    @model_validator(mode="after")
+    def _refuse_default_secrets_in_prod(self) -> Settings:
+        """Production không khởi động với khoá ký phiên mặc định / trong ví dụ / quá ngắn."""
+        if self.app_env == "prod" and (self.jwt_secret in INSECURE_JWT_SECRETS or len(self.jwt_secret) < 32):
+            raise ValueError(
+                "JWT_SECRET còn là giá trị mặc định hoặc ngắn hơn 32 ký tự: đặt chuỗi ngẫu nhiên riêng "
+                "(vd `openssl rand -hex 32`) trước khi chạy production."
+            )
+        return self
+
     @property
     def pricing(self) -> dict[str, dict[str, float]]:
         return {**DEFAULT_AI_PRICING, **self.ai_pricing}
+
+    @property
+    def allows_simulation(self) -> bool:
+        """Endpoint giả lập (tiền về giả, tin đến giả, đơn sàn giả, webhook của driver mock, hành động mẫu) chỉ mở ở
+        dev/test. Ở production luôn 404 — kể cả khi driver đang là `mock`."""
+        return self.app_env in ("dev", "test")
 
     @property
     def is_test(self) -> bool:

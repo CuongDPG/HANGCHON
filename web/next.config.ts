@@ -5,6 +5,8 @@ import type { NextConfig } from "next";
 const API_ORIGIN = (process.env.API_ORIGIN ?? "http://localhost:8010").replace(/\/$/, "");
 
 const nextConfig: NextConfig = {
+  // Bản chạy thật chạy `server.js` của bản standalone bằng Node (web/Dockerfile).
+  output: "standalone",
   cacheComponents: true,
   partialPrefetching: true,
   poweredByHeader: false,
