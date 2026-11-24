@@ -41,6 +41,17 @@ class OrderStatus(StrEnum):
     RETURNED = "returned"
 
 
+# Một cách tính suất/tồn duy nhất (orders + catalog): đơn còn sống mà chưa trả (`paid_at` trống) do orders cộng
+# «giữ tạm» khi kiểm còn hàng; đơn đã trả do catalog ghi vào `drop_items.slots_reserved` / `inventory_items.reserved`.
+RELEASED_STATUSES = (OrderStatus.CANCELLED, OrderStatus.RETURNED)  # đơn đã nhả suất/tồn
+PRE_SHIP_STATUSES = (  # đơn chưa rời kho (món giữ sẵn còn nằm trong `on_hand`)
+    OrderStatus.PENDING_PAYMENT,
+    OrderStatus.CONFIRMED,
+    OrderStatus.AWAITING_STOCK,
+    OrderStatus.READY_TO_SHIP,
+)
+
+
 class PaymentMethod(StrEnum):
     BANK_TRANSFER = "bank_transfer"  # VietQR, tự xác nhận
     COD = "cod"
