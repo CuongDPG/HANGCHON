@@ -8,10 +8,16 @@
  * Lỗi luôn là `ApiError` với `message` tiếng Việt đọc được (lấy từ `detail` của API nếu có).
  */
 
-/** Danh sách có phân trang — khớp `Paginated[T]` của backend. */
+/** Danh sách có phân trang — khớp `Paginated[T]` của backend (`app/core/pagination.py`). */
 export type Paginated<T> = {
   items: T[];
   total: number;
+  /** Trang hiện tại, bắt đầu từ 1. */
+  page: number;
+  /** Số dòng mỗi trang. */
+  size: number;
+  /** Tổng số trang. */
+  pages: number;
 };
 
 export type QueryValue = string | number | boolean | null | undefined | Array<string | number>;

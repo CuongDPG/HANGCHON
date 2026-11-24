@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -82,6 +83,21 @@ register_setting("ai.monthly_budget_vnd", "Trần chi phí AI mỗi tháng (VND)
                  description="Bỏ trống = dùng AI_MONTHLY_BUDGET_VND. 0 = không giới hạn.")  # fmt: skip
 register_setting("store.name", "Tên cửa hàng", "Hàng Chọn", group="Cửa hàng")
 register_setting("store.tagline", "Câu giới thiệu", "Đồ gia dụng nhỏ, chọn từng món", group="Cửa hàng")
+register_setting("store.curator_name", "Tên người chọn", "", group="Cửa hàng",
+                 description="Tên hiện ở trang «Về người chọn» và cuối bài đăng.")  # fmt: skip
+register_setting("store.curator_bio", "Lời giới thiệu", "", group="Cửa hàng",
+                 description="Vài câu chị tự giới thiệu: chọn hàng thế nào, thử bao lâu.")  # fmt: skip
+register_setting("store.bank_code", "Ngân hàng nhận chuyển khoản", "", group="Thanh toán",
+                 description="Mã ngân hàng theo VietQR, vd VCB, TCB, MB.")  # fmt: skip
+register_setting("store.bank_account_no", "Số tài khoản", "", group="Thanh toán")
+register_setting("store.bank_account_name", "Tên chủ tài khoản", "", group="Thanh toán",
+                 description="Viết hoa không dấu, đúng như trên ngân hàng.")  # fmt: skip
+register_setting("store.default_shipping_fee_vnd", "Phí giao mặc định (VND)", 30000, group="Giao hàng",
+                 description="Áp cho đơn khi chưa lấy được báo giá của hãng giao.")  # fmt: skip
+
+# Hành động mẫu để xem thử giao diện bàn làm việc khi chưa có module nghiệp vụ (chỉ khi đặt HC_DEMO_ACTIONS=1).
+if os.environ.get("HC_DEMO_ACTIONS", "").lower() in ("1", "true", "yes"):
+    from app.modules.control import demo  # noqa: F401
 
 
 # ---- số liệu «Hôm nay» -------------------------------------------------------------------------------------------
