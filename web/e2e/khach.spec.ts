@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 /**
  * Luồng chính khu Khách (h1–h8) trên dữ liệu thật của API (driver mock, AI fake):
  * tin khách đến → AI soạn nháp → chị gửi; sổ khách tìm không dấu; khách gửi cảm nhận qua link thử hàng.
- * Cần API đang chạy với dữ liệu mẫu (`uv run python -m app.modules.inbox.seed`) và tài khoản chị mặc định;
+ * Cần API đang chạy với dữ liệu mẫu (`uv run python -m app.seed --demo`, scripts/e2e.sh tự dựng) và tài khoản chị mặc định;
  * không có thì bài này tự bỏ qua. Đổi tài khoản bằng E2E_OWNER_EMAIL / E2E_OWNER_PASSWORD.
  */
 
@@ -41,12 +41,12 @@ test("tin khách đến → AI soạn → chị sửa và gửi", async ({ page 
 
   await page.goto(`/desk/khach/hoi-thoai/${thread.id}`);
   await expect(main.getByText("Khăn tắm cho bé giá bao nhiêu shop?")).toBeVisible();
-  await expect(main.getByText(/168\.000đ/).first()).toBeVisible();
+  await expect(main.getByText(/189\.000đ/).first()).toBeVisible();
   await main.getByRole("button", { name: "Sửa" }).click();
-  await main.getByRole("textbox", { name: "Câu trả lời" }).fill("Dạ khăn tắm cho bé giá 168.000đ ạ, còn hàng sẵn.");
+  await main.getByRole("textbox", { name: "Câu trả lời" }).fill("Dạ khăn tắm cho bé giá 189.000đ ạ, đợt sau mình về thêm.");
   await main.getByRole("button", { name: "Gửi", exact: true }).first().click();
   await expect(page.getByText("Đã gửi cho khách")).toBeVisible();
-  await expect(main.getByText("Dạ khăn tắm cho bé giá 168.000đ ạ, còn hàng sẵn.")).toBeVisible();
+  await expect(main.getByText("Dạ khăn tắm cho bé giá 189.000đ ạ, đợt sau mình về thêm.")).toBeVisible();
   await expect(main.getByText(/Chị gửi · AI soạn/)).toBeVisible();
   await noOverflow(page);
 });
@@ -55,9 +55,9 @@ test("sổ khách tìm không dấu và mở hồ sơ", async ({ page }) => {
   await login(page);
   await page.goto("/desk/khach/so-khach");
   const main = page.getByRole("main");
-  await main.getByRole("searchbox", { name: "Tìm khách" }).fill("pham lan");
-  await main.getByRole("link", { name: /Phạm Lan/ }).click();
-  await expect(main.getByRole("heading", { level: 1, name: "Phạm Lan" })).toBeVisible();
+  await main.getByRole("searchbox", { name: "Tìm khách" }).fill("pham ngoc lan");
+  await main.getByRole("link", { name: /Phạm Ngọc Lan/ }).click();
+  await expect(main.getByRole("heading", { level: 1, name: "Phạm Ngọc Lan" })).toBeVisible();
   await expect(main.getByText("AI tóm tắt")).toBeVisible();
   await noOverflow(page);
 });

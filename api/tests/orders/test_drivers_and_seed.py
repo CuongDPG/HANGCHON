@@ -8,15 +8,12 @@ import json
 import httpx
 import pytest
 import respx
-from sqlalchemy import func, select
 
 from app.core.config import settings
-from app.core.db import SessionLocal
 from app.core.enums import Channel, ShippingStatus
 from app.integrations import get_driver
 from app.integrations.base import IntegrationNotConfigured
 from app.integrations.shipping import Address, ShippingRequest
-from app.modules.orders.models import Order
 
 REQ = ShippingRequest(
     order_code="HC-48213",
@@ -74,11 +71,11 @@ async def test_ghn_quote_create_track(monkeypatch: pytest.MonkeyPatch) -> None:
 async def test_ghtk_quote_and_track(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "ghtk_token", "tok")
     for k, v in {
-        "GHTK_PICK_NAME": "Hàng Chọn",
-        "GHTK_PICK_TEL": "0900000000",
-        "GHTK_PICK_ADDRESS": "1 Kho Mẫu",
+        "ghtk_pick_name": "Hàng Chọn",
+        "ghtk_pick_tel": "0900000000",
+        "ghtk_pick_address": "1 Kho Mẫu",
     }.items():
-        monkeypatch.setenv(k, v)
+        monkeypatch.setattr(settings, k, v)
     base = "https://services.giaohangtietkiem.vn"
     respx.get(f"{base}/services/shipment/fee").mock(
         return_value=httpx.Response(
@@ -120,18 +117,3 @@ def test_marketplace_signatures() -> None:
     )
     b = tiktok_shop.sign("sec", "/order/202309/orders/search", {"timestamp": 1, "app_key": "k"}, "{}")
     assert a == b  # bỏ sign/access_token, không phụ thuộc thứ tự tham số
-
-
-async def test_seed_demo_idempotent() -> None:
-    from app.modules.orders.seed import seed_demo
-
-    async with SessionLocal() as s:
-        first = await seed_demo(s)
-        await s.commit()
-    async with SessionLocal() as s:
-        second = await seed_demo(s)
-        await s.commit()
-        assert first["orders"] == 7 and second == {"products": 0, "drops": 0, "orders": 0}
-        assert await s.scalar(select(func.count()).select_from(Order)) == 7
-        statuses = set((await s.execute(select(Order.status))).scalars())
-        assert {"pending_payment", "awaiting_stock", "ready_to_ship"} <= statuses

@@ -42,6 +42,7 @@ import {
 import { formatDateTime, formatDayMonth, formatTime, formatWeekday } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { CheckChips, ChannelMark, CHANNEL_LABEL, draftDisplay, isDone, localFile, MicButton, StatusBadge, toLocalInput, useSpeech } from "./shared";
+import { RelatedLinks } from "@/components/desk/related-links";
 
 const ORDER = ["facebook", "instagram", "threads", "tiktok", "zalo_oa"];
 
@@ -60,6 +61,7 @@ export function StudioScreen({ kind, id }: { kind: "product" | "drop"; id: strin
         title={data?.name ?? "Xưởng nội dung"}
         actions={data && drafts.length ? <Badge tone={done === drafts.length ? "success" : "neutral"}>{done}/{drafts.length} đã duyệt</Badge> : null}
       />
+      <RelatedLinks links={[kind === "drop" ? { href: `/desk/san-pham/dot/${id}`, label: "Đợt mở bán" } : { href: `/desk/san-pham/${id}`, label: "Sản phẩm" }]} />
       {isPending ? (
         <SkeletonList rows={4} />
       ) : error ? (

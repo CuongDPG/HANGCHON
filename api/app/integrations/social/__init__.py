@@ -1,6 +1,9 @@
 """Mạng xã hội: đăng bài, đẩy bản nháp (TikTok), đọc bình luận/tin nhắn, trả lời, số liệu bài.
 
-Driver: `mock` (mặc định), `meta` (Facebook Page, Instagram, Threads), `tiktok_draft`, `zalo_oa`."""
+Driver: `mock` (mặc định), `meta` (Facebook Page, Instagram, Threads), `tiktok_draft`, `zalo_oa`. Mỗi driver thật gộp
+phần đăng bài + phần nhắn tin trong một lớp `Driver`. Chọn driver theo kênh bằng một cấu hình chung cho đăng bài và
+hộp thư: `SOCIAL_CHANNEL_DRIVERS="facebook=meta,instagram=meta,threads=meta,zalo_oa=zalo_oa,tiktok=tiktok_draft"`;
+kênh không khai dùng `SOCIAL_DRIVER` (mặc định `mock`). Xem `driver_name_for(channel)`."""
 
 from __future__ import annotations
 
@@ -64,8 +67,40 @@ class PostMetrics(BaseModel):
     video_views: int = 0
 
 
+# Tên driver cũ (khi phần đăng bài / nhắn tin còn tách đôi) → driver đã gộp
+_ALIASES = {
+    "meta_publish": "meta",
+    "meta_messaging": "meta",
+    "zalo_oa_publish": "zalo_oa",
+    "zalo_oa_messaging": "zalo_oa",
+    "tiktok_draft_publish": "tiktok_draft",
+}
+
+
+def canonical_driver(name: str | None) -> str:
+    return _ALIASES.get(name or "mock", name or "mock")
+
+
+def driver_name_for(channel: Channel | str) -> str:
+    """Driver cho một kênh: `SOCIAL_CHANNEL_DRIVERS` → `SOCIAL_DRIVER` → `mock`."""
+    from app.core.config import settings
+
+    key = channel.value if isinstance(channel, Channel) else str(channel)
+    spec = settings.social_channel_drivers.replace(" ", "")
+    mapping = dict(p.split("=", 1) for p in spec.split(",") if "=" in p)
+    return canonical_driver(mapping.get(key) or settings.social_driver or "mock")
+
+
+def driver_for(channel: Channel | str) -> SocialDriver:
+    from app.integrations.base import get_driver
+
+    return get_driver("social", driver_name_for(channel))
+
+
 class SocialDriver(abc.ABC):
     name: str
+    supports_messaging: bool = True
+    channels: tuple[Channel, ...] = ()  # kênh driver phục vụ (rỗng = mọi kênh)
 
     @abc.abstractmethod
     async def publish(self, post: SocialPost) -> PublishResult: ...

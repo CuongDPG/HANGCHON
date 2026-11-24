@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 /**
  * Luồng chính của khách trên website (lát cắt store): kệ hàng → tìm không dấu → trang sản phẩm (con dấu, lý do chọn)
  * → hồ sơ chọn → hỏi trợ lý → đợt gom → nhờ chị tìm.
- * Cần API đang chạy với dữ liệu mẫu (`uv run python -m app.modules.catalog.seed`); không có thì bỏ qua.
+ * Cần API đang chạy với dữ liệu mẫu (`uv run python -m app.seed --demo`, scripts/e2e.sh tự dựng); không có thì bỏ qua.
  */
 test.describe("website: kệ hàng → sản phẩm → hồ sơ chọn", () => {
   test.beforeEach(async ({ request }) => {

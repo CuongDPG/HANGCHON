@@ -7,7 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 API_DIR = Path(__file__).resolve().parents[2]
@@ -20,6 +20,13 @@ DEFAULT_AI_PRICING: dict[str, dict[str, float]] = {
     "claude-sonnet-5-5": {"input": 2.0, "output": 10.0, "cache_read": 0.2, "cache_write": 2.5},
     "claude-haiku-5-5": {"input": 0.10, "output": 0.50, "cache_read": 0.01, "cache_write": 0.125},
     "fake": {"input": 0.0, "output": 0.0, "cache_read": 0.0, "cache_write": 0.0},
+}
+
+
+# Khoá ký phiên nằm công khai trong repo (mặc định + api/.env.example) → production từ chối khởi động.
+INSECURE_JWT_SECRETS = {
+    "dev-only-change-me-please-32-bytes-min",
+    "doi-chuoi-nay-thanh-chuoi-ngau-nhien-dai-it-nhat-32-ky-tu",
 }
 
 
@@ -71,6 +78,9 @@ class Settings(BaseSettings):
 
     # việc nền
     jobs_eager: bool = False  # True: enqueue chạy luôn trong tiến trình (test)
+    # Hàng đợi arq. Nhiều bản làm việc dùng chung một Redis → mỗi bản một tên (dev.sh tự đặt theo tên thư mục),
+    # để worker của bản này không nhận job của bản khác (rồi chạy trên nhầm CSDL).
+    jobs_queue_name: str = "arq:queue"
 
     # lưu trữ tệp
     storage_driver: str = "local"
@@ -125,14 +135,47 @@ class Settings(BaseSettings):
     tiktok_shop_app_secret: str | None = None
     hooks_mock_secret: str = "mock-webhook-secret"
 
+    # chi tiết driver thật (mọi biến môi trường driver đọc qua đây, không đọc thẳng os.environ)
+    # Mạng xã hội: driver theo từng kênh, dùng chung cho đăng bài (content) và hộp thư (inbox).
+    # "facebook=meta,instagram=meta,threads=meta,zalo_oa=zalo_oa,tiktok=tiktok_draft"; kênh không khai → SOCIAL_DRIVER.
+    social_channel_drivers: str = ""
+    meta_graph_version: str = "v24.0"
+    threads_user_id: str | None = None
+    threads_access_token: str | None = None
+    tiktok_access_token: str | None = None
+    zalo_app_id: str | None = None
+    zalo_oa_author: str = "Hàng Chọn"
+    zalo_oa_broadcast: bool = False  # True: bài viết OA gửi luôn tới người quan tâm (tốn hạn mức tin)
+    onebound_api_secret: str | None = None
+    ghn_env: Literal["dev", "prod"] = "prod"
+    ghtk_env: Literal["dev", "prod"] = "prod"
+    ghtk_pick_name: str | None = None
+    ghtk_pick_tel: str | None = None
+    ghtk_pick_address: str | None = None
+    ghtk_pick_district: str | None = None
+    ghtk_pick_ward: str | None = None
+    shopee_shop_id: str | None = None
+    shopee_access_token: str | None = None
+    tiktok_shop_access_token: str | None = None
+    tiktok_shop_cipher: str | None = None
+    # dựng video (f6)
+    content_ffmpeg: bool = True
+    content_font_path: str | None = None
+    # sao lưu (k4): đường dẫn pg_dump; không có thì thử `docker exec <container> pg_dump`
+    pg_dump_path: str | None = None
+    pg_dump_docker_container: str | None = "hangchon-postgres-1"
+
     @field_validator("*", mode="before")
     @classmethod
     def _blank_is_none(cls, v: Any, info: Any) -> Any:
-        """Biến môi trường để trống (`KEY=`) với trường tuỳ chọn → None."""
+        """Biến môi trường để trống (`KEY=`, hay gặp trong compose `${KEY:-}`): trường tuỳ chọn → None,
+        trường khác → giá trị mặc định."""
         if v == "" and info.field_name in cls.model_fields:
-            ann = cls.model_fields[info.field_name].annotation
-            if type(None) in getattr(ann, "__args__", ()):
+            field = cls.model_fields[info.field_name]
+            if type(None) in getattr(field.annotation, "__args__", ()):
                 return None
+            if not field.is_required() and field.annotation is not str:
+                return field.get_default(call_default_factory=True)
         return v
 
     @field_validator("ai_pricing", mode="before")
@@ -142,9 +185,25 @@ class Settings(BaseSettings):
             return json.loads(v) if v.strip() else {}
         return v
 
+    @model_validator(mode="after")
+    def _refuse_default_secrets_in_prod(self) -> Settings:
+        """Production không khởi động với khoá ký phiên mặc định / trong ví dụ / quá ngắn."""
+        if self.app_env == "prod" and (self.jwt_secret in INSECURE_JWT_SECRETS or len(self.jwt_secret) < 32):
+            raise ValueError(
+                "JWT_SECRET còn là giá trị mặc định hoặc ngắn hơn 32 ký tự: đặt chuỗi ngẫu nhiên riêng "
+                "(vd `openssl rand -hex 32`) trước khi chạy production."
+            )
+        return self
+
     @property
     def pricing(self) -> dict[str, dict[str, float]]:
         return {**DEFAULT_AI_PRICING, **self.ai_pricing}
+
+    @property
+    def allows_simulation(self) -> bool:
+        """Endpoint giả lập (tiền về giả, tin đến giả, đơn sàn giả, webhook của driver mock, hành động mẫu) chỉ mở ở
+        dev/test. Ở production luôn 404 — kể cả khi driver đang là `mock`."""
+        return self.app_env in ("dev", "test")
 
     @property
     def is_test(self) -> bool:

@@ -180,16 +180,3 @@ async def test_month_revenue_stat_on_today(owner_client: httpx.AsyncClient) -> N
         await db.commit()
     stats = {s["key"]: s for s in (await owner_client.get("/api/desk/control/today")).json()["stats"]}
     assert stats["finance.month_revenue"]["value"] == 275_000 and stats["finance.month_revenue"]["format"] == "vnd"
-
-
-async def test_seed_demo_is_idempotent() -> None:
-    from app.modules.control.seed import seed_demo as control_seed
-    from app.modules.finance.seed import seed_demo as finance_seed
-
-    async with SessionLocal() as db:
-        first = await finance_seed(db), await control_seed(db)
-        second = await finance_seed(db), await control_seed(db)
-        await db.commit()
-    assert first[0]["expenses"] == 7 and first[1]["approvals"] > 0
-    assert second[0] == {"expenses": 0} and second[1]["approvals"] == 0
-    assert len(await _entries()) == 7

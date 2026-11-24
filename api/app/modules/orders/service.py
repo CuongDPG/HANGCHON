@@ -2,8 +2,9 @@
 danh sách cho chị (g1), trang theo dõi cho khách (e5).
 
 Chống đặt vượt: khoá dòng `drop_items` / `inventory_items` (SELECT … FOR UPDATE, chỉ đọc) rồi tính
-`còn lại = tổng − phần catalog đã trừ − phần các đơn chưa thanh toán đang giữ`. Catalog trừ suất/tồn khi nghe
-`order.paid` (ARCHITECTURE mục 10), nên đơn đã phát `order.paid` (có `paid_at`) không bị tính lần hai."""
+`còn lại = tổng − phần catalog đã ghi − phần các đơn chưa thanh toán đang giữ`. Catalog ghi suất/tồn của đơn đã trả
+khi nghe `order.paid` và trả lại khi nghe `order.cancelled` (xem `app.modules.catalog.inventory`), nên đơn đã trả
+(có `paid_at`) không bị tính lần hai."""
 
 from __future__ import annotations
 
@@ -28,6 +29,7 @@ from app.integrations import get_driver
 from app.modules.catalog.models import Drop, DropItem, DropStatus, Product, ProductStatus, ProductVariant, SaleMode
 from app.modules.orders import notify, refs
 from app.modules.orders.models import (
+    PRE_SHIP_STATUSES,
     Customer,
     FulfillmentSource,
     Order,
@@ -221,7 +223,7 @@ async def pending_stock_qty(
             OrderItem.product_id == product_id,
             OrderItem.variant_id.is_(None) if variant_id is None else OrderItem.variant_id == variant_id,
             OrderItem.fulfillment_source == FulfillmentSource.STOCK,
-            Order.status.not_in(NOT_HOLDING),
+            Order.status.in_(PRE_SHIP_STATUSES),  # đơn đã rời kho thì `on_hand` đã trừ
             Order.paid_at.is_(None),
         )
     )
@@ -621,6 +623,7 @@ async def create_order(
     raw: dict[str, Any] | None = None,
     notify_customer: bool = True,
     user: Any = None,
+    referral_code: str | None = None,
 ) -> FinalizeResult:
     if client_ref:
         existing = (
@@ -636,6 +639,8 @@ async def create_order(
         payment_method=payment_method, customer_note=customer_note, internal_note=internal_note,
         external_id=external_id, raw={**(raw or {}), **({"client_ref": client_ref} if client_ref else {})},
     )  # fmt: skip
+    if referral_code:
+        order.referral_code = referral_code[:30]
     await finalize(
         db, order, lines, opts=opts or ResolveOptions(), shipping_fee_vnd=shipping_fee_vnd, discount_vnd=discount_vnd,
         actor=actor, already_paid=already_paid, notify_customer=notify_customer, user=user,

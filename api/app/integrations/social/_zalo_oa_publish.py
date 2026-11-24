@@ -8,14 +8,12 @@
   Bật bằng ZALO_OA_BROADCAST=1 (mặc định chỉ tạo bài viết, chị tự bấm gửi trong trang quản lý OA).
 - Số liệu: GET /v2.0/article/getdetail?id= (lượt xem, chia sẻ nếu có).
 
-Cấu hình: ZALO_OA_ACCESS_TOKEN (settings), ZALO_OA_AUTHOR (tên tác giả hiển thị, mặc định «Hàng Chọn»).
-Phần tin nhắn 1–1 thuộc driver hộp thư.
+Cấu hình (settings): ZALO_OA_ACCESS_TOKEN, ZALO_OA_AUTHOR (tên tác giả hiển thị), ZALO_OA_BROADCAST.
+Lớp `ZaloOAPublisher` được gộp vào driver `zalo_oa` (`zalo_oa.py`).
 """
 
 from __future__ import annotations
 
-import os
-from datetime import datetime
 from typing import Any
 
 import httpx
@@ -24,17 +22,16 @@ from app.core.config import settings
 from app.core.enums import Channel
 from app.core.timeutil import now_utc
 from app.integrations.base import IntegrationError, IntegrationNotConfigured
-from app.integrations.social import InboundEvent, PostMetrics, PublishResult, SentMessage, SocialDriver, SocialPost
-from app.integrations.social._ratelimit_publish import RateLimited, limiter
+from app.integrations.social import PostMetrics, PublishResult, SocialPost
+from app.integrations.social._ratelimit import RateLimited, limiter
 
 API = "https://openapi.zalo.me/v2.0"
 
 
 class ZaloOAPublisher:
-    def __init__(self, transport: httpx.AsyncBaseTransport | None = None) -> None:
-        self._transport = transport
+    _transport: httpx.AsyncBaseTransport | None = None
 
-    def _token(self) -> str:
+    def _publish_token(self) -> str:
         if not settings.zalo_oa_access_token:
             raise IntegrationNotConfigured("Thiếu ZALO_OA_ACCESS_TOKEN để đăng bài Zalo OA.")
         return settings.zalo_oa_access_token
@@ -49,7 +46,7 @@ class ZaloOAPublisher:
                     f"{API}/{path.lstrip('/')}",
                     json=json,
                     params=params,
-                    headers={"access_token": self._token()},
+                    headers={"access_token": self._publish_token()},
                 )
             except httpx.HTTPError as e:
                 raise IntegrationError(f"Không kết nối được Zalo: {e}") from e
@@ -75,7 +72,7 @@ class ZaloOAPublisher:
         art: dict[str, Any] = {
             "type": "normal",
             "title": title,
-            "author": os.environ.get("ZALO_OA_AUTHOR", "Hàng Chọn"),
+            "author": settings.zalo_oa_author,
             "description": post.text[:300],
             "body": body,
             "status": "show",
@@ -87,7 +84,7 @@ class ZaloOAPublisher:
         if not token:
             raise IntegrationError("Zalo OA không trả mã bài viết.", code="zalo_error")
         aid = (await self._req("POST", "article/verify", json={"token": token})).get("id") or token
-        if os.environ.get("ZALO_OA_BROADCAST") == "1":
+        if settings.zalo_oa_broadcast:
             await self._req(
                 "POST",
                 "oa/message",
@@ -112,19 +109,3 @@ class ZaloOAPublisher:
         return PostMetrics(
             external_id=external_id, impressions=views, reach=views, shares=int(d.get("total_share") or 0)
         )
-
-
-class Driver(ZaloOAPublisher, SocialDriver):
-    name = "zalo_oa_publish"
-
-    async def fetch_inbound(self, since: datetime | None = None) -> list[InboundEvent]:
-        raise IntegrationNotConfigured("Tin nhắn Zalo OA nằm ở driver «zalo_oa» của module hộp thư.")
-
-    async def send_message(self, channel: Channel, thread_external_id: str, text: str) -> SentMessage:
-        raise IntegrationNotConfigured("Tin nhắn Zalo OA nằm ở driver «zalo_oa» của module hộp thư.")
-
-    async def reply_comment(self, channel: Channel, comment_external_id: str, text: str) -> SentMessage:
-        raise IntegrationNotConfigured("Zalo OA nằm ở driver «zalo_oa» của module hộp thư.")
-
-    async def parse_webhook(self, headers: dict[str, str], body: bytes) -> list[InboundEvent]:
-        raise IntegrationNotConfigured("Webhook Zalo OA nằm ở driver «zalo_oa» của module hộp thư.")

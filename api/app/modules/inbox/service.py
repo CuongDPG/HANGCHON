@@ -460,7 +460,7 @@ async def _last_inbound(db: AsyncSession, thread: Thread) -> Message | None:
 
 async def driver_for(db: AsyncSession, thread: Thread) -> Any:
     acc = await db.get(ChannelAccount, thread.channel_account_id) if thread.channel_account_id else None
-    return messaging_driver(acc.driver if acc else "mock")
+    return messaging_driver(acc.driver if acc else "mock", thread.channel)
 
 
 async def capabilities(db: AsyncSession, thread: Thread) -> dict[str, Any]:

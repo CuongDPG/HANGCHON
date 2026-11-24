@@ -165,25 +165,34 @@ Module không gọi service của module khác. Bên phát gọi `await events.e
 | Sự kiện | Payload | Bên phát | Bên nghe (việc phải làm) |
 |---|---|---|---|
 | `brief.created` | `brief_id` | sourcing | — |
-| `candidate.assessed` | `candidate_id`, `assessment_id` | assessment | sourcing (cập nhật điểm), control (việc chờ nếu đạt ngưỡng) |
-| `candidate.stage_changed` | `candidate_id`, `from`, `to` | selection | supply (mua mẫu → gợi ý đơn đặt mẫu) |
+| `candidate.assessed` | `candidate_id`, `assessment_id` | assessment | sourcing (cập nhật điểm xếp hạng), selection (đạt điểm đạt của khung chấm → việc chờ «mua mẫu?», `selection.suggest_sample`) |
+| `candidate.stage_changed` | `candidate_id`, `from`, `to` | selection | supply (sang Mua mẫu → đơn đặt mẫu chờ chị duyệt) |
 | `candidate.selected` | `candidate_id`, `decision_id` | selection | catalog (tạo sản phẩm nháp, e1), selection (học gu, c6) |
 | `candidate.rejected` | `candidate_id`, `decision_id` | selection | selection (học gu) |
-| `price.approved` | `candidate_id`, `price_vnd` | supply | catalog (cập nhật giá bán) |
+| `price.approved` | `candidate_id`, `price_vnd`, `price_proposal_id`, `product_id` | supply | catalog (cập nhật giá bán) |
 | `product.published` | `product_id` | catalog | content (soạn bài các kênh, f1) |
 | `drop.opened` | `drop_id` | catalog | content (bài báo mở đợt), crm (tin cho nhóm khách quen) |
-| `drop.closed` | `drop_id` | catalog | orders (chốt số lượng), supply (soạn đơn đặt nguồn, g3) |
-| `order.created` | `order_id` | orders | crm (sổ khách), finance |
-| `order.paid` | `order_id`, `payment_id` | orders | finance (ghi sổ doanh thu, k1), catalog (trừ suất/tồn) |
-| `order.shipped` | `order_id`, `shipment_id` | orders | — (orders tự báo khách) |
-| `order.delivered` | `order_id` | orders | catalog (xin đánh giá, e8), crm (nhắc mua lại, h6) |
-| `order.refunded` | `order_id`, `amount_vnd` | orders | finance |
-| `inbound.arrived` | `inbound_shipment_id` | supply | orders (đơn chuyển sang chờ giao), catalog (nhập tồn) |
-| `message.received` | `thread_id`, `message_id` | inbox | crm (sổ khách), sourcing (nghe khách muốn gì, a6), orders (nhận ra ý định mua, g6) |
-| `review.published` | `review_id`, `product_id` | catalog | content (gợi ý bài) |
+| `drop.closed` | `drop_id` | catalog | orders (chốt danh sách đơn của đợt), supply (soạn đơn đặt nguồn, g3) |
+| `order.created` | `order_id` | orders | crm (sổ khách, mã giới thiệu, đánh dấu đã mua lại) |
+| `order.paid` | `order_id`, `payment_id` | orders | finance (ghi sổ doanh thu, k1), catalog (ghi suất/tồn của đơn đã trả; hết suất thì đóng đợt) |
+| `order.cancelled` | `order_id`, `was_paid` | orders | catalog (trả suất/tồn) |
+| `order.shipped` | `order_id`, `shipment_id` | orders | catalog (món giữ sẵn rời kho: trừ `on_hand` một lần); orders tự báo khách |
+| `order.delivered` | `order_id` | orders | catalog (xin đánh giá, e8), crm (nhắc mua lại h6, giới thiệu h7) |
+| `order.refunded` | `order_id`, `amount_vnd`, `return_id?`, `payment_id?` | orders | finance (ghi giảm trừ), catalog (trả suất/tồn) |
+| `inbound.arrived` | `inbound_shipment_id` | supply | orders (đơn chuyển sang chờ giao), catalog (lô bổ sung → nhập tồn; mọi lô của đợt đã về → đợt sang giao) |
+| `message.received` | `thread_id`, `message_id` | inbox | orders (hồ sơ khách cho người lạ; nhận ra ý định mua g6), crm (sổ khách), sourcing (nghe khách muốn gì, a6) |
+| `customer.identified` | `customer_id`, `thread_id`, `channel`, `external_id`, `created` | orders | inbox (gắn hội thoại vào hồ sơ khách), crm (tóm tắt sổ khách) |
+| `review.published` | `review_id`, `product_id` | catalog | content (đánh giá ≥ 4★ → gợi ý bài kể lại lời khách, `content.suggest_post`) |
 | `find_request.created` | `find_request_id` | catalog | sourcing (tín hiệu nhu cầu, a6) |
 | `find_request.threshold` | `find_request_id` | catalog | sourcing (đề xuất mở đề tìm) |
+| `tester.feedback_received` | `tester_invite_id`, `candidate_id`, `customer_id`, `customer_name`, `feedback`, `rating` | crm | selection (ghi chú thử `author=tester` cạnh ghi chú của chị, h8) |
 | `post.published` | `scheduled_post_id` | content | — |
-| `expense.recorded` | `expense_id` | supply, control | finance |
+| `expense.recorded` | `expense_id` **hoặc** `source_key`, `amount_vnd`, `category`, `incurred_on`, `description`, `vendor?`, `purchase_order_id?` | supply (trả tiền NCC), control (tiền AI tháng trước, ngày 1 hằng tháng) | finance (có `expense_id` → ghi sổ chi phí đó; không thì tạo `expenses` theo `source_key` rồi ghi sổ) |
+
+Một cách tính suất/tồn duy nhất: đơn **chưa trả** còn sống do orders tự cộng «giữ tạm» khi kiểm còn hàng; đơn **đã trả**
+(`orders.paid_at`) do catalog ghi vào `drop_items.slots_reserved` / `inventory_items.reserved` (tính lại từ đơn nên
+không trừ hai lần). Hằng số chung ở `app/modules/orders/models.py` (`RELEASED_STATUSES`, `PRE_SHIP_STATUSES`).
+Kiểm hợp đồng: `api/tests/integration/test_event_contract.py` (bên nghe của từng dòng + các chuỗi) và
+`api/tests/integration/test_lifecycle.py` (vòng đời trọn một món).
 
 Bên phát phải phát sự kiện dù chưa có ai nghe. Bên nghe phải chạy được lặp lại mà không sinh trùng (idempotent).

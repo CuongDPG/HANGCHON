@@ -325,6 +325,8 @@ class CheckoutIn(AddressFields):
     note: str | None = Field(default=None, max_length=500)
     client_ref: str | None = Field(default=None, max_length=64, description="Chống bấm đặt hai lần")
     marketing_opt_in: bool = False
+    src: str | None = Field(default=None, max_length=40, description="Mã bài dẫn khách tới (?src= trong link bài đăng)")
+    referral_code: str | None = Field(default=None, max_length=30, description="Mã giới thiệu (?ref=)")
 
 
 class DropBrief(BaseModel):
@@ -426,6 +428,14 @@ class PublicReturn(BaseModel):
     created_at: datetime
 
 
+class PublicReviewLink(BaseModel):
+    """e8: món đã nhận đang chờ khách đánh giá (đọc bảng `reviews` của catalog)."""
+
+    name: str
+    token: str
+    status: str
+
+
 class PublicOrderOut(BaseModel):
     code: str
     token: str
@@ -461,6 +471,7 @@ class PublicOrderOut(BaseModel):
     can_change_address: bool
     can_request_return: bool
     notify_hint: str | None
+    reviews: list[PublicReviewLink] = Field(default_factory=list)
 
 
 class LookupIn(BaseModel):

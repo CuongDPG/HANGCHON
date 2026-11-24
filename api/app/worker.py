@@ -22,6 +22,7 @@ class WorkerSettings:
     functions = build_functions()
     cron_jobs = build_cron_jobs()
     redis_settings = redis_settings()
+    queue_name = settings.jobs_queue_name
     on_startup = startup
     timezone = VN_TZ  # giờ trong @cron(...) là giờ Việt Nam
     max_jobs = 10

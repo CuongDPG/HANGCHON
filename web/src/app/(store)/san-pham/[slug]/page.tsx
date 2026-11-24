@@ -208,10 +208,11 @@ function BuyBoxFor({ p }: { p: ProductDetail }) {
       productId={p.id}
       slug={p.slug}
       name={p.name}
-      priceVnd={p.price_vnd}
+      priceVnd={p.drop?.price_vnd || p.price_vnd}
       imageUrl={p.image?.src_small ?? undefined}
+      dropId={p.drop?.id}
       dropLabel={p.drop?.label}
-      slotsLeft={p.drop?.slots_left ?? undefined}
+      slotsLeft={p.drop ? (p.drop.slots_left ?? undefined) : p.stock}
       available={p.available}
     />
   );

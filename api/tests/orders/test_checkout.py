@@ -7,7 +7,6 @@ import asyncio
 import httpx
 from sqlalchemy import func, select
 
-from app.core import events
 from app.core.db import SessionLocal
 from app.integrations import get_driver
 from app.modules.catalog.models import DropItem, DropStatus, SaleMode
@@ -134,26 +133,58 @@ async def test_concurrent_orders_cannot_take_the_same_last_slot() -> None:
 
 
 async def test_paid_orders_are_not_double_counted_when_catalog_deducts(client: httpx.AsyncClient) -> None:
-    """Catalog trừ suất khi nghe order.paid; orders không đếm đơn đã trả lần hai."""
+    """Catalog ghi suất của đơn đã trả (order.paid); orders không đếm đơn đã trả lần hai; huỷ thì trả suất."""
     p = await make_product()
     d = await make_drop([(p, 100_000, 3)])
+    o = await place(client, cart((p, 2, d)))
+    from tests.orders.conftest import send_transfer
 
-    @events.on("order.paid")
-    async def fake_catalog(db, payload) -> None:  # giả lập catalog
-        order = await db.get(Order, __import__("uuid").UUID(payload["order_id"]))
-        for it in order.items:
-            di = await db.get(DropItem, it.drop_item_id)
-            di.slots_reserved += it.quantity
+    await send_transfer(client, o["payment"]["amount_due_vnd"], o["payment"]["transfer_content"])
+    async with SessionLocal() as s:
+        di = (await s.execute(select(DropItem).where(DropItem.drop_id == d.id))).scalar_one()
+        assert di.slots_reserved == 2
+    q = await client.post("/api/store/orders/quote", json={"items": cart((p, 1, d))})
+    assert q.json()["lines"][0]["available"] == 1
+    r = await client.post("/api/store/orders", json=checkout_body(cart((p, 2, d))))
+    assert r.status_code == 409 and "Chỉ còn 1 suất" in r.json()["detail"]
 
-    try:
-        o = await place(client, cart((p, 2, d)))
-        from tests.orders.conftest import send_transfer
+    async with SessionLocal() as s:
+        order = (await s.execute(select(Order).where(Order.code == o["code"]))).scalar_one()
+        await service.cancel_order(s, order, "Khách đổi ý", notify_customer=False)
+        await s.commit()
+        di = (await s.execute(select(DropItem).where(DropItem.drop_id == d.id))).scalar_one()
+        await s.refresh(di)
+        assert di.slots_reserved == 0
+    q = await client.post("/api/store/orders/quote", json={"items": cart((p, 1, d))})
+    assert q.json()["lines"][0]["available"] == 3
 
-        await send_transfer(client, o["payment"]["amount_due_vnd"], o["payment"]["transfer_content"])
-        q = await client.post("/api/store/orders/quote", json={"items": cart((p, 1, d))})
-        assert q.json()["lines"][0]["available"] == 1
-    finally:
-        events._handlers["order.paid"].remove(fake_catalog)
+
+async def test_stock_is_reserved_when_paid_and_leaves_on_shipping(client: httpx.AsyncClient) -> None:
+    """Món giữ sẵn: đơn chưa trả giữ tạm, đã trả thì catalog giữ (`reserved`), giao hãng thì trừ `on_hand` một lần."""
+    from app.modules.catalog.inventory import ship_order
+    from app.modules.catalog.models import InventoryItem
+
+    s_prod = await make_product(name="Khăn lau", mode=SaleMode.IN_STOCK, price=89_000)
+    await make_inventory(s_prod, 5)
+    o = await place(client, cart((s_prod, 2, None)))
+    from tests.orders.conftest import send_transfer
+
+    await send_transfer(client, o["payment"]["amount_due_vnd"], o["payment"]["transfer_content"])
+    q = await client.post("/api/store/orders/quote", json={"items": cart((s_prod, 1, None))})
+    assert q.json()["lines"][0]["available"] == 3
+    async with SessionLocal() as s:
+        inv = (await s.execute(select(InventoryItem).where(InventoryItem.product_id == s_prod.id))).scalar_one()
+        assert (inv.on_hand, inv.reserved) == (5, 2)
+        order = (await s.execute(select(Order).where(Order.code == o["code"]))).scalar_one()
+        order.status = OrderStatus.SHIPPING
+        await s.flush()
+        await ship_order(s, order.id)
+        await ship_order(s, order.id)  # chạy lặp không trừ hai lần
+        await s.commit()
+        await s.refresh(inv)
+        assert (inv.on_hand, inv.reserved) == (3, 0)
+    q = await client.post("/api/store/orders/quote", json={"items": cart((s_prod, 1, None))})
+    assert q.json()["lines"][0]["available"] == 3
 
 
 async def test_mixed_drops_rejected_and_stock_checked(client: httpx.AsyncClient) -> None:

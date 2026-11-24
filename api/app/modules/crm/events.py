@@ -37,6 +37,12 @@ async def on_message(db: AsyncSession, payload: dict[str, Any]) -> None:
         await _refresh_later(db, thread.customer_id)
 
 
+@events.on("customer.identified")
+async def on_customer_identified(db: AsyncSession, payload: dict[str, Any]) -> None:
+    """Khách mới có hồ sơ từ tin nhắn → tóm tắt sổ khách (h4)."""
+    await _refresh_later(db, uuid.UUID(payload["customer_id"]))
+
+
 @events.on("order.created")
 async def on_order_created(db: AsyncSession, payload: dict[str, Any]) -> None:
     oid = uuid.UUID(payload["order_id"])

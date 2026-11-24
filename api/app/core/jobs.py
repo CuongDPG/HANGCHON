@@ -105,4 +105,6 @@ async def enqueue(name: str, *, _defer_by: float | None = None, _job_id: str | N
     if settings.jobs_eager:
         return await JOBS[name](job_context(), **kwargs)
     pool = await get_pool()
-    return await pool.enqueue_job(name, _defer_by=_defer_by, _job_id=_job_id, **kwargs)
+    return await pool.enqueue_job(
+        name, _defer_by=_defer_by, _job_id=_job_id, _queue_name=settings.jobs_queue_name, **kwargs
+    )

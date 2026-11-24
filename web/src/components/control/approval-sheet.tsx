@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, CornerUpLeft, PencilLine } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { Badge, Button, DateTime, Input, LevelTag, Sheet, Skeleton, Textarea, notifySuccess } from "@/components/ui";
 import { isOwner, useSession } from "@/lib/api/auth";
@@ -132,6 +133,11 @@ function ApprovalBody({ item, onClose, onDone }: { item: ApprovalItem; onClose: 
           · <DateTime value={item.created_at} format="relative" />
         </span>
         {item.status !== "pending" && status ? <Badge tone={status.tone}>{status.label}</Badge> : null}
+        {item.href ? (
+          <Link href={item.href} className="ml-auto text-[14px] font-semibold text-accent" onClick={onClose}>
+            Mở chi tiết →
+          </Link>
+        ) : null}
       </div>
 
       {latest.error ? (

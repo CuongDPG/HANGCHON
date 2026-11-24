@@ -15,7 +15,6 @@ OneBound không có radar xu hướng và giá sàn Việt Nam: hai việc này 
 from __future__ import annotations
 
 import base64
-import os
 import re
 from datetime import date
 from decimal import Decimal, InvalidOperation
@@ -95,7 +94,7 @@ class Driver(SourcesDriver):
 
     def _creds(self) -> tuple[str, str]:
         key = settings.onebound_api_key
-        secret = os.environ.get("ONEBOUND_API_SECRET", "")
+        secret = settings.onebound_api_secret or ""
         if not key or not secret:
             raise IntegrationNotConfigured(
                 "Chưa cấu hình ONEBOUND_API_KEY / ONEBOUND_API_SECRET cho nguồn 1688/Taobao."

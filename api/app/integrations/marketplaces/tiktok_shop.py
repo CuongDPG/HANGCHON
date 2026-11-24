@@ -12,7 +12,6 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-import os
 import time
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -44,7 +43,7 @@ class Driver(MarketplacesDriver):
 
     def _creds(self) -> tuple[str, str, str, str]:
         key, secret = settings.tiktok_shop_app_key, settings.tiktok_shop_app_secret
-        token, cipher = os.environ.get("TIKTOK_SHOP_ACCESS_TOKEN", ""), os.environ.get("TIKTOK_SHOP_CIPHER", "")
+        token, cipher = settings.tiktok_shop_access_token or "", settings.tiktok_shop_cipher or ""
         if not (key and secret and token and cipher):
             raise IntegrationNotConfigured("Chưa đủ khoá TikTok Shop (app key/secret, access token, shop cipher).")
         return key, secret, token, cipher

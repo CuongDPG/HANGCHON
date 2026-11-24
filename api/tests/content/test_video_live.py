@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 from sqlalchemy import select
 
+from app.core.config import settings
 from app.core.db import SessionLocal
 from app.core.enums import Actor, Channel
 from app.core.storage import get_storage
@@ -81,7 +82,7 @@ async def test_video_plan_render_and_approve(product_factory, owner_client):
 
 
 async def test_video_without_ffmpeg_exports_plan(product_factory, owner_client, monkeypatch):
-    monkeypatch.setenv("CONTENT_FFMPEG", "0")
+    monkeypatch.setattr(settings, "content_ffmpeg", False)
     p = await product_factory()
     async with SessionLocal() as db:
         a = MediaAsset(

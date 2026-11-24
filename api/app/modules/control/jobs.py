@@ -26,3 +26,54 @@ async def expire_approvals(ctx: dict[str, Any]) -> int:
         )
         await db.commit()
         return res.rowcount or 0
+
+
+async def record_ai_cost(db: Any, key: str) -> int:
+    """k1/k2: tiền AI của một tháng (giờ VN) → `expense.recorded` (finance tự ghi chi phí, khoá theo tháng nên chạy
+    lặp lại không sinh trùng). Trả số tiền đã báo."""
+    from datetime import timedelta
+
+    from sqlalchemy import func, select
+
+    from app.core import events
+    from app.core.timeutil import local_month_bounds_utc, to_local
+    from app.modules.control.models import AIRun
+
+    start, end = local_month_bounds_utc(key)
+    total = int(
+        await db.scalar(
+            select(func.coalesce(func.sum(AIRun.cost_vnd), 0)).where(AIRun.created_at >= start, AIRun.created_at < end)
+        )
+        or 0
+    )
+    if total <= 0:
+        return 0
+    await events.emit(
+        "expense.recorded",
+        {
+            "expense_id": None,
+            "source": "control",
+            "source_key": f"ai-cost:{key}",
+            "amount_vnd": total,
+            "category": "ai",
+            "incurred_on": to_local(end - timedelta(seconds=1)).date().isoformat(),
+            "description": f"Chi phí AI tháng {key[5:]}/{key[:4]}",
+            "vendor": "Anthropic",
+        },
+        db=db,
+    )
+    return total
+
+
+@cron("control.ai_cost_expense", day={1}, hour={2}, minute={30})
+async def ai_cost_expense(ctx: dict[str, Any]) -> int:
+    """Ngày 1 hằng tháng: ghi tiền AI tháng trước vào sổ chi phí."""
+    from datetime import timedelta
+
+    from app.core.timeutil import local_month_bounds_utc, month_key
+
+    start, _ = local_month_bounds_utc(month_key())
+    async with ctx["db"]() as db:
+        total = await record_ai_cost(db, month_key(start - timedelta(days=1)))
+        await db.commit()
+        return total

@@ -14,7 +14,7 @@ from app.core.enums import Channel
 from app.core.security import hmac_sha256
 from app.core.timeutil import now_utc
 from app.integrations import IntegrationError, get_driver
-from app.integrations.social.zalo_oa_messaging import zalo_signature
+from app.integrations.social.zalo_oa import zalo_signature
 from app.modules.inbox.models import Thread, ThreadKind
 from app.modules.inbox.policy import reply_window
 
@@ -31,7 +31,7 @@ def meta_env(monkeypatch):
 def zalo_env(monkeypatch):
     monkeypatch.setattr(settings, "zalo_oa_secret", "oa-secret")
     monkeypatch.setattr(settings, "zalo_oa_access_token", "ztok")
-    monkeypatch.setenv("ZALO_APP_ID", "app9")
+    monkeypatch.setattr(settings, "zalo_app_id", "app9")
 
 
 def _meta_body(obj: str, entry: dict) -> bytes:
@@ -47,7 +47,7 @@ async def test_meta_messenger_and_comment_webhook(meta_env):
     respx.get(url__regex=r"https://graph.facebook.com/v\d+\.\d+/PSID1.*").mock(
         return_value=httpx.Response(200, json={"name": "Trần Thu Hà"})
     )
-    d = get_driver("social", "meta_messaging")
+    d = get_driver("social", "meta")
     body = _meta_body(
         "page",
         {
@@ -80,7 +80,7 @@ async def test_meta_messenger_and_comment_webhook(meta_env):
 
 
 async def test_meta_instagram_webhook_and_verify(meta_env):
-    d = get_driver("social", "meta_messaging")
+    d = get_driver("social", "meta")
     body = _meta_body(
         "instagram",
         {"id": "IG1", "changes": [{"field": "comments", "value": {"id": "c9", "text": "Còn màu xanh không?",
@@ -100,7 +100,7 @@ async def test_meta_send_uses_response_or_human_agent_tag(meta_env):
         return_value=httpx.Response(200, json={"recipient_id": "PSID1", "message_id": "mid.9"})
     )
     reply = respx.post(url__regex=r".*/c1/comments").mock(return_value=httpx.Response(200, json={"id": "c1_r"}))
-    d = get_driver("social", "meta_messaging")
+    d = get_driver("social", "meta")
     s = await d.send_message(Channel.FACEBOOK, "PSID1", "Dạ còn ạ")
     assert s.external_id == "mid.9"
     assert json.loads(route.calls[-1].request.content) == {
@@ -121,7 +121,7 @@ async def test_meta_error_is_reported(meta_env):
         return_value=httpx.Response(400, json={"error": {"message": "Outside window", "code": 10}})
     )
     with pytest.raises(IntegrationError) as e:
-        await get_driver("social", "meta_messaging").send_message(Channel.FACEBOOK, "PSID1", "Dạ")
+        await get_driver("social", "meta").send_message(Channel.FACEBOOK, "PSID1", "Dạ")
     assert "Outside window" in e.value.message and e.value.code == "meta_10"
 
 
@@ -133,7 +133,7 @@ async def test_zalo_webhook_signature_and_send(zalo_env):
     send = respx.post("https://openapi.zalo.me/v3.0/oa/message/cs").mock(
         return_value=httpx.Response(200, json={"error": 0, "data": {"message_id": "zm1"}})
     )
-    d = get_driver("social", "zalo_oa_messaging")
+    d = get_driver("social", "zalo_oa")
     payload = {
         "app_id": "app9", "event_name": "user_send_text", "timestamp": "1764000000000",
         "sender": {"id": "zu1"}, "recipient": {"id": "oa1"}, "message": {"msg_id": "zmsg1", "text": "Đơn bị móp"},

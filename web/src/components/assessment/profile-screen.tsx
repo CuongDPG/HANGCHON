@@ -28,6 +28,7 @@ import { DecisionBar } from "./decision-bar";
 import { ReviewsCard } from "./reviews-card";
 import { ScoreCard } from "./score-card";
 import { WarningsCard } from "./warnings-card";
+import { RelatedLinks } from "@/components/desk/related-links";
 
 const STEP_LABEL: Record<string, string> = {
   details: "lấy chi tiết",
@@ -99,6 +100,7 @@ export function ProfileScreen({ id }: { id: string }) {
           ) : undefined
         }
       />
+      <RelatedLinks links={[{ href: `/desk/ban-chon/${c.id}`, label: "Trên bàn chọn" }, { href: `/desk/nguon-cung/gia-von/${c.id}`, label: "Giá vốn" }]} />
 
       <div className="flex items-start gap-3">
         <ImageBox src={c.main_image_url} alt={c.title_vi} className="w-[84px] shrink-0" placeholder="" priority />

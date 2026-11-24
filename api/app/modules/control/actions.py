@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import ai
+from app.core.config import settings
 from app.core.db import SessionLocal
 from app.core.money import format_vnd
 from app.core.timeutil import local_day_bounds_utc
@@ -96,7 +97,7 @@ register_setting("store.default_shipping_fee_vnd", "Phí giao mặc định (VND
                  description="Áp cho đơn khi chưa lấy được báo giá của hãng giao.")  # fmt: skip
 
 # Hành động mẫu để xem thử giao diện bàn làm việc khi chưa có module nghiệp vụ (chỉ khi đặt HC_DEMO_ACTIONS=1).
-if os.environ.get("HC_DEMO_ACTIONS", "").lower() in ("1", "true", "yes"):
+if settings.allows_simulation and os.environ.get("HC_DEMO_ACTIONS", "").lower() in ("1", "true", "yes"):
     from app.modules.control import demo  # noqa: F401
 
 

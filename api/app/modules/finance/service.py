@@ -177,6 +177,39 @@ async def record_expense(db: AsyncSession, expense_id: uuid.UUID, *, manual: boo
     )
 
 
+async def record_expense_event(db: AsyncSession, payload: dict[str, Any]) -> LedgerEntry | None:
+    """`expense.recorded` từ module khác: có `expense_id` thì ghi sổ chi phí đó; không thì tạo `Expense` từ payload
+    (`source_key`, `amount_vnd`, `category`, `incurred_on`, `description`, `vendor`, `purchase_order_id`).
+    Chạy lặp lại không sinh trùng (khoá `expenses.source_key` + `ledger_entries.source_key`)."""
+    if payload.get("expense_id"):
+        return await record_expense(db, uuid.UUID(str(payload["expense_id"])))
+    key = payload.get("source_key")
+    amount = int(payload.get("amount_vnd") or 0)
+    if not key or amount <= 0:
+        log.warning("expense.recorded thiếu source_key hoặc số tiền: %s", payload)
+        return None
+    exp = (await db.execute(select(Expense).where(Expense.source_key == key))).scalar_one_or_none()
+    if exp is None:
+        try:
+            category = ExpenseCategory(payload.get("category") or "other")
+        except ValueError:
+            category = ExpenseCategory.OTHER
+        incurred = payload.get("incurred_on")
+        po_id = payload.get("purchase_order_id")
+        exp = Expense(
+            source_key=key,
+            incurred_on=date.fromisoformat(incurred) if incurred else local_today(),
+            category=category,
+            amount_vnd=amount,
+            description=str(payload.get("description") or "Chi phí"),
+            vendor=payload.get("vendor"),
+            purchase_order_id=uuid.UUID(str(po_id)) if po_id else None,
+        )
+        db.add(exp)
+        await db.flush()
+    return await record_expense(db, exp.id)
+
+
 # ---- chi phí nhập tay --------------------------------------------------------------------------------------------
 
 RECEIPT_TYPES = {
@@ -815,32 +848,73 @@ async def generate_report(db: AsyncSession, ws: date | None = None, *, user: Use
 BACKUP_KEEP_KEY = "finance.backup_keep"
 PG_DUMP_MISSING = (
     "Máy chủ chưa có lệnh pg_dump nên chưa sao lưu được. Cài gói postgresql-client (cùng bản với Postgres, "
-    "vd postgresql-client-17) vào máy chạy API, hoặc đặt PG_DUMP_PATH trỏ tới pg_dump."
+    "vd postgresql-client-17) vào máy chạy API, hoặc đặt PG_DUMP_PATH trỏ tới pg_dump, hoặc chạy Postgres trong "
+    "Docker và đặt PG_DUMP_DOCKER_CONTAINER (tên container) để sao lưu bằng pg_dump trong container."
 )
 
 
-def pg_dump_path() -> str | None:
-    custom = os.environ.get("PG_DUMP_PATH")
+def _local_pg_dump() -> str | None:
+    custom = settings.pg_dump_path
     if custom:
         return custom if os.path.isfile(custom) and os.access(custom, os.X_OK) else None
     return shutil.which("pg_dump")
 
 
+def _docker_container() -> str | None:
+    """Container Postgres chạy được `docker exec` (chỉ khi CSDL ở máy này và chưa chỉ định PG_DUMP_PATH)."""
+    name = settings.pg_dump_docker_container
+    host = make_url(settings.database_url).host or "localhost"
+    if not name or settings.pg_dump_path or host not in ("localhost", "127.0.0.1", "::1") or not shutil.which("docker"):
+        return None
+    import subprocess
+
+    try:
+        out = subprocess.run(
+            ["docker", "inspect", "-f", "{{.State.Running}}", name], capture_output=True, text=True, timeout=5
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return name if out.returncode == 0 and out.stdout.strip() == "true" else None
+
+
+def pg_dump_path() -> str | None:
+    """Cách chạy pg_dump sẽ dùng (để hiện cho chị): đường dẫn trên máy, hoặc `docker:<container>`."""
+    local = _local_pg_dump()
+    if local:
+        return local
+    container = _docker_container()
+    return f"docker:{container}" if container else None
+
+
+def _pg_dump_command(url: Any) -> tuple[list[str], dict[str, str]] | None:
+    opts = ["--no-owner", "--no-privileges", "--format=plain", "--username", url.username or "postgres"]
+    password = url.password or ""
+    local = _local_pg_dump()
+    if local:
+        args = [local, *opts, "--host", url.host or "localhost", "--port", str(url.port or 5432), url.database or ""]
+        return args, {**os.environ, "PGPASSWORD": password, "PGCONNECT_TIMEOUT": "10"}
+    container = _docker_container()
+    if container:
+        # trong container Postgres nghe cổng 5432 nội bộ; mật khẩu chuyển qua biến môi trường, không qua dòng lệnh
+        args = ["docker", "exec", "-e", "PGPASSWORD", container, "pg_dump", *opts, url.database or ""]
+        return args, {**os.environ, "PGPASSWORD": password}
+    return None
+
+
 async def run_backup(db: AsyncSession, trigger: BackupTrigger, user: User | None = None) -> Backup:
     """pg_dump → gzip → storage (`private/backups/...`), ghi `backups`, chỉ giữ N bản gần nhất.
+    pg_dump trên máy (PG_DUMP_PATH hoặc PATH) → không có thì `docker exec` vào container Postgres.
     Lỗi (thiếu pg_dump, sai bản, mất kết nối) → bản ghi `failed` kèm lời giải thích, không raise."""
     started = now_utc()
     b = Backup(kind=BackupKind.DATABASE, status=BackupStatus.RUNNING, trigger=trigger, started_at=started,
                triggered_by_id=user.id if user else None)  # fmt: skip
     db.add(b)
     await db.flush()
-    exe = pg_dump_path()
-    if exe is None:
-        return await _backup_failed(db, b, PG_DUMP_MISSING)
     url = make_url(settings.database_url)
-    args = [exe, "--no-owner", "--no-privileges", "--format=plain", "--host", url.host or "localhost",
-            "--port", str(url.port or 5432), "--username", url.username or "postgres", url.database or ""]  # fmt: skip
-    env = {**os.environ, "PGPASSWORD": url.password or "", "PGCONNECT_TIMEOUT": "10"}
+    cmd = _pg_dump_command(url)
+    if cmd is None:
+        return await _backup_failed(db, b, PG_DUMP_MISSING)
+    args, env = cmd
     try:
         proc = await asyncio.create_subprocess_exec(
             *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=env

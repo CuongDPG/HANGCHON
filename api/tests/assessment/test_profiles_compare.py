@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import func, select
-
 from app.modules.catalog.models import Category
-from app.modules.sourcing.models import Candidate, SourcingBrief
+from app.modules.sourcing.models import Candidate
 from tests.sourcing.util import scanned_brief
 
 API = "/api/desk/assessment"
@@ -88,19 +86,3 @@ async def test_comparison(owner_client):
     r = await owner_client.post(f"{API}/comparisons", json={"candidate_ids": [ids[0], other[0]["id"]]})
     assert r.status_code == 400
     assert (await owner_client.get(f"{API}/comparisons/{uuid.uuid4()}")).status_code == 404
-
-
-async def test_seed_demo_is_idempotent(db):
-    from app.modules.assessment.models import Assessment
-    from app.modules.sourcing.seed import seed_demo
-
-    first = await seed_demo(db)
-    assert first["briefs"] == 3 and first["demand"] >= 4
-    n_cand = await db.scalar(select(func.count()).select_from(Candidate))
-    n_ass = await db.scalar(select(func.count()).select_from(Assessment))
-    assert n_cand >= 10 and n_ass >= 4
-    again = await seed_demo(db)
-    assert again["briefs"] == 0
-    assert await db.scalar(select(func.count()).select_from(Candidate)) == n_cand
-    assert await db.scalar(select(func.count()).select_from(Assessment)) == n_ass
-    assert await db.scalar(select(func.count()).select_from(SourcingBrief)) == 3

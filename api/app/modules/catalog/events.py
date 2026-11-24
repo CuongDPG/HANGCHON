@@ -6,16 +6,15 @@ import logging
 import uuid
 from typing import Any
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import events
 from app.core.config import settings
 from app.core.jobs import enqueue
-from app.modules.catalog import drops as drop_svc
+from app.modules.catalog import inventory
 from app.modules.catalog import products as product_svc
 from app.modules.catalog import reviews as review_svc
-from app.modules.catalog.models import Drop, DropItem, DropStatus
+from app.modules.catalog.models import Product
 
 log = logging.getLogger("app.catalog")
 
@@ -52,10 +51,19 @@ async def on_candidate_selected(db: AsyncSession, payload: dict[str, Any]) -> No
 
 @events.on("price.approved")
 async def on_price_approved(db: AsyncSession, payload: dict[str, Any]) -> None:
-    cid = _id(payload, "candidate_id")
-    if cid is None:
-        return
-    await product_svc.apply_price(db, cid, int(payload.get("price_vnd") or 0))
+    price = int(payload.get("price_vnd") or 0)
+    if payload.get("candidate_id"):
+        cid = _id(payload, "candidate_id")
+        if cid is not None:
+            await product_svc.apply_price(db, cid, price)
+    elif payload.get("product_id"):  # đề xuất giá cho sản phẩm đã có (không gắn ứng viên)
+        pid = _id(payload, "product_id")
+        p = await db.get(Product, pid) if pid else None
+        if p is not None and p.candidate_id:
+            await product_svc.apply_price(db, p.candidate_id, price)
+        elif p is not None and price > 0:
+            p.price_vnd = price
+            await db.flush()
 
 
 @events.on("order.delivered")
@@ -68,22 +76,32 @@ async def on_order_delivered(db: AsyncSession, payload: dict[str, Any]) -> None:
 
 @events.on("order.paid")
 async def on_order_paid(db: AsyncSession, payload: dict[str, Any]) -> None:
-    """e3: trừ suất trong đợt (đếm lại từ đơn đã trả tiền); hết suất thì đóng đợt."""
-    from app.modules.orders.models import OrderItem
-
+    """e3/g8: đơn đã trả → tính lại suất của đợt và phần tồn đang giữ; hết suất thì đóng đợt."""
     oid = _id(payload, "order_id")
-    if oid is None:
-        return
-    item_ids = [
-        i for i in (await db.execute(select(OrderItem.drop_item_id).where(OrderItem.order_id == oid))).scalars() if i
-    ]
-    if not item_ids:
-        return
-    await drop_svc.recount_slots(db, item_ids)
-    drop_ids = set((await db.execute(select(DropItem.drop_id).where(DropItem.id.in_(item_ids)))).scalars())
-    for did in drop_ids:
-        d = await db.get(Drop, did)
-        if d is not None and d.status == DropStatus.OPEN:
-            await db.refresh(d, ["items"])
-            if drop_svc.sold_out(d):
-                await drop_svc.close_drop(db, d, reason="hết suất")
+    if oid is not None:
+        await inventory.sync_order(db, oid, close_sold_out=True)
+
+
+@events.on("order.cancelled")
+@events.on("order.refunded")
+async def on_order_released(db: AsyncSession, payload: dict[str, Any]) -> None:
+    """Đơn huỷ / hoàn tiền → trả suất và phần tồn đang giữ (tính lại từ đơn nên không trả hai lần)."""
+    oid = _id(payload, "order_id")
+    if oid is not None:
+        await inventory.sync_order(db, oid)
+
+
+@events.on("order.shipped")
+async def on_order_shipped(db: AsyncSession, payload: dict[str, Any]) -> None:
+    """g8: đơn rời kho → trừ tồn món giữ sẵn (một lần cho mỗi đơn)."""
+    oid = _id(payload, "order_id")
+    if oid is not None:
+        await inventory.ship_order(db, oid)
+
+
+@events.on("inbound.arrived")
+async def on_inbound_arrived(db: AsyncSession, payload: dict[str, Any]) -> None:
+    """g8/e3: lô hàng về → nhập tồn (lô bổ sung) hoặc chuyển đợt sang giao khi mọi lô đã về."""
+    iid = _id(payload, "inbound_shipment_id")
+    if iid is not None:
+        await inventory.receive_inbound(db, iid)

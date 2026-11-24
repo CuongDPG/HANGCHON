@@ -20,7 +20,6 @@ from app.modules.catalog.models import Drop, DropItem, Product
 from app.modules.control.models import ApprovalItem, ApprovalStatus
 from app.modules.orders.models import Order, OrderItem, OrderStatus
 from app.modules.sourcing.models import CandidateStage
-from app.modules.supply import service as supply_service
 from app.modules.supply.models import PurchaseOrder
 from tests.selection.helpers import capture, make_candidate
 
@@ -403,16 +402,3 @@ async def test_suppliers_crud_and_search(owner_client: httpx.AsyncClient, client
     r = await owner_client.post(f"{S}/purchase-orders/sample", json={"candidate_id": str(c.id), "supplier_id": a["id"]})
     assert r.status_code == 400 and r.json()["code"] == "supplier_blocked"
     assert (await owner_client.delete(f"{S}/suppliers/{a['id']}")).status_code == 204
-
-
-async def test_demo_seed_idempotent(owner, db) -> None:
-    from app.modules.supply.seed import seed_demo
-
-    first = await seed_demo(db)
-    await db.commit()
-    assert first["suppliers"] == 5 and first["purchase_orders"] == 3
-    assert await seed_demo(db) == {"suppliers": 0, "cost_sheets": 0, "purchase_orders": 0}
-    await db.commit()
-    async with SessionLocal() as s:
-        warn = await supply_service.document_warnings(s)
-        assert [w["missing"] for w in warn] == [["original_label"]]

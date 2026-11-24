@@ -15,6 +15,8 @@ API_PORT="${API_PORT:-8010}"
 WEB_PORT="${WEB_PORT:-3010}"
 mkdir -p "$LOGS" "$PIDS"
 unset VIRTUAL_ENV  # tránh dùng nhầm venv của dự án khác
+# mỗi bản làm việc một hàng đợi job trên Redis dùng chung (không nhận nhầm job của worktree khác)
+export JOBS_QUEUE_NAME="${JOBS_QUEUE_NAME:-arq:hangchon:$(basename "$ROOT")}"
 
 compose() { docker compose -f "$ROOT/docker-compose.yml" "$@"; }
 

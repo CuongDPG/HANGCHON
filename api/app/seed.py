@@ -1,4 +1,5 @@
-"""Dữ liệu khởi đầu: `uv run python -m app.seed` (chạy lại nhiều lần không sinh trùng).
+"""Dữ liệu khởi đầu: `uv run python -m app.seed` (chạy lại nhiều lần không sinh trùng); thêm `--demo` để dựng câu
+chuyện mẫu dùng chung cho mọi module (`app/demo.py`).
 
 Tạo tài khoản chị (OWNER_EMAIL / OWNER_PASSWORD) và dữ liệu mẫu tối thiểu: nhóm hàng, khung chấm điểm 7 tiêu chí,
 giọng viết mặc định, vài nguyên tắc chọn, tài khoản kênh giả. Dữ liệu mẫu đầy đủ do các module bổ sung sau."""
@@ -26,16 +27,6 @@ CATEGORIES = [
     ("tieu-hao", "Đồ tiêu hao", True, 60),
 ]
 
-CRITERIA = [
-    ("cong_nang", "Công năng", 20, "Làm đúng việc, giải quyết được vấn đề thật"),
-    ("do_ben", "Chất lượng, độ bền", 20, "Chắc tay, đánh giá dài hạn tốt"),
-    ("an_toan", "Chất liệu an toàn", 15, "Đặc biệt đồ tiếp xúc thực phẩm"),
-    ("de_dung", "Dễ dùng, dễ vệ sinh", 15, "Không cầu kỳ, rửa nhanh"),
-    ("tham_my", "Thẩm mỹ", 10, "Gọn, hợp nhà Việt"),
-    ("gia_tri", "Đáng tiền", 15, "So với giá bán ở Việt Nam"),
-    ("van_chuyen", "Dễ nhập, dễ giao", 5, "Nhẹ, không pin/chất lỏng, ít vỡ"),
-]
-
 PRINCIPLES = [
     ("must", "Đồ tiếp xúc thực phẩm phải có chất liệu rõ ràng (inox 304, silicon thực phẩm, PP...)"),
     ("must_not", "Không chọn hàng có pin hoặc chất lỏng ở giai đoạn đầu"),
@@ -47,6 +38,7 @@ PRINCIPLES = [
 async def seed(db: AsyncSession) -> dict[str, int]:
     from app.core.enums import Channel
     from app.modules.assessment.models import ScoringProfile
+    from app.modules.assessment.service import ensure_seeded_profile
     from app.modules.catalog.models import Category
     from app.modules.content.models import VoiceProfile
     from app.modules.control.models import User
@@ -66,16 +58,10 @@ async def seed(db: AsyncSession) -> dict[str, int]:
             db.add(Category(slug=slug, name=name, position=i, is_consumable=consumable, default_reorder_days=days))
             counts["categories"] += 1
 
+    # khung chấm 7 tiêu chí theo bản thiết kế (25/20/15/15/10/10/5) — một nguồn duy nhất ở module assessment
     if not await db.scalar(select(ScoringProfile.id).where(ScoringProfile.is_default.is_(True))):
-        db.add(
-            ScoringProfile(
-                name="Khung mặc định",
-                is_default=True,
-                pass_score=65,
-                criteria=[{"key": k, "label": lbl, "weight": w, "description": d} for k, lbl, w, d in CRITERIA],
-            )
-        )
         counts["scoring_profiles"] += 1
+    await ensure_seeded_profile(db)
 
     if not await db.scalar(select(VoiceProfile.id).limit(1)):
         db.add(
@@ -109,16 +95,23 @@ async def seed(db: AsyncSession) -> dict[str, int]:
     return counts
 
 
-async def main() -> None:
+async def main(demo: bool = False) -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     discover_modules()
     async with SessionLocal() as db:
         counts = await seed(db)
         await db.commit()
     log.info("Đã tạo: %s", ", ".join(f"{k}={v}" for k, v in counts.items()))
+    if demo:
+        from app.demo import seed_demo
+
+        made = await seed_demo()
+        log.info("Dữ liệu mẫu: %s", ", ".join(f"{k}={v}" for k, v in made.items()) if made else "đã có sẵn, bỏ qua")
     if settings.owner_email:
         log.info("Đăng nhập bàn làm việc bằng %s", settings.owner_email)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import sys
+
+    asyncio.run(main(demo="--demo" in sys.argv[1:]))

@@ -23,6 +23,7 @@ from sqlalchemy import and_, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import ai, control
+from app.core import events
 from app.core.config import settings
 from app.core.enums import Actor, Channel
 from app.core.errors import BadRequest, Conflict, NotFound
@@ -65,7 +66,7 @@ from app.modules.crm.models import (
 from app.modules.inbox.models import Direction, Message, Thread, ThreadKind
 from app.modules.inbox.textsearch import digits, email_local, like_pattern, sql_fold
 from app.modules.orders.models import Customer, CustomerIdentity, Order, OrderItem, OrderStatus
-from app.modules.selection.models import TrialNote
+from app.modules.selection.models import NoteAuthor, TrialNote
 from app.modules.sourcing.models import Candidate, CandidateStage
 
 log = logging.getLogger("app.crm")
@@ -1089,11 +1090,12 @@ async def trial_candidates(db: AsyncSession) -> list[Candidate]:
 
 
 async def trial_notes(db: AsyncSession, candidate_id: uuid.UUID, limit: int = 10) -> list[TrialNote]:
+    """Ghi chú thử của chị (cảm nhận của khách thử hiện riêng ở lời mời)."""
     return list(
         (
             await db.execute(
                 select(TrialNote)
-                .where(TrialNote.candidate_id == candidate_id)
+                .where(TrialNote.candidate_id == candidate_id, TrialNote.author != NoteAuthor.TESTER)
                 .order_by(TrialNote.recorded_at.desc())
                 .limit(limit)
             )
@@ -1216,6 +1218,13 @@ async def respond_invite(
         inv.feedback_at = now
         inv.responded_at = inv.responded_at or now
         inv.status = TesterInviteStatus.FEEDBACK_RECEIVED
+        c = await db.get(Customer, inv.customer_id)
+        await events.emit(
+            "tester.feedback_received",
+            {"tester_invite_id": str(inv.id), "candidate_id": str(inv.candidate_id), "customer_id": str(inv.customer_id),
+             "customer_name": c.name if c else None, "feedback": inv.feedback, "rating": rating},
+            db=db,
+        )  # fmt: skip
     else:
         raise BadRequest("Thao tác không hợp lệ.")
     await control.audit(db, "crm.tester_responded", actor=Actor.CUSTOMER, entity_type="tester_invites",

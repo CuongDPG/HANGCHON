@@ -29,6 +29,7 @@ from app.modules.orders.schemas import (
     PublicItem,
     PublicOrderOut,
     PublicReturn,
+    PublicReviewLink,
     PublicShipment,
     TimelineStep,
 )
@@ -228,6 +229,16 @@ async def public_view(db: AsyncSession, order: Order) -> PublicOrderOut:
             await db.execute(select(Return).where(Return.order_id == order.id).order_by(Return.created_at.desc()))
         ).scalars()
     )
+    from app.modules.catalog.models import Review, ReviewStatus  # chỉ đọc
+
+    review_rows = (
+        (await db.execute(select(Review).where(Review.order_id == order.id).order_by(Review.created_at)))
+        .scalars()
+        .all()
+        if order.status in (OrderStatus.DELIVERED, OrderStatus.COMPLETED)
+        else []
+    )
+    names = {i.id: i.name for i in order.items}
     marketplace = order.channel in (Channel.TIKTOK_SHOP, Channel.SHOPEE)
     active_ship = sh is not None and sh.status not in FINAL
     notify_on = await control.get_setting(db, "orders.notify_enabled") is not False
@@ -257,4 +268,9 @@ async def public_view(db: AsyncSession, order: Order) -> PublicOrderOut:
         can_change_address=order.status in service.ADDRESS_EDITABLE and not active_ship and not marketplace and order.status != OrderStatus.DRAFT,
         can_request_return=order.status in (OrderStatus.DELIVERED, OrderStatus.COMPLETED) and not any(r.status in OPEN_STATUSES for r in rets),
         notify_hint=f"Mỗi mốc bạn sẽ nhận một {hint_channel}." if notify_on and not marketplace else None,
+        reviews=[
+            PublicReviewLink(name=names.get(r.order_item_id, "Món đã nhận"), token=r.token, status=r.status.value)
+            for r in review_rows if r.status in (ReviewStatus.REQUESTED, ReviewStatus.SUBMITTED,
+                                                 ReviewStatus.PENDING_REVIEW, ReviewStatus.PUBLISHED)
+        ],
     )  # fmt: skip

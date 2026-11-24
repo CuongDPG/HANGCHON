@@ -202,14 +202,14 @@ async def _stats(db) -> list[control.Stat]:
     briefs = (await db.execute(select(func.count()).where(SourcingBrief.status == BriefStatus.ACTIVE))).scalar_one()
     return [
         control.Stat(
-            key="sourcing.new_candidates", label="ứng viên mới 7 ngày", value=int(new), href="/desk/san-hang", order=40
+            key="sourcing.new_candidates", label="Ứng viên mới 7 ngày", value=int(new), href="/desk/san-hang", order=40
         ),
         control.Stat(
-            key="sourcing.active_briefs", label="đề đang chạy", value=int(briefs), href="/desk/san-hang", order=41
+            key="sourcing.active_briefs", label="Đề đang chạy", value=int(briefs), href="/desk/san-hang", order=41
         ),
         control.Stat(
             key="sourcing.open_demand",
-            label="nhu cầu khách",
+            label="Nhu cầu khách",
             value=int(demand),
             href="/desk/san-hang?tab=khach-hoi",
             order=42,

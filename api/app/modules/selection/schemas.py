@@ -35,6 +35,7 @@ class TrialNoteOut(ORM):
     kind: TrialNoteKind
     author: NoteAuthor
     tester_invite_id: uuid.UUID | None
+    author_name: str | None
     text: str | None
     audio_storage_key: str | None
     media: list[Any]

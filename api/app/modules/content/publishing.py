@@ -6,15 +6,14 @@
 - Số liệu: cron kéo `post_metrics`; đơn gắn với bài qua mã nguồn trong link `?src=<mã bài>` — đọc `orders.raw["src"]`
   (chỉ đọc bảng orders; module orders lưu tham số `src` của trang đặt hàng vào `raw`).
 
-Chọn driver theo kênh: biến môi trường `SOCIAL_PUBLISH_DRIVERS="facebook=meta_publish,instagram=meta_publish,
-threads=meta_publish,tiktok=tiktok_draft_publish,zalo_oa=zalo_oa_publish"`; kênh không khai báo dùng driver
+Chọn driver theo kênh: `SOCIAL_CHANNEL_DRIVERS="facebook=meta,instagram=meta,threads=meta,tiktok=tiktok_draft,
+zalo_oa=zalo_oa"` (chung với hộp thư); kênh không khai báo dùng driver
 `SOCIAL_DRIVER` chung (mặc định `mock`).
 """
 
 from __future__ import annotations
 
 import logging
-import os
 import uuid
 from collections import defaultdict
 from datetime import date, datetime, timedelta
@@ -28,8 +27,8 @@ from app.core import events
 from app.core.enums import Channel
 from app.core.errors import AppError, BadRequest, Conflict
 from app.core.timeutil import local_today, now_utc, to_local
-from app.integrations import get_driver
 from app.integrations.social import SocialPost
+from app.integrations.social import driver_for as social_driver_for
 from app.modules.catalog.models import Drop, Product
 from app.modules.content import facts
 from app.modules.content.ai_io import InsightIn, InsightOut, PostStat
@@ -58,10 +57,8 @@ LINK_IN_BIO = (Channel.INSTAGRAM, Channel.TIKTOK)  # link trong chú thích khô
 
 
 def driver_for(channel: Channel) -> Any:
-    spec = os.environ.get("SOCIAL_PUBLISH_DRIVERS", "")
-    mapping = dict(p.split("=", 1) for p in spec.replace(" ", "").split(",") if "=" in p)
-    name = mapping.get(channel.value)
-    return get_driver("social", name) if name else get_driver("social")
+    """Driver đăng bài của kênh — cùng cấu hình với hộp thư (`SOCIAL_CHANNEL_DRIVERS`, xem app.integrations.social)."""
+    return social_driver_for(channel)
 
 
 async def _video_url(db: AsyncSession, draft: ContentDraft) -> str | None:

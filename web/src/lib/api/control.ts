@@ -36,6 +36,8 @@ export type Preview = {
 
 export type ApprovalItem = {
   id: string;
+  /** Màn hình của đối tượng liên quan (máy chủ tính), vd /desk/don-hang/<id>. */
+  href?: string | null;
   action: string;
   action_label: string;
   action_group: string | null;
@@ -67,6 +69,7 @@ export type ApprovalItem = {
 
 export type Activity = {
   id: string;
+  href?: string | null;
   action: string;
   action_label: string;
   module: string;

@@ -55,7 +55,7 @@ REGULAR_MIN_KEY = "crm.regular_min_orders"
 
 
 def _simulate_enabled() -> bool:
-    return settings.app_env in ("dev", "test")
+    return settings.allows_simulation
 
 
 def _last(m: Message | None) -> LastMessage | None:

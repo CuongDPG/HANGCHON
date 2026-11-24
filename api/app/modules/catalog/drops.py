@@ -325,8 +325,9 @@ async def add_reminder(db: AsyncSession, drop: Drop, contact: str) -> bool:
 
 
 async def recount_slots(db: AsyncSession, drop_item_ids: list[uuid.UUID]) -> None:
-    """Số suất đã đặt = tổng số lượng các dòng đơn đã trả tiền (đặt cọc) và chưa huỷ. Tính lại → chạy lặp không sai."""
-    from app.modules.orders.models import Order, OrderItem, OrderStatus, PaymentState
+    """Số suất đã đặt = tổng số lượng các dòng đơn đã trả (đủ tiền hoặc đủ cọc: `paid_at`) và chưa huỷ/hoàn.
+    Đơn chưa trả do orders tự cộng khi kiểm suất (xem `app.modules.catalog.inventory`). Tính lại → chạy lặp không sai."""
+    from app.modules.orders.models import RELEASED_STATUSES, Order, OrderItem
 
     if not drop_item_ids:
         return
@@ -336,8 +337,8 @@ async def recount_slots(db: AsyncSession, drop_item_ids: list[uuid.UUID]) -> Non
             .join(Order, Order.id == OrderItem.order_id)
             .where(
                 OrderItem.drop_item_id.in_(drop_item_ids),
-                Order.payment_state.in_((PaymentState.PAID, PaymentState.PARTIALLY_PAID)),
-                Order.status.not_in((OrderStatus.CANCELLED, OrderStatus.RETURNED)),
+                Order.paid_at.is_not(None),
+                Order.status.not_in(RELEASED_STATUSES),
             )
             .group_by(OrderItem.drop_item_id)
         )

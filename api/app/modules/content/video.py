@@ -19,6 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import ai, control
+from app.core.config import settings
 from app.core.enums import Channel
 from app.core.errors import BadRequest, Conflict, NotFound
 from app.core.storage import get_storage, new_key
@@ -41,7 +42,7 @@ MAX_CLIP_BYTES = 200 * 1024 * 1024
 VIDEO_TYPES = {"video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm", "video/x-m4v": "m4v"}
 W, H = 720, 1280  # 9:16
 FONT_CANDIDATES = [
-    os.environ.get("CONTENT_FONT_PATH", ""),
+    settings.content_font_path or "",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
     "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
     "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
@@ -51,7 +52,7 @@ FONT_CANDIDATES = [
 
 
 def ffmpeg_available() -> bool:
-    if os.environ.get("CONTENT_FFMPEG", "1") == "0":
+    if not settings.content_ffmpeg:
         return False
     return bool(shutil.which("ffmpeg") and shutil.which("ffprobe"))
 

@@ -14,7 +14,6 @@ nếu `Address.codes` chưa có `ghn_district_id` / `ghn_ward_code`.
 from __future__ import annotations
 
 import json
-import os
 import unicodedata
 from datetime import UTC, datetime
 from typing import Any
@@ -83,7 +82,7 @@ class Driver(ShippingDriver):
     name = "ghn"
 
     def __init__(self) -> None:
-        self.base = DEV if os.environ.get("GHN_ENV") == "dev" else PROD
+        self.base = DEV if settings.ghn_env == "dev" else PROD
         self._provinces: list[dict[str, Any]] | None = None
         self._districts: dict[int, list[dict[str, Any]]] = {}
         self._wards: dict[int, list[dict[str, Any]]] = {}

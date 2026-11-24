@@ -20,6 +20,7 @@ export type ImageSet = {
 
 export type SealInfo = { chosen: number; total: number | null };
 export type DropRef = {
+  id: string;
   slug: string;
   label: string;
   title: string;

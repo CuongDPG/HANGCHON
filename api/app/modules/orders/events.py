@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import events
-from app.modules.orders import drafts, drops
+from app.modules.orders import customers, drafts, drops
 
 
 @events.on("drop.closed")
@@ -25,5 +25,6 @@ async def _inbound_arrived(db: AsyncSession, payload: dict[str, Any]) -> None:
 
 @events.on("message.received")
 async def _message_received(db: AsyncSession, payload: dict[str, Any]) -> None:
-    """g6: tin nhắn khách → AI nhận ra ý định mua → đơn nháp chờ chị chốt."""
+    """h4: người lạ nhắn → có hồ sơ khách ngay; g6: AI nhận ra ý định mua → đơn nháp chờ chị chốt."""
+    await customers.ensure_from_message(db, uuid.UUID(str(payload["thread_id"])), uuid.UUID(str(payload["message_id"])))
     await drafts.on_message(db, uuid.UUID(str(payload["thread_id"])), uuid.UUID(str(payload["message_id"])))

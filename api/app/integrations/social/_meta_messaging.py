@@ -11,18 +11,14 @@ trả lời bình luận, nhắn riêng từ bình luận (private reply), gửi
 - Instagram: webhook `comments` + `messages`; trả lời bình luận `POST /{ig-comment-id}/replies`; nhắn tin
   `POST /{page-id}/messages` (Instagram Messaging qua Facebook Login, dùng Page token)
 
-Cấu hình (api/.env): META_APP_SECRET, META_PAGE_ID, META_PAGE_TOKEN, META_IG_USER_ID, META_WEBHOOK_VERIFY_TOKEN,
-META_GRAPH_VERSION (mặc định v24.0). Token không lưu trong CSDL.
-
-Phần đăng bài (`publish`, `post_metrics`) do module nội dung viết ở `meta.py`; lớp `MetaMessaging` ở đây là mixin để
-người tích hợp gộp: `class Driver(MetaMessaging, <phần đăng bài>)` và đặt `supports_messaging = True`.
+Cấu hình (settings): META_APP_SECRET, META_PAGE_ID, META_PAGE_TOKEN, META_IG_USER_ID, META_WEBHOOK_VERIFY_TOKEN,
+META_GRAPH_VERSION. Token không lưu trong CSDL. Lớp `MetaMessaging` được gộp vào driver `meta` (`meta.py`).
 """
 
 from __future__ import annotations
 
 import json
 import logging
-import os
 from datetime import UTC, datetime
 from typing import Any
 
@@ -33,7 +29,7 @@ from app.core.enums import Channel
 from app.core.security import verify_hmac_sha256
 from app.core.timeutil import now_utc
 from app.integrations.base import IntegrationError, IntegrationNotConfigured
-from app.integrations.social import InboundEvent, PostMetrics, PublishResult, SentMessage, SocialDriver, SocialPost
+from app.integrations.social import InboundEvent, SentMessage
 
 log = logging.getLogger("app.integrations.meta")
 
@@ -70,7 +66,7 @@ class MetaMessaging:
 
     @property
     def version(self) -> str:
-        return os.environ.get("META_GRAPH_VERSION", "v24.0")
+        return settings.meta_graph_version
 
     def _token(self) -> str:
         if not settings.meta_page_token:
@@ -259,15 +255,3 @@ class MetaMessaging:
         path = f"{comment_external_id}/replies" if channel == Channel.INSTAGRAM else f"{comment_external_id}/comments"
         data = await self._post(path, {"message": text})
         return SentMessage(external_id=str(data.get("id", "")), sent_at=now_utc())
-
-
-class Driver(MetaMessaging, SocialDriver):
-    """Driver chỉ có phần nhắn tin (dùng khi `meta.py` chưa gộp phần này)."""
-
-    name = "meta_messaging"
-
-    async def publish(self, post: SocialPost) -> PublishResult:
-        raise IntegrationNotConfigured("Đăng bài Meta nằm ở driver «meta» của module nội dung.")
-
-    async def post_metrics(self, channel: Channel, external_id: str) -> PostMetrics:
-        raise IntegrationNotConfigured("Số liệu bài Meta nằm ở driver «meta» của module nội dung.")

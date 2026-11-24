@@ -138,7 +138,7 @@ async def test_order_paid_recounts_slots_and_closes_sold_out(db, owner_client, d
     d = (await owner_client.post("/api/desk/catalog/drops", json=_body(p))).json()
     await owner_client.post(f"/api/desk/catalog/drops/{d['id']}/open")
     item_id = d["items"][0]["id"]
-    o = Order(code="HCTEST1", drop_id=d["id"], status=OrderStatus.CONFIRMED, payment_state=PaymentState.PAID,
+    o = Order(code="HCTEST1", drop_id=d["id"], status=OrderStatus.CONFIRMED, payment_state=PaymentState.PAID, paid_at=now_utc(),
               recipient_name="Khách thử", recipient_phone="0000000000", placed_at=now_utc())  # fmt: skip
     db.add(o)
     await db.flush()

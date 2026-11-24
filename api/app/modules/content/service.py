@@ -12,7 +12,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import ai, control
@@ -380,6 +380,14 @@ async def compose_pending(db: AsyncSession, *, limit: int = 10) -> int:
         product = await db.get(Product, product_id) if product_id else None
         drop = await db.get(Drop, drop_id) if drop_id else None
         if product is None and drop is None:
+            continue
+        if drop is not None and drop.status not in (DropStatus.SCHEDULED, DropStatus.OPEN):
+            # đợt đã đóng / huỷ trước khi kịp soạn: bài báo mở đợt không còn ý nghĩa → cất đi, không xếp lịch
+            await db.execute(
+                update(ContentDraft)
+                .where(ContentDraft.drop_id == drop.id, ContentDraft.status == DraftStatus.DRAFTING)
+                .values(status=DraftStatus.ARCHIVED)
+            )
             continue
         try:
             async with db.begin_nested():

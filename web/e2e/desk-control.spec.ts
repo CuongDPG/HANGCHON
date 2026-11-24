@@ -25,7 +25,10 @@ test("Hôm nay → sửa rồi duyệt, trả lại, đổi mức tự chủ, ho
 
   // i1 + i2: mở việc chờ từ «Hôm nay», sửa rồi duyệt
   await expect(main(page).getByRole("heading", { level: 2, name: /việc chờ chị/ })).toBeVisible();
-  const rows = main(page).getByRole("button", { name: /Duyệt →/ });
+  // việc an toàn để duyệt trong dữ liệu mẫu: gợi ý mua mẫu (đơn nháp từ tin nhắn còn thiếu địa chỉ thì duyệt sẽ lỗi)
+  const all = main(page).getByRole("button", { name: /Duyệt →/ });
+  const safe = all.filter({ hasText: "Mua mẫu «" });
+  const rows = (await safe.count()) ? safe : all;
   if (await rows.count()) {
     await rows.first().click();
     const sheet = page.getByRole("dialog");

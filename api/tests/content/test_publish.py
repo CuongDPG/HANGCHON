@@ -8,6 +8,7 @@ import pytest
 from sqlalchemy import func, select
 
 from app.core import events
+from app.core.config import settings
 from app.core.db import SessionLocal
 from app.core.enums import Channel
 from app.core.jobs import JOBS, job_context
@@ -156,10 +157,15 @@ async def test_metrics_attribution_and_insights(product_factory, owner_client):
 
 async def test_driver_for_channel_mapping(monkeypatch):
     assert driver_for(Channel.FACEBOOK).name == "mock"
-    monkeypatch.setenv("SOCIAL_PUBLISH_DRIVERS", "facebook=meta_publish, tiktok=tiktok_draft_publish")
-    assert driver_for(Channel.FACEBOOK).name == "meta_publish"
-    assert driver_for(Channel.TIKTOK).name == "tiktok_draft_publish"
+    monkeypatch.setattr(settings, "social_channel_drivers", "facebook=meta, tiktok=tiktok_draft_publish")
+    assert driver_for(Channel.FACEBOOK).name == "meta"
+    assert driver_for(Channel.TIKTOK).name == "tiktok_draft"  # tên cũ vẫn hiểu
     assert driver_for(Channel.INSTAGRAM).name == "mock"
+    # cùng một cấu hình cho hộp thư
+    from app.modules.inbox.channels import messaging_driver
+
+    assert messaging_driver("mock", Channel.FACEBOOK).name == "meta"
+    assert messaging_driver("mock", Channel.ZALO_OA).name == "mock"
 
 
 async def test_reschedule_and_cancel(product_factory, owner_client):

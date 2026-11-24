@@ -156,13 +156,20 @@ async def quote(body: QuoteIn, db: DbSession) -> QuoteOut:
     )  # fmt: skip
 
 
+def _attribution(src: str | None) -> dict[str, str] | None:
+    """f7: mã bài trong link (`?src=`) lưu ở `orders.raw["src"]` để content đếm đơn theo bài."""
+    clean = "".join(ch for ch in (src or "").strip().lower() if ch.isalnum() or ch in "-_")[:40]
+    return {"src": clean} if clean else None
+
+
 @store.post("", response_model=PublicOrderOut, status_code=status.HTTP_201_CREATED)
 async def checkout(body: CheckoutIn, db: DbSession) -> PublicOrderOut:
     """e4: đặt hàng một trang, không cần tài khoản. Giữ suất/tồn ngay trong giao dịch; phát `order.created`."""
     res = await service.create_order(
         db, lines=body.items, name=body.name, phone=body.phone, address=_address(body),
         payment_method=PaymentMethod(body.payment_method), channel=Channel.WEB, customer_note=body.note,
-        client_ref=body.client_ref, actor=Actor.CUSTOMER,
+        client_ref=body.client_ref, actor=Actor.CUSTOMER, raw=_attribution(body.src),
+        referral_code=(body.referral_code or "").strip().upper() or None,
     )  # fmt: skip
     if res.created and body.marketing_opt_in and res.order.customer_id:
         from app.modules.orders.models import Customer
@@ -423,7 +430,9 @@ async def _payment(db: DbSession, payment_id: uuid.UUID) -> Payment:
 
 @desk.post("/payments/simulate", response_model=list[PaymentRowOut])
 async def simulate_transfer(body: SimulateTransferIn, _: CurrentUser, db: DbSession) -> list[PaymentRowOut]:
-    """Chỉ khi dùng thanh toán giả (mock): giả lập khách chuyển khoản để chạy thử luồng khớp tiền."""
+    """Chỉ khi dùng thanh toán giả (mock) ở dev/test: giả lập khách chuyển khoản để chạy thử luồng khớp tiền."""
+    if not settings.allows_simulation:
+        raise NotFound("Không có đường dẫn này.")
     driver = get_driver("payments")
     if driver.name != "mock":
         raise BadRequest("Chỉ giả lập được khi dùng thanh toán giả.")
@@ -552,7 +561,9 @@ async def pull_orders(mk: Channel, _: CurrentUser, db: DbSession) -> Marketplace
 async def simulate_marketplace(
     mk: Channel, body: SimulateMarketplaceOrderIn, _: CurrentUser, db: DbSession
 ) -> MarketplaceSyncOut:
-    """Chỉ với sàn giả (mock): giả lập một đơn trên sàn rồi kéo về."""
+    """Chỉ với sàn giả (mock) ở dev/test: giả lập một đơn trên sàn rồi kéo về."""
+    if not settings.allows_simulation:
+        raise NotFound("Không có đường dẫn này.")
     p = await db.get(Product, body.product_id)
     if p is None:
         raise NotFound("Không thấy sản phẩm.")
@@ -703,8 +714,9 @@ async def open_return(order_id: uuid.UUID, body: DeskReturnIn, user: CurrentUser
 
 
 def _allowed(kind: str, name: str) -> bool:
-    configured = getattr(settings, f"{kind}_driver", "mock")
-    return name == configured or (name == "mock" and settings.app_env != "prod")
+    if name == "mock":  # webhook giả lập: chỉ dev/test, production luôn 404 dù driver đang là mock
+        return settings.allows_simulation
+    return name == getattr(settings, f"{kind}_driver", "mock")
 
 
 @hooks.post("/payments/{provider}", response_model=WebhookAck)
@@ -722,7 +734,7 @@ async def payments_webhook(provider: str, request: Request, db: DbSession) -> We
 async def shipping_webhook(carrier: str, request: Request, db: DbSession) -> WebhookAck:
     """g4: trạng thái vận đơn từ hãng (GHN, GHTK...)."""
     if carrier not in ("mock", "ghn", "ghtk") or not (
-        _allowed("shipping", carrier) or carrier in (await shipping.carrier_drivers(db))
+        _allowed("shipping", carrier) or (carrier != "mock" and carrier in (await shipping.carrier_drivers(db)))
     ):
         raise NotFound("Không có webhook này.")
     headers = {**dict(request.headers), **{f"x-query-{k}": v for k, v in request.query_params.items()}}

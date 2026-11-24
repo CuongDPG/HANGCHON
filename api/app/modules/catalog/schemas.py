@@ -401,6 +401,7 @@ class CategoryRef(BaseModel):
 
 
 class DropRef(BaseModel):
+    id: uuid.UUID
     slug: str
     label: str
     title: str
