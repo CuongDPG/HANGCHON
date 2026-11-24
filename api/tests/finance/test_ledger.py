@@ -42,7 +42,8 @@ async def test_order_paid_for_missing_order_is_ignored() -> None:
     async with SessionLocal() as db:
         n = await events.emit("order.paid", {"order_id": "7f1c4c39-1e8a-4d9b-9a49-8d3c1b2a0f11"}, db=db)
         await db.commit()
-    assert n == 1 and await _entries() == []
+    # các module khác cũng nghe order.paid, nên chỉ cần không ai lỗi và sổ không bị ghi
+    assert n >= 1 and await _entries() == []
 
 
 async def test_refund_reduces_revenue_and_is_idempotent(owner_client: httpx.AsyncClient) -> None:
