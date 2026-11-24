@@ -2,6 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { MapPin, MessageCircleQuestion, PackageOpen, RotateCcw, Search } from "lucide-react";
+import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import {
@@ -114,6 +115,23 @@ function OrderView({ order, token }: { order: PublicOrder; token: string }) {
           )}
         </div>
         {order.notify_hint ? <p className="text-[14px] text-ink-2">{order.notify_hint}</p> : null}
+        {order.reviews?.length ? (
+          <Card className="flex flex-col gap-2">
+            <h2 className="font-sans text-[15px] font-semibold">Đánh giá món đã nhận</h2>
+            {order.reviews.map((r) => (
+              <div key={r.token} className="flex items-center justify-between gap-2 text-[14px]">
+                <span className="min-w-0 truncate">{r.name}</span>
+                {r.status === "requested" ? (
+                  <Link href={`/danh-gia/${r.token}`} className="shrink-0 text-accent">
+                    Viết đánh giá
+                  </Link>
+                ) : (
+                  <Badge tone={r.status === "published" ? "success" : "neutral"}>{r.status === "published" ? "Đã hiện trên web" : "Đã gửi, chị đang xem"}</Badge>
+                )}
+              </div>
+            ))}
+          </Card>
+        ) : null}
         {order.returns.length ? (
           <Card className="flex flex-col gap-2">
             <h2 className="font-sans text-[15px] font-semibold">Đổi trả</h2>

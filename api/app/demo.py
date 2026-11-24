@@ -55,7 +55,7 @@ BRIEFS = [
 
 # ứng viên: (khoá, đề, tên, tên gốc, nền tảng, giá, tiền tệ, gram, sao, số đánh giá, nhà cung cấp, cột đích)
 CANDIDATES = [
-    ("p_binh", "binh", "Bình giữ nhiệt nắp bật 500 ml", "ワンタッチ真空ボトル 500ml", "rakuten", "1980", "JPY", 260, "4.7", 812, "sup_jp", "selected"),
+    ("p_binh", "binh", "Bình giữ nhiệt nắp bật 500 ml", "一键弹盖保温杯500ml", "1688", "42", "CNY", 260, "4.7", 812, "sup_inox", "selected"),
     ("p_hop", "binh", "Hộp cơm inox 3 ngăn giữ nhiệt", "304不锈钢三格保温饭盒", "1688", "38", "CNY", 640, "4.8", 2140, "sup_inox", "selected"),
     ("c_mini", "binh", "Bình giữ nhiệt mini 350 ml", "迷你保温杯350ml", "taobao", "22", "CNY", 210, "4.6", 530, "sup_inox", "trial"),
     ("c_ly", "binh", "Ly giữ nhiệt có ống hút", "吸管保温杯", "1688", "18", "CNY", 300, "4.5", 960, "sup_inox", "sample"),
@@ -75,7 +75,7 @@ CANDIDATES = [
     ("c_giay", "gia", "Giá phơi giày ban công", "阳台晒鞋架", "taobao", "14", "CNY", 350, "4.3", 210, None, "candidate"),
     ("p_khan", "nha", "Khăn tắm sợi tre cho bé", "竹纤维婴儿浴巾", "1688", "28", "CNY", 380, "4.8", 1860, "sup_inox", "selected"),
     ("p_den", "nha", "Đèn kẹp đọc sách cắm dây USB", "USB夹式阅读灯", "1688", "25", "CNY", 290, "4.7", 1240, "sup_inox", "selected"),
-    ("p_moc", "nha", "Móc dán tường chịu lực (bộ 10)", "強力粘着フック10個", "amazon_jp", "980", "JPY", 120, "4.6", 4410, "sup_jp", "selected"),
+    ("p_moc", "nha", "Móc dán tường chịu lực (bộ 10)", "强力无痕粘钩10个", "1688", "12", "CNY", 120, "4.6", 4410, "sup_inox", "selected"),
     ("c_aochoang", "nha", "Áo choàng tắm cho bé có mũ", "婴儿连帽浴袍", "taobao", "35", "CNY", 450, "4.6", 520, None, "trial"),
     ("c_densac", "nha", "Đèn đọc sách có pin sạc", "充电阅读灯", "1688", "29", "CNY", 310, "4.5", 760, None, "rejected"),
     ("c_khanmat", "nha", "Khăn mặt cotton (bộ 5)", "纯棉毛巾5条", "1688", "20", "CNY", 400, "4.4", 2300, None, "candidate"),
@@ -117,6 +117,23 @@ REJECTS = {
 # cost sheet thêm cho món đã chọn: (cước nội địa VND)
 PRICE = {"p_binh": 289000, "p_hop": 329000, "p_gia": 279000, "p_kep": 119000, "p_khan": 189000, "p_den": 239000,
          "p_moc": 99000}  # fmt: skip
+
+# thông số đo khi thử (ghi đè thông số nguồn giả lập trên trang sản phẩm)
+SPECS = {
+    "p_binh": ("500 ml · inox 304 · 260 g", [("Dung tích", "500 ml"), ("Chất liệu", "Inox 304, nắp nhựa PP"),
+                                             ("Giữ nóng", "Khoảng 8 giờ (chị đo: 7h sáng → 5h chiều còn ấm)"), ("Khối lượng", "260 g")]),
+    "p_hop": ("3 ngăn · inox 304 · 640 g", [("Số ngăn", "3, có nắp kín"), ("Chất liệu", "Inox 304"),
+                                            ("Dung tích", "Khoảng 1,2 lít"), ("Khối lượng", "640 g")]),
+    "p_gia": ("Gấp gọn · inox · 2,1 kg", [("Kích thước mở", "150 × 60 × 95 cm"), ("Khi gấp", "Dày 6 cm"),
+                                          ("Chất liệu", "Inox 201, chân nhựa"), ("Khối lượng", "2,1 kg")]),
+    "p_kep": ("Bộ 20 cái · inox", [("Số lượng", "20 cái"), ("Chất liệu", "Inox"), ("Độ mở", "3 cm")]),
+    "p_khan": ("70 × 140 cm · sợi tre · 380 g", [("Kích thước", "70 × 140 cm"), ("Chất liệu", "Sợi tre 70%, cotton 30%"),
+                                                ("Giặt", "Giặt máy, nước lạnh"), ("Khối lượng", "380 g")]),
+    "p_den": ("Cắm USB · không pin · 290 g", [("Nguồn điện", "Cắm cổng USB 5V, không có pin"), ("Ánh sáng", "3 mức, vàng ấm"),
+                                              ("Dây", "1,2 m"), ("Khối lượng", "290 g")]),
+    "p_moc": ("Bộ 10 · chịu 5 kg mỗi móc", [("Số lượng", "10 móc"), ("Tải", "Khoảng 5 kg mỗi móc, tường phẳng"),
+                                            ("Gỡ ra", "Không để vết keo")]),
+}  # fmt: skip
 
 CUSTOMERS = {
     "ha": ("Đào Thu Hà", "0900000101", "Hà Nội"),
@@ -197,9 +214,6 @@ class Story:
             b = await self.call("POST", f"{OWNER}/sourcing/briefs", json={"text": text})
             self.ids[key] = b["id"]
             self.bump("briefs")
-        await self.call(
-            "PATCH", f"{OWNER}/sourcing/briefs/{self.ids['gia']}", json={"status": "active"}, ok=(200, 400, 422)
-        )
         async with SessionLocal() as s:
             for i, (key, brief, title, orig, plat, price, cur, grams, rating, reviews, sup, _) in enumerate(CANDIDATES):
                 c = Candidate(
@@ -217,11 +231,22 @@ class Story:
                 await s.flush()
                 self.ids[key] = str(c.id)
                 self.bump("candidates")
+            # chị đã xác nhận cách AI hiểu đề; ứng viên ở trên là kết quả lượt quét (dựng tay để tên món cố định)
+            from app.modules.sourcing.models import BriefStatus, SourcingBrief
+
+            for key, _ in BRIEFS:
+                b = await s.get(SourcingBrief, uuid.UUID(self.ids[key]))
+                b.status = BriefStatus.ACTIVE
             await s.commit()
+        await self.call("PATCH", f"{OWNER}/sourcing/briefs/{self.ids['gia']}", json={"is_scheduled": True})  # a7
         for key, *_rest in CANDIDATES:
             a = await self.call("POST", f"{OWNER}/assessment/candidates/{self.ids[key]}/run", json={})
             self.ids[f"a_{key}"] = a["id"]
             self.bump("assessments")
+        # b3: so sánh cạnh nhau ba bình giữ nhiệt
+        await self.call("POST", f"{OWNER}/assessment/comparisons", json={
+            "candidate_ids": [self.ids[k] for k in ("p_binh", "c_mini", "c_binhnhat")],
+            "title": "Ba bình giữ nhiệt khoảng 500 ml"})  # fmt: skip
         # chị xác nhận điểm cho các món đã đi tiếp
         for key, *_rest, target in CANDIDATES:
             if target in ("selected", "trial"):
@@ -274,6 +299,14 @@ class Story:
         })  # fmt: skip
         prop = await self.call("POST", f"{OWNER}/supply/price-proposals", json={"candidate_id": self.ids[key]})
         await self.approve(prop["approval_item_id"], {"price_vnd": PRICE[key]})
+        subtitle, specs = SPECS[key]
+        await self.call("PATCH", f"{OWNER}/catalog/products/{pid}", json={
+            "subtitle": subtitle, "specs": [{"label": a, "value": b} for a, b in specs]})  # fmt: skip
+        cats = {c["slug"]: c["id"] for c in await self.call("GET", f"{OWNER}/selection/categories")}
+        slug = {"p_binh": "mang-theo", "p_hop": "nha-bep", "p_gia": "sap-xep-luu-tru", "p_kep": "sap-xep-luu-tru",
+                "p_khan": "phong-tam", "p_moc": "phong-tam", "p_den": "sap-xep-luu-tru"}[key]  # fmt: skip
+        if cats.get(slug):
+            await self.call("PATCH", f"{OWNER}/catalog/products/{pid}", json={"category_id": cats[slug]})
         if key == "p_kep":  # món giữ sẵn (bán cả theo đợt lẫn có sẵn)
             await self.call("PATCH", f"{OWNER}/catalog/products/{pid}", json={"sale_mode": "both"})
         if key == "p_khan":  # đồ dùng hằng ngày: nhắc mua lại sau 90 ngày
@@ -362,7 +395,7 @@ class Story:
 
     async def run(self) -> None:
         # 5 tuần trước: ra đề, quét, thẩm định; mua mẫu những món đáng thử
-        with at(35, 9):
+        with at(42, 9):
             await self.sourcing()
             for key, *_rest, target in CANDIDATES:
                 if target == "rejected" and key in ("c_inhinh", "c_nhua"):
@@ -424,9 +457,9 @@ class Story:
         with at(2, 9):
             await self.call("POST", f"{OWNER}/orders/{await self.order_id('d2_huy')}/cancel",
                             json={"reason": "Khách đặt nhầm màu, xin huỷ"})  # fmt: skip
-        with at(1, 15):  # hàng giữ sẵn: một đơn chờ gói, một đơn đã giao cho hãng
-            await self.order("s_lan", "lan", [("p_kep", 1, None)])
+        with at(1, 15):  # hàng giữ sẵn: một đơn đã giao cho hãng, một đơn mới sáng nay chờ gói
             await self.order("s_thao", "thao", [("p_kep", 2, None)])
+        await self.order("s_lan", "lan", [("p_kep", 1, None)])
         with at(0.15):
             shipping = await self.ship(["s_thao"])
         for sid in shipping:  # hãng giả đã lấy hàng, đang giao
@@ -485,15 +518,29 @@ class Story:
         for item in await self.pending("catalog.send_review_request"):  # chị duyệt tin xin đánh giá
             await self.approve(item["id"])
 
-        texts = [
-            (5, "Phơi được cả chăn đôi, gấp lại gọn sau cửa. Ốc chân mình vặn lại một lần là chắc."),
-            (5, "Khăn mềm, bé thích quấn. Giặt máy mấy lần vẫn mềm như mới."),
-            (4, "Giá phơi chắc, giao hơi lâu nhưng đúng như chị tả."),
-            (3, "Khăn ổn nhưng màu nhạt hơn ảnh mình xem."),
-        ]
+        texts = {  # theo món: (sao, lời khách)
+            "Giá phơi chữ X gấp gọn": [(5, "Phơi được cả chăn đôi, gấp lại gọn sau cửa. Ốc chân mình vặn lại một lần là chắc."),
+                                       (4, "Giá phơi chắc, giao hơi lâu nhưng đúng như chị tả.")],
+            "Khăn tắm sợi tre cho bé": [(5, "Khăn mềm, bé thích quấn. Giặt máy mấy lần vẫn mềm như mới."),
+                                        (3, "Khăn ổn nhưng màu nhạt hơn ảnh mình xem.")],
+        }  # fmt: skip
+        from app.modules.orders.models import OrderItem
+
         async with SessionLocal() as s:
-            rows = list((await s.execute(select(Review.id, Review.token).order_by(Review.created_at))).all())
-        for (rid, token), (rating, body) in zip(rows, texts, strict=False):
+            rows = list(
+                (
+                    await s.execute(
+                        select(Review.id, Review.token, OrderItem.name)
+                        .join(OrderItem, OrderItem.id == Review.order_item_id)
+                        .order_by(Review.created_at)
+                    )
+                ).all()
+            )
+        for rid, token, name in rows:
+            queue = texts.get(name) or []
+            if not queue:
+                continue  # để lại vài lời mời chưa trả lời
+            rating, body = queue.pop(0)
             await self.call("POST", f"/api/store/catalog/reviews/{token}", public=True,
                             data={"rating": str(rating), "body": body})  # fmt: skip
             self.bump("reviews")
@@ -540,9 +587,22 @@ class Story:
             if d["status"] == "pending_review":
                 await self.call("POST", f"{OWNER}/content/drafts/{d['id']}/approve", json={})
                 self.bump("posts_approved")
+        # bài của các món đang bán đã duyệt vào lịch tuần; bài của đợt 3 (sắp mở) còn chờ chị
+        for key in ("p_binh", "p_hop", "p_kep", "p_gia", "p_khan"):
+            await self.publish_posts(key, ("facebook", "instagram", "threads", "tiktok", "zalo_oa"), publish=False)
         await self.call("POST", f"{OWNER}/content/calendar/plan", json={}, ok=(200, 201, 400, 409, 422))
+        # kịch bản livestream cho đợt đang mở (f8)
+        thursday = local_today() + timedelta(days=(3 - local_today().weekday()) % 7 or 7)
+        await self.call("POST", f"{OWNER}/content/livestreams", json={
+            "title": "Live tối thứ Năm: đồ giữ nhiệt mùa đông", "drop_id": self.ids["d2"],
+            "product_ids": [self.ids["prod_p_binh"], self.ids["prod_p_hop"], self.ids["prod_p_kep"]], "minutes": 30,
+            "scheduled_for": datetime.combine(thursday, time(20, 30), tzinfo=VN_TZ).isoformat(),
+        })  # fmt: skip
+        self.bump("livestreams")
 
     async def inbox(self) -> None:
+        await self.call("PATCH", f"{OWNER}/control/settings/inbox.shipping_policy", json={
+            "value": "Phí giao 25.000–35.000đ tuỳ tỉnh, đơn từ 500.000đ miễn phí giao, giao 2–4 ngày"})  # fmt: skip
         msgs = [
             ("facebook", "direct_message", "demo_psid_ha", "Đào Thu Hà", "Bình giữ nhiệt nắp bật còn hàng không chị?", True),
             ("facebook", "comment", "demo_psid_tuan", "Tuấn Vũ", "Hộp cơm inox 3 ngăn giá bao nhiêu ạ?", True),

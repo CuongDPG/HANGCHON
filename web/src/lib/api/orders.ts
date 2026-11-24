@@ -133,6 +133,8 @@ export type PublicOrder = {
   can_change_address: boolean;
   can_request_return: boolean;
   notify_hint: string | null;
+  /** e8: món đã nhận chờ khách đánh giá (link một lần /danh-gia/<token>). */
+  reviews: { name: string; token: string; status: string }[];
 };
 
 export type OrderListItem = {
@@ -215,7 +217,7 @@ export type ReturnRecord = {
 };
 export type ReturnRow = ReturnRecord & { order_code: string; recipient_name: string };
 
-export type OrderDetail = Omit<PublicOrder, "items" | "events" | "timeline" | "payment" | "shipment" | "returns" | "token" | "headline" | "can_change_address" | "can_request_return" | "notify_hint" | "drop"> & {
+export type OrderDetail = Omit<PublicOrder, "items" | "events" | "timeline" | "payment" | "shipment" | "returns" | "token" | "headline" | "can_change_address" | "can_request_return" | "notify_hint" | "drop" | "reviews"> & {
   id: string;
   external_id: string | null;
   transfer_content: string | null;

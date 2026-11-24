@@ -3,7 +3,7 @@
 #
 #   scripts/check.sh api    ruff (lint + format) + TOÀN BỘ pytest (Postgres thật, CSDL test theo tên worktree)
 #   scripts/check.sh web    bun run typecheck && bun run lint && bun run test
-#   scripts/check.sh e2e    bun run e2e (Playwright)
+#   scripts/check.sh e2e    Playwright trên hệ thống dựng riêng (CSDL e2e + dữ liệu mẫu + API + worker + web), xem scripts/e2e.sh
 #   scripts/check.sh        api + web
 set -euo pipefail
 
@@ -38,8 +38,7 @@ check_web() {
 }
 
 check_e2e() {
-  cd "$ROOT/web"
-  bun run e2e
+  "$ROOT/scripts/e2e.sh" "$@"
 }
 
 target="${1:-all}"
@@ -47,7 +46,7 @@ shift || true
 case "$target" in
   api) check_api "$@" ;;
   web) check_web ;;
-  e2e) check_e2e ;;
+  e2e) check_e2e "$@" ;;
   all) (check_api) && (check_web) ;;
   *) echo "Dùng: $0 [api|web|e2e]" >&2; exit 2 ;;
 esac

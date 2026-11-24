@@ -76,7 +76,15 @@ ai.task(
     description="Nhận ra ý định mua trong tin nhắn, rút món, số lượng, người nhận, địa chỉ (g6)",
 )
 
-_BUY_WORDS = ("lay", "dat", "chot", "mua", "ship", "gui cho", "order")
+_BUY_WORDS = (
+    "lay",
+    "dat",
+    "chot",
+    "mua",
+    "ship cho",
+    "gui cho",
+    "order",
+)  # «phí ship bao nhiêu» là hỏi, không phải mua
 _ASK_ONLY = ("bao nhieu", "gia", "con hang", "con khong", "?")
 
 

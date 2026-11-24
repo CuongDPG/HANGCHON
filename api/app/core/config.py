@@ -78,6 +78,9 @@ class Settings(BaseSettings):
 
     # việc nền
     jobs_eager: bool = False  # True: enqueue chạy luôn trong tiến trình (test)
+    # Hàng đợi arq. Nhiều bản làm việc dùng chung một Redis → mỗi bản một tên (dev.sh tự đặt theo tên thư mục),
+    # để worker của bản này không nhận job của bản khác (rồi chạy trên nhầm CSDL).
+    jobs_queue_name: str = "arq:queue"
 
     # lưu trữ tệp
     storage_driver: str = "local"

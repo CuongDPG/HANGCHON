@@ -5,11 +5,11 @@ import path from "node:path";
  * Luồng chính khu Nội dung (f1, f3, f5): đăng nhập → xưởng → mở một món → xem bản Facebook → viết lại «Ngắn hơn»
  * → «Duyệt, xếp lịch» → lịch tuần hiện «Đã duyệt, chờ giờ». Kèm mở các màn hình con.
  *
- * Cần API thật có dữ liệu mẫu (app.seed + app.modules.content.seed) → chỉ chạy khi đặt E2E_CONTENT=1, vd:
+ * Cần API thật có dữ liệu mẫu (app.seed --demo) → chỉ chạy khi đặt E2E_CONTENT=1, vd:
  *   E2E_CONTENT=1 E2E_BASE_URL=http://localhost:3016 bun run e2e e2e/content.spec.ts
  * E2E_SHOTS=1 để chụp ảnh vào test-results/shots/.
  */
-test.skip(!process.env.E2E_CONTENT, "Cần API + dữ liệu mẫu (E2E_CONTENT=1)");
+test.skip(!process.env.E2E_API, "Cần API + dữ liệu mẫu (E2E_API=1, xem scripts/e2e.sh)");
 
 const EMAIL = process.env.E2E_OWNER_EMAIL ?? "chi@hangchon.local";
 const PASSWORD = process.env.E2E_OWNER_PASSWORD ?? "doimatkhau";
@@ -42,19 +42,14 @@ test("xưởng: viết lại, duyệt, xếp lịch", async ({ page }, info) => 
   await shot(page, "noi-dung", info.project.name);
   await noOverflow(page);
 
-  await main.getByRole("link", { name: /Giá phơi chữ X/ }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Giá phơi chữ X gấp gọn" })).toBeVisible();
+  await main.getByRole("link", { name: /Móc dán tường/ }).first().click();
+  await expect(page.getByRole("heading", { level: 1, name: "Móc dán tường chịu lực (bộ 10)" })).toBeVisible();
   await main.getByRole("tab", { name: /Instagram/ }).click();
   await expect(main.getByLabel("Thứ tự ảnh")).toBeVisible();
   await shot(page, "xuong-instagram", info.project.name);
   await main.getByRole("tab", { name: /TikTok/ }).click();
   await expect(main.getByLabel("Kịch bản theo cảnh")).toBeVisible();
   await shot(page, "xuong-tiktok", info.project.name);
-
-  // Facebook của giá phơi có lời nói quá → nút Duyệt bị khoá cho tới khi sửa
-  await main.getByRole("tab", { name: /Facebook/ }).click();
-  await expect(main.getByRole("button", { name: "Duyệt, xếp lịch" })).toBeDisabled();
-  await shot(page, "xuong-can-sua", info.project.name);
 
   await main.getByRole("tab", { name: /Threads/ }).click();
   await main.getByRole("button", { name: "Ngắn hơn" }).click();

@@ -7,6 +7,8 @@ const API_ORIGIN = (process.env.API_ORIGIN ?? "http://localhost:8010").replace(/
 const nextConfig: NextConfig = {
   // Bản chạy thật chạy `server.js` của bản standalone bằng Node (web/Dockerfile).
   output: "standalone",
+  // scripts/e2e.sh chạy `next dev` riêng trong `.next-e2e` để không đụng máy chủ dev (`.next`) của cùng bản làm việc
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   cacheComponents: true,
   partialPrefetching: true,
   poweredByHeader: false,

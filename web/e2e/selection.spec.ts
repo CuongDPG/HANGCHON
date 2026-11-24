@@ -3,7 +3,7 @@ import { expect, test, type APIRequestContext } from "@playwright/test";
 /**
  * Luồng chính bàn chọn (c1–c4) trên dữ liệu mẫu: chuyển một ứng viên sang Đang thử, ghi chú thử hàng,
  * đóng dấu Đã chọn, sửa lời rồi chốt; kanban 5 cột trên máy tính.
- * Cần API chạy với dữ liệu mẫu (`python -m app.seed && python -m app.modules.supply.seed`);
+ * Cần API chạy với dữ liệu mẫu (`python -m app.seed --demo`, scripts/e2e.sh tự dựng);
  * không đăng nhập được thì bỏ qua. Đặt E2E_OWNER_EMAIL / E2E_OWNER_PASSWORD nếu khác mặc định.
  */
 
@@ -86,5 +86,5 @@ test("kanban 5 cột trên máy tính, nguồn cung mở được", async ({ pag
   }
   await page.goto("/desk/nguon-cung?tab=ncc");
   await expect(page.getByRole("heading", { level: 1, name: "Nguồn cung" })).toBeVisible();
-  await expect(page.getByText("Xưởng gia dụng Nghĩa Ô (ví dụ)")).toBeVisible();
+  await expect(page.getByText("Xưởng inox Phật Sơn (ví dụ)")).toBeVisible();
 });

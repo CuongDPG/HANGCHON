@@ -45,6 +45,8 @@ export function BuyBox({ productId, slug, name, priceVnd, imageUrl, dropId, drop
           <Badge tone="accent" icon={<Hourglass />}>
             {dropLabel ?? "Đặt trong đợt"}
           </Badge>
+        ) : soldOut ? (
+          <Badge tone="outline">Chờ đợt sau</Badge>
         ) : (
           <Badge tone="success">Có sẵn</Badge>
         )}
@@ -56,7 +58,7 @@ export function BuyBox({ productId, slug, name, priceVnd, imageUrl, dropId, drop
       ) : null}
       {soldOut ? (
         <Button block disabled>
-          {dropId ? "Đợt này đã hết suất" : "Tạm hết hàng"}
+          {dropId ? "Đợt này đã hết suất" : "Chưa mở đợt, tạm hết hàng"}
         </Button>
       ) : (
         <>

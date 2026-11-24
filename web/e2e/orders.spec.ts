@@ -3,7 +3,7 @@ import path from "node:path";
 
 /**
  * Luồng chính của đơn hàng (e4, e5, g1, g2): giỏ → đặt hàng một trang → mã QR → tiền về (giả lập) → trang theo dõi
- * tự cập nhật → chị thấy đơn ở bàn làm việc. Cần API thật đang chạy với dữ liệu mẫu (`app.modules.orders.seed`)
+ * tự cập nhật → chị thấy đơn ở bàn làm việc. Cần API thật đang chạy với dữ liệu mẫu (`app.seed --demo`, scripts/e2e.sh tự dựng)
  * và driver thanh toán giả; không có API thì bỏ qua.
  *   E2E_BASE_URL=http://localhost:3015 E2E_SHOTS=1 bunx playwright test e2e/orders.spec.ts
  */
