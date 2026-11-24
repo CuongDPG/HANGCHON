@@ -13,6 +13,7 @@ export function NoteItem({ note }: { note: TrialNote }) {
   return (
     <li className="rounded-md border border-line bg-surface p-3">
       <div className="flex items-center gap-2 text-[13px] text-ink-2">
+        {note.author === "tester" ? <Badge tone="accent">Khách thử · {note.author_name ?? "khách quen"}</Badge> : null}
         {note.kind === "voice" ? <Mic className="size-3.5" aria-label="Ghi bằng giọng nói" /> : null}
         <DateTime value={note.recorded_at} format="dateTime" />
         {note.trial_day ? <span>· ngày thử thứ {note.trial_day}</span> : null}

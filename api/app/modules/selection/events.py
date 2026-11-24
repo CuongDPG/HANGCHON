@@ -15,3 +15,31 @@ from app.modules.selection import service
 @events.on("candidate.rejected")
 async def _learn_taste(db: AsyncSession, payload: dict[str, Any]) -> None:
     await service.mark_taste_pending(db, uuid.UUID(payload["candidate_id"]))
+
+
+@events.on("tester.feedback_received")
+async def _tester_feedback(db: AsyncSession, payload: dict[str, Any]) -> None:
+    """h8: cảm nhận của khách thử hàng → một ghi chú thử (author=tester) cạnh ghi chú của chị. Mỗi lời mời một ghi chú."""
+    from sqlalchemy import select
+
+    from app.core.timeutil import now_utc
+    from app.modules.selection.models import NoteAuthor, ProcessingStatus, TrialNote, TrialNoteKind
+
+    invite_id = uuid.UUID(payload["tester_invite_id"])
+    if await db.scalar(select(TrialNote.id).where(TrialNote.tester_invite_id == invite_id)):
+        return
+    rating = payload.get("rating")
+    text = str(payload.get("feedback") or "").strip()
+    db.add(
+        TrialNote(
+            candidate_id=uuid.UUID(payload["candidate_id"]),
+            kind=TrialNoteKind.TEXT,
+            author=NoteAuthor.TESTER,
+            tester_invite_id=invite_id,
+            author_name=payload.get("customer_name") or "Khách thử",
+            text=f"{text} ({rating}/5)" if rating else text,
+            recorded_at=now_utc(),
+            processing_status=ProcessingStatus.DONE,
+        )
+    )
+    await db.flush()

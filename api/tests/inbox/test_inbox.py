@@ -190,7 +190,8 @@ async def test_search_tabs_and_customer_link(owner_client, shop, db):
         r = await owner_client.get("/api/desk/inbox/threads", params={"tab": "all", "q": q})
         assert r.json()["total"] == expect, q
     t3 = await _simulate(owner_client, "Cảm ơn shop", author_name="Khách lạ", author_external_id="x9")
-    assert t3["customer_id"] is None
+    # người lạ có hồ sơ khách ngay (orders tạo qua message.received → customer.identified)
+    assert t3["customer_id"] not in (None, str(c.id), str(c2.id)) and t3["customer"]["name"] == "Khách lạ"
     r = await owner_client.post(f"/api/desk/inbox/threads/{t3['id']}/customer", json={"customer_id": str(c.id)})
     assert r.json()["customer"]["name"] == "Đào Thu Hà"
     r = await owner_client.post(f"/api/desk/inbox/threads/{t3['id']}/status", json={"status": "closed"})

@@ -1,7 +1,42 @@
 "use client";
 
-import { Badge, Card, DateTime, Money, ProgressBar, SectionLabel } from "@/components/ui";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
+import { Badge, Button, Card, DateTime, Money, ProgressBar, SectionLabel, notifySuccess, useConfirm } from "@/components/ui";
+import { deskDropApi } from "@/lib/api/catalog";
 import type { DropOverview } from "@/lib/api/orders";
+
+/** «Chốt đợt sớm»: đóng đợt là việc của catalog → gọi endpoint của catalog; đóng xong orders chốt đơn, supply soạn đơn đặt. */
+function CloseEarlyButton({ drop }: { drop: DropOverview }) {
+  const confirm = useConfirm();
+  const qc = useQueryClient();
+  const close = useMutation({
+    mutationFn: () => deskDropApi.close(drop.id),
+    onSuccess: () => {
+      notifySuccess(`Đã chốt ${drop.code}. Đơn đặt nhà cung cấp đang chờ chị duyệt.`);
+      qc.invalidateQueries({ queryKey: ["orders"] });
+      qc.invalidateQueries({ queryKey: ["catalog", "drops"] });
+      qc.invalidateQueries({ queryKey: ["control"] });
+    },
+  });
+  return (
+    <Button
+      size="sm"
+      variant="secondary"
+      loading={close.isPending}
+      onClick={async () => {
+        const ok = await confirm({
+          title: `Chốt ${drop.code} ngay?`,
+          message: "Đợt ngừng nhận đơn, AI cộng số lượng và soạn đơn đặt nhà cung cấp để chị duyệt.",
+          confirmLabel: "Chốt đợt",
+        });
+        if (ok) close.mutate();
+      }}
+    >
+      Chốt đợt sớm
+    </Button>
+  );
+}
 
 const DROP_STATUS: Record<string, string> = {
   open: "đang mở",
@@ -41,6 +76,14 @@ export function DropCard({ drop }: { drop: DropOverview }) {
         </span>
         <Money value={drop.revenue_vnd} compact className="font-semibold" />
       </div>
+      {open ? (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Link href={`/desk/san-pham/dot/${drop.id}`} className="text-[14px] text-accent">
+            Xem đợt
+          </Link>
+          <CloseEarlyButton drop={drop} />
+        </div>
+      ) : null}
       <details className="text-[14px]">
         <summary className="cursor-pointer text-accent">Số lượng theo món</summary>
         <ul className="mt-2 flex flex-col gap-1">

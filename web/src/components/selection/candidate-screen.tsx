@@ -139,7 +139,7 @@ export function CandidateScreen({ id }: { id: string }) {
       {data.decision?.decision === "rejected" ? <RejectionCard decision={data.decision} /> : null}
 
       <section className="flex flex-col gap-3">
-        <SectionLabel aside={<LevelTag level="owner" size="sm" />}>Ghi chú của chị · {data.notes.length}</SectionLabel>
+        <SectionLabel aside={<LevelTag level="owner" size="sm" />}>Ghi chú thử · {data.notes.length}</SectionLabel>
         <NoteComposer candidateId={id} />
         {data.notes.length ? (
           <ul className="flex flex-col gap-2">

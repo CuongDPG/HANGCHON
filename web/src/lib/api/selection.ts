@@ -51,6 +51,8 @@ export type TrialNote = {
   id: string;
   candidate_id: string | null;
   kind: "voice" | "text" | "photo" | "video";
+  author: "owner" | "tester" | "helper" | string;
+  author_name: string | null;
   text: string | null;
   recorded_at: string;
   trial_day: number | null;

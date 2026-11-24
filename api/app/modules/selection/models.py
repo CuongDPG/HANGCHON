@@ -71,6 +71,7 @@ class TrialNote(UUIDPk, Timestamps, Base):
     kind: Mapped[TrialNoteKind] = mapped_column(enum_col(TrialNoteKind))
     author: Mapped[NoteAuthor] = mapped_column(enum_col(NoteAuthor), default=NoteAuthor.OWNER)
     tester_invite_id: Mapped[uuid.UUID | None] = fk("tester_invites")
+    author_name: Mapped[str | None] = mapped_column(String(120), comment="Tên khách thử (author=tester, h8)")
     text: Mapped[str | None] = mapped_column(Text, comment="Chị gõ, hoặc lời đã chép")
     audio_storage_key: Mapped[str | None] = mapped_column(String(300))
     media: Mapped[list[Any]] = json_list(comment='[{"storage_key","content_type","width","height"}]')
