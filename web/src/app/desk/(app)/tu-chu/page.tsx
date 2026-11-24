@@ -1,7 +1,7 @@
-import { DeskPlaceholder } from "@/components/desk/desk-placeholder";
+import { AutonomyScreen } from "@/components/control/autonomy-screen";
 
 export const metadata = { title: "Mức tự chủ" };
 
 export default function DeskAutonomyPage() {
-  return <DeskPlaceholder navKey="autonomy" />;
+  return <AutonomyScreen />;
 }

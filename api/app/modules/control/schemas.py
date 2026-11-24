@@ -4,11 +4,11 @@ import uuid
 from datetime import date, datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, computed_field
 
 from app.core.enums import Actor
 from app.modules.control.models import ActivityMode, AIRunStatus, ApprovalStatus, AutonomyLevel, UserRole
-from app.modules.control.registry import Stat
+from app.modules.control.registry import ACTIONS, Stat
 
 
 def _email(v: str) -> str:
@@ -93,6 +93,25 @@ class ApprovalItemOut(ORM):
     created_at: datetime
     updated_at: datetime
 
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def action_label(self) -> str:
+        spec = ACTIONS.get(self.action)
+        return spec.label if spec else self.action
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def action_group(self) -> str | None:
+        spec = ACTIONS.get(self.action)
+        return spec.group if spec else None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def locked(self) -> bool:
+        """Việc «Chị quyết» (luôn hỏi: khiếu nại, đổi trả, hoàn tiền, đặt hàng/trả tiền NCC...)."""
+        spec = ACTIONS.get(self.action)
+        return bool(spec and spec.locked)
+
 
 class ApproveIn(BaseModel):
     payload: dict[str, Any] | None = Field(default=None, description="Phần chị sửa (gộp nông vào payload)")
@@ -101,6 +120,33 @@ class ApproveIn(BaseModel):
 
 class ReturnIn(BaseModel):
     note: str = Field(min_length=1, max_length=2000, description="Lời nhắn cho AI")
+
+
+class BatchApproveIn(BaseModel):
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=100)
+    note: str | None = Field(default=None, max_length=2000)
+
+
+class BatchApproveResult(BaseModel):
+    id: uuid.UUID
+    status: ApprovalStatus | None
+    error: str | None = None
+
+
+class BatchApproveOut(BaseModel):
+    approved: int
+    failed: int
+    results: list[BatchApproveResult]
+
+
+class ApprovalGroupOut(BaseModel):
+    """Số việc đang chờ theo loại việc (để lọc và duyệt hàng loạt)."""
+
+    action: str
+    label: str
+    group: str | None
+    locked: bool
+    count: int
 
 
 class ActivityOut(ORM):
@@ -123,8 +169,23 @@ class ActivityOut(ORM):
     undone_by_id: uuid.UUID | None
     created_at: datetime
 
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def action_label(self) -> str:
+        spec = ACTIONS.get(self.action)
+        return spec.label if spec else self.action
+
 
 # ---- mức tự chủ --------------------------------------------------------------------------------------------------
+
+
+class AutonomyHistory(BaseModel):
+    """Lịch sử duyệt gần đây của một hành động (căn cứ gợi ý nới mức tự chủ)."""
+
+    approved: int  # trong các lần quyết gần nhất
+    edited: int
+    returned: int
+    streak: int  # số lần duyệt liền gần nhất không sửa, không trả lại
 
 
 class AutonomyOut(BaseModel):
@@ -138,6 +199,8 @@ class AutonomyOut(BaseModel):
     locked: bool
     customer_facing: bool
     updated_at: datetime | None
+    history: AutonomyHistory
+    suggest_auto: bool = Field(description="Gợi ý nới: chị duyệt liên tục không sửa")
 
 
 class AutonomyUpdate(BaseModel):
@@ -152,9 +215,17 @@ class PendingBlock(BaseModel):
     items: list[ApprovalItemOut]
 
 
+class DoneGroup(BaseModel):
+    action: str
+    label: str
+    count: int
+
+
 class DoneBlock(BaseModel):
     total: int
     items: list[ActivityOut]
+    auto_total: int = 0  # riêng việc AI tự làm (không tính việc thực thi sau khi chị duyệt)
+    groups: list[DoneGroup] = Field(default_factory=list, description="Việc AI tự làm hôm nay, gom theo loại")
 
 
 class AICostBrief(BaseModel):
@@ -177,6 +248,7 @@ class TodayOut(BaseModel):
 
 class AICostByTask(BaseModel):
     task: str
+    label: str = ""
     runs: int
     cost_vnd: int
     input_tokens: int
@@ -246,6 +318,10 @@ class SettingUpdate(BaseModel):
     value: Any
 
 
+class SettingsBulkUpdate(BaseModel):
+    values: dict[str, Any] = Field(min_length=1)
+
+
 class AuditOut(ORM):
     id: uuid.UUID
     created_at: datetime
@@ -256,6 +332,15 @@ class AuditOut(ORM):
     entity_id: str | None
     summary: str | None
     data: dict[str, Any]
+    actor_name: str | None = None
+
+
+class IntegrationOut(BaseModel):
+    kind: str
+    label: str
+    driver: str
+    is_mock: bool
+    available: list[str]
 
 
 # ---- lệnh bằng lời -----------------------------------------------------------------------------------------------

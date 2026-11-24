@@ -98,19 +98,67 @@ async def get_level(db: AsyncSession, action: str) -> AutonomyLevel:
     return row.level if row else spec.default_level
 
 
+# Gợi ý nới mức tự chủ (i3): xét HISTORY_WINDOW lần quyết gần nhất; duyệt liền SUGGEST_STREAK lần không sửa → gợi ý.
+HISTORY_WINDOW = 20
+SUGGEST_STREAK = 10
+
+
+async def approval_history(db: AsyncSession) -> dict[str, dict[str, int]]:
+    """Theo từng hành động: trong HISTORY_WINDOW lần chị quyết gần nhất có bao nhiêu lần duyệt / sửa / trả lại,
+    và chuỗi duyệt liền (không sửa, không trả lại) tính từ lần gần nhất."""
+    rn = func.row_number().over(partition_by=ApprovalItem.action, order_by=ApprovalItem.decided_at.desc()).label("rn")
+    sub = (
+        select(ApprovalItem.action, ApprovalItem.status, ApprovalItem.edited_payload, ApprovalItem.decided_at, rn)
+        .where(
+            ApprovalItem.status.in_([ApprovalStatus.APPROVED, ApprovalStatus.RETURNED]),
+            ApprovalItem.decided_at.is_not(None),
+        )
+        .subquery()
+    )
+    rows = (
+        await db.execute(
+            select(sub.c.action, sub.c.status, sub.c.edited_payload)
+            .where(sub.c.rn <= HISTORY_WINDOW)
+            .order_by(sub.c.action, sub.c.decided_at.desc())
+        )
+    ).all()
+    out: dict[str, dict[str, int]] = {}
+    for action, st, edited in rows:
+        h = out.setdefault(action, {"approved": 0, "edited": 0, "returned": 0, "streak": 0, "_open": 1})
+        clean = st == ApprovalStatus.APPROVED and not edited
+        if st == ApprovalStatus.APPROVED:
+            h["approved"] += 1
+            h["edited"] += 1 if edited else 0
+        else:
+            h["returned"] += 1
+        if h["_open"] and clean:
+            h["streak"] += 1
+        else:
+            h["_open"] = 0
+    for h in out.values():
+        h.pop("_open")
+    return out
+
+
 async def list_autonomy(db: AsyncSession) -> list[dict[str, Any]]:
     rows = {r.action: r for r in (await db.execute(select(AutonomySetting))).scalars()}
+    history = await approval_history(db)
+    empty = {"approved": 0, "edited": 0, "returned": 0, "streak": 0}
     out = []
     for spec in sorted(ACTIONS.values(), key=lambda s: (s.group, s.label)):
         row = rows.get(spec.key)
+        level = AutonomyLevel.LOCKED_ASK if spec.locked else (row.level if row else spec.default_level)
+        hist = history.get(spec.key, empty)
         out.append(
             {
+                "history": hist,
+                "suggest_auto": level == AutonomyLevel.ASK and hist["streak"] >= SUGGEST_STREAK,
                 "action": spec.key,
                 "label": spec.label,
                 "group": spec.group,
                 "description": spec.description,
                 "module": spec.module,
-                "level": AutonomyLevel.LOCKED_ASK if spec.locked else (row.level if row else spec.default_level),
+                "level": level,
                 "default_level": spec.default_level,
                 "locked": spec.locked,
                 "customer_facing": spec.customer_facing,
@@ -404,6 +452,45 @@ async def return_item(db: AsyncSession, item_id: uuid.UUID, user: User, note: st
     return item
 
 
+async def approve_many(
+    db: AsyncSession, ids: list[uuid.UUID], user: User, *, note: str | None = None
+) -> list[dict[str, Any]]:
+    """Duyệt hàng loạt (i2): mỗi việc trong savepoint riêng; việc đã xử lý / không tìm thấy không làm hỏng việc khác."""
+    results: list[dict[str, Any]] = []
+    for item_id in dict.fromkeys(ids):
+        try:
+            async with db.begin_nested():
+                item = await approve(db, item_id, user, note=note)
+            results.append({"id": item_id, "status": item.status, "error": item.error})
+        except AppError as e:
+            results.append({"id": item_id, "status": None, "error": e.message})
+    return results
+
+
+async def pending_groups(db: AsyncSession) -> list[dict[str, Any]]:
+    rows = (
+        await db.execute(
+            select(ApprovalItem.action, func.count())
+            .where(ApprovalItem.status == ApprovalStatus.PENDING)
+            .group_by(ApprovalItem.action)
+            .order_by(func.count().desc())
+        )
+    ).all()
+    out = []
+    for action, n in rows:
+        spec = ACTIONS.get(action)
+        out.append(
+            {
+                "action": action,
+                "label": spec.label if spec else action,
+                "group": spec.group if spec else None,
+                "locked": bool(spec and spec.locked),
+                "count": int(n),
+            }
+        )
+    return out
+
+
 async def cancel_pending(
     db: AsyncSession,
     *,
@@ -508,6 +595,13 @@ async def list_settings(db: AsyncSession) -> list[dict[str, Any]]:
 # ---- chi phí AI --------------------------------------------------------------------------------------------------
 
 
+def _task_label(task: str) -> str:
+    from app.ai.registry import TASKS
+
+    spec = TASKS.get(task)
+    return (spec.description if spec and spec.description else "") or task
+
+
 async def ai_costs(db: AsyncSession, key: str | None = None) -> dict[str, Any]:
     key = key or month_key()
     start, end = local_month_bounds_utc(key)
@@ -550,7 +644,14 @@ async def ai_costs(db: AsyncSession, key: str | None = None) -> dict[str, Any]:
         "error_count": int(status_counts.get(AIRunStatus.ERROR, 0)) + int(status_counts.get(AIRunStatus.REFUSED, 0)),
         "blocked_count": int(status_counts.get(AIRunStatus.BLOCKED, 0)),
         "by_task": [
-            {"task": t, "runs": int(n), "cost_vnd": int(c), "input_tokens": int(i), "output_tokens": int(o)}
+            {
+                "task": t,
+                "label": _task_label(t),
+                "runs": int(n),
+                "cost_vnd": int(c),
+                "input_tokens": int(i),
+                "output_tokens": int(o),
+            }
             for t, n, c, i, o in by_task
         ],
         "by_day": [{"date": d, "runs": int(n), "cost_vnd": int(c)} for d, n, c in by_day],
@@ -590,11 +691,25 @@ async def today(db: AsyncSession, *, limit: int = 10) -> dict[str, Any]:
     done_q = select(AIActivity).where(AIActivity.created_at >= start, AIActivity.created_at < end)
     done_total = (await db.execute(select(func.count()).select_from(done_q.subquery()))).scalar_one()
     done = (await db.execute(done_q.order_by(AIActivity.created_at.desc()).limit(limit))).scalars()
+    auto_rows = (
+        await db.execute(
+            select(AIActivity.action, func.count())
+            .where(AIActivity.created_at >= start, AIActivity.created_at < end, AIActivity.mode == ActivityMode.AUTO)
+            .group_by(AIActivity.action)
+            .order_by(func.count().desc())
+        )
+    ).all()
+    groups = [{"action": a, "label": ACTIONS[a].label if a in ACTIONS else a, "count": int(n)} for a, n in auto_rows]
     spent, budget = await monthly_spend_vnd(), await monthly_budget_vnd()
     return {
         "date": local_today(),
         "pending": {"total": pending_total, "items": list(pending)},
-        "ai_done": {"total": done_total, "items": list(done)},
+        "ai_done": {
+            "total": done_total,
+            "items": list(done),
+            "auto_total": sum(g["count"] for g in groups),
+            "groups": groups,
+        },
         "stats": await collect_stats(db),
         "ai_cost": {
             "month": month_key(),

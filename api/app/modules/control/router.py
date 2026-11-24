@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import uuid
-from typing import Annotated
+from datetime import date, datetime, time, timedelta
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Query, Request, Response, status
 from sqlalchemy import select
@@ -14,7 +15,8 @@ from app.core.deps import CurrentUser, OwnerUser
 from app.core.errors import BadRequest, Conflict, NotFound, Unauthorized
 from app.core.pagination import Page, Paginated, paginate
 from app.core.security import create_access_token, hash_password, verify_password
-from app.core.timeutil import now_utc
+from app.core.timeutil import VN_TZ, now_utc
+from app.integrations.base import KINDS, driver_name
 from app.modules.control import service
 from app.modules.control.models import (
     ActivityMode,
@@ -27,24 +29,29 @@ from app.modules.control.models import (
     AutonomyLevel,
     User,
 )
-from app.modules.control.registry import INTENTS
+from app.modules.control.registry import INTENTS, SETTINGS
 from app.modules.control.schemas import (
     ActivityOut,
     AICostsOut,
     AIRunOut,
+    ApprovalGroupOut,
     ApprovalItemOut,
     ApproveIn,
     AuditOut,
     AutonomyOut,
     AutonomyUpdate,
+    BatchApproveIn,
+    BatchApproveOut,
     BudgetUpdate,
     CommandIn,
     CommandOut,
+    IntegrationOut,
     IntentOut,
     LoginIn,
     PasswordChange,
     ReturnIn,
     SettingOut,
+    SettingsBulkUpdate,
     SettingUpdate,
     TodayOut,
     UserCreate,
@@ -162,21 +169,33 @@ async def list_approvals(
     _: CurrentUser,
     db: DbSession,
     page: Page,
-    status_: Annotated[ApprovalStatus | None, Query(alias="status")] = ApprovalStatus.PENDING,
+    status_: Annotated[list[ApprovalStatus] | None, Query(alias="status")] = None,
     action: str | None = None,
     module: str | None = None,
 ) -> Paginated[ApprovalItemOut]:
-    q = select(ApprovalItem)
-    if status_ is not None:
-        q = q.where(ApprovalItem.status == status_)
+    """`status` lặp được (`?status=approved&status=returned`); bỏ trống = đang chờ."""
+    statuses = status_ or [ApprovalStatus.PENDING]
+    q = select(ApprovalItem).where(ApprovalItem.status.in_(statuses))
     if action:
         q = q.where(ApprovalItem.action == action)
     if module:
         q = q.where(ApprovalItem.module == module)
     order = (ApprovalItem.priority.desc(), ApprovalItem.created_at.asc())
-    if status_ != ApprovalStatus.PENDING:
+    if statuses != [ApprovalStatus.PENDING]:
         order = (ApprovalItem.updated_at.desc(),)  # type: ignore[assignment]
     return await paginate(db, q.order_by(*order), page, ApprovalItemOut)
+
+
+@router.get("/approvals/groups", response_model=list[ApprovalGroupOut], summary="Việc chờ theo loại")
+async def approval_groups(_: CurrentUser, db: DbSession) -> list[dict]:
+    return await service.pending_groups(db)
+
+
+@router.post("/approvals/approve-batch", response_model=BatchApproveOut, summary="Duyệt hàng loạt (i2)")
+async def approve_batch(body: BatchApproveIn, user: OwnerUser, db: DbSession) -> dict:
+    results = await service.approve_many(db, body.ids, user, note=body.note)
+    ok = sum(1 for r in results if r["status"] == ApprovalStatus.APPROVED)
+    return {"approved": ok, "failed": len(results) - ok, "results": results}
 
 
 @router.get("/approvals/{item_id}", response_model=ApprovalItemOut)
@@ -207,8 +226,14 @@ async def list_activity(
     mode: ActivityMode | None = None,
     ref_type: str | None = None,
     ref_id: uuid.UUID | None = None,
+    date_from: Annotated[date | None, Query(description="Từ ngày (giờ VN), gồm cả ngày này")] = None,
+    date_to: Annotated[date | None, Query(description="Tới ngày (giờ VN), gồm cả ngày này")] = None,
 ) -> Paginated[ActivityOut]:
     q = select(AIActivity)
+    if date_from:
+        q = q.where(AIActivity.created_at >= datetime.combine(date_from, time.min, tzinfo=VN_TZ))
+    if date_to:
+        q = q.where(AIActivity.created_at < datetime.combine(date_to + timedelta(days=1), time.min, tzinfo=VN_TZ))
     for col, val in (
         (AIActivity.action, action),
         (AIActivity.module, module),
@@ -281,6 +306,25 @@ async def list_settings(_: CurrentUser, db: DbSession) -> list[dict]:
     return await service.list_settings(db)
 
 
+@router.patch("/settings", response_model=list[SettingOut], summary="Lưu nhiều cài đặt một lần")
+async def update_settings(body: SettingsBulkUpdate, user: OwnerUser, db: DbSession) -> list[dict]:
+    unknown = [k for k in body.values if k not in SETTINGS]
+    if unknown:
+        raise BadRequest(f"Không có cài đặt: {', '.join(unknown)}.")
+    for key, value in body.values.items():
+        if (
+            key.endswith("_vnd")
+            and value is not None
+            and (not isinstance(value, int) or isinstance(value, bool) or value < 0)
+        ):
+            raise BadRequest(f"«{SETTINGS[key].label}» phải là số tiền nguyên, không âm.")
+    current = {s["key"]: s["value"] for s in await service.list_settings(db)}
+    for key, value in body.values.items():
+        if current.get(key) != value:
+            await service.set_setting(db, key, value, user)
+    return await service.list_settings(db)
+
+
 @router.patch("/settings/{key}", response_model=SettingOut)
 async def update_setting(key: str, body: SettingUpdate, user: OwnerUser, db: DbSession) -> dict:
     await service.set_setting(db, key, body.value, user)
@@ -295,6 +339,7 @@ async def list_audit(
     action: str | None = None,
     entity_type: str | None = None,
     entity_id: str | None = None,
+    actions: Annotated[list[str] | None, Query(description="Lọc nhiều khoá hành động")] = None,
 ) -> Paginated[AuditOut]:
     q = select(AuditLog)
     if action:
@@ -303,7 +348,56 @@ async def list_audit(
         q = q.where(AuditLog.entity_type == entity_type)
     if entity_id:
         q = q.where(AuditLog.entity_id == entity_id)
-    return await paginate(db, q.order_by(AuditLog.created_at.desc()), page, AuditOut)
+    if actions:
+        q = q.where(AuditLog.action.in_(actions))
+    q = q.add_columns(User.name).outerjoin(User, User.id == AuditLog.actor_user_id)
+
+    def _row(r: Any) -> AuditOut:
+        out = AuditOut.model_validate(r[0])
+        out.actor_name = r[1]
+        return out
+
+    return await paginate(db, q.order_by(AuditLog.created_at.desc()), page, _row, scalars=False)
+
+
+INTEGRATION_LABELS = {
+    "sources": "Nguồn hàng (săn hàng)",
+    "social": "Mạng xã hội",
+    "payments": "Thanh toán chuyển khoản",
+    "shipping": "Vận chuyển",
+    "notify": "Báo tin cho khách",
+    "marketplaces": "Sàn TMĐT",
+    "einvoice": "Hoá đơn điện tử",
+    "storage": "Lưu trữ tệp",
+}
+
+
+@router.get("/integrations", response_model=list[IntegrationOut], summary="Driver tích hợp đang bật")
+async def list_integrations(_: CurrentUser) -> list[IntegrationOut]:
+    from importlib import resources
+
+    out = []
+    for kind in KINDS:
+        try:
+            files = resources.files(f"app.integrations.{kind}")
+            available = sorted(
+                f.name.removesuffix(".py")
+                for f in files.iterdir()
+                if f.name.endswith(".py") and not f.name.startswith("_")
+            )
+        except ModuleNotFoundError:
+            available = []
+        name = driver_name(kind)
+        out.append(
+            IntegrationOut(
+                kind=kind,
+                label=INTEGRATION_LABELS.get(kind, kind),
+                driver=name,
+                is_mock=name == "mock",
+                available=available,
+            )
+        )
+    return out
 
 
 # ra lệnh bằng lời (i6)

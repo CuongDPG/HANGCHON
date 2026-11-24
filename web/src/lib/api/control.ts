@@ -1,0 +1,419 @@
+"use client";
+
+/**
+ * API của trung tâm điều khiển (backend `app/modules/control`): «Hôm nay», hàng chờ duyệt, mức tự chủ, nhật ký AI,
+ * chi phí AI, cài đặt, lưu vết, lệnh bằng lời, tài khoản phụ giúp.
+ */
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { api, type Paginated } from "./client";
+import type { SessionUser } from "./auth";
+
+/* ---------- kiểu dữ liệu ---------- */
+
+export type AutonomyLevel = "auto" | "ask" | "off" | "locked_ask";
+export type ApprovalStatus = "pending" | "approved" | "returned" | "failed" | "cancelled" | "expired";
+
+export type Source = { url?: string; title?: string } & Record<string, unknown>;
+
+/** Quy ước `preview` (module nào cũng dùng được): những khoá này hiện đẹp, khoá khác hiện dạng nhãn — giá trị. */
+export type Preview = {
+  kind?: string;
+  /** Nội dung chính: bài viết, tin nhắn. */
+  text?: string;
+  channel?: string;
+  image_url?: string;
+  images?: string[];
+  /** Dòng nhãn — giá trị; `format: "vnd"` để hiện tiền. */
+  fields?: { label: string; value: unknown; format?: "vnd" | "number" | "text" }[];
+  /** Danh sách gạch đầu dòng. */
+  list?: string[];
+  /** Dòng hàng (hoá đơn, đơn đặt). */
+  lines?: { name: string; quantity: number; unit_price_vnd: number; unit?: string }[];
+  total_vnd?: number;
+  /** Trang chi tiết trên bàn làm việc để xem kỹ hơn. */
+  href?: string;
+} & Record<string, unknown>;
+
+export type ApprovalItem = {
+  id: string;
+  action: string;
+  action_label: string;
+  action_group: string | null;
+  locked: boolean;
+  module: string;
+  title: string;
+  summary: string | null;
+  payload: Record<string, unknown>;
+  preview: Preview;
+  edited_payload: Record<string, unknown> | null;
+  was_edited: boolean;
+  status: ApprovalStatus;
+  priority: number;
+  rationale: string | null;
+  sources: Source[];
+  ref_type: string | null;
+  ref_id: string | null;
+  ai_generated: boolean;
+  ai_run_id: string | null;
+  decision_note: string | null;
+  decided_at: string | null;
+  decided_by_id: string | null;
+  result: Record<string, unknown> | null;
+  error: string | null;
+  attempts: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Activity = {
+  id: string;
+  action: string;
+  action_label: string;
+  module: string;
+  title: string;
+  summary: string | null;
+  mode: "auto" | "approved";
+  rationale: string | null;
+  sources: Source[];
+  payload: Record<string, unknown>;
+  result: Record<string, unknown> | null;
+  ref_type: string | null;
+  ref_id: string | null;
+  approval_item_id: string | null;
+  ai_run_id: string | null;
+  undoable: boolean;
+  undone_at: string | null;
+  undone_by_id: string | null;
+  created_at: string;
+};
+
+export type Stat = {
+  key: string;
+  label: string;
+  value: number | string;
+  format: "number" | "vnd" | "percent" | "text";
+  hint: string | null;
+  href: string | null;
+  order: number;
+};
+
+export type Today = {
+  date: string;
+  pending: { total: number; items: ApprovalItem[] };
+  ai_done: { total: number; items: Activity[]; auto_total: number; groups: { action: string; label: string; count: number }[] };
+  stats: Stat[];
+  ai_cost: { month: string; spent_vnd: number; budget_vnd: number; used_pct: number };
+};
+
+export type ApprovalGroup = { action: string; label: string; group: string | null; locked: boolean; count: number };
+
+export type AutonomyRow = {
+  action: string;
+  label: string;
+  group: string;
+  description: string;
+  module: string;
+  level: AutonomyLevel;
+  default_level: AutonomyLevel;
+  locked: boolean;
+  customer_facing: boolean;
+  updated_at: string | null;
+  history: { approved: number; edited: number; returned: number; streak: number };
+  suggest_auto: boolean;
+};
+
+export type AICosts = {
+  month: string;
+  spent_vnd: number;
+  budget_vnd: number;
+  remaining_vnd: number;
+  used_pct: number;
+  run_count: number;
+  error_count: number;
+  blocked_count: number;
+  by_task: { task: string; label: string; runs: number; cost_vnd: number; input_tokens: number; output_tokens: number }[];
+  by_day: { date: string; runs: number; cost_vnd: number }[];
+};
+
+export type Setting = {
+  key: string;
+  label: string;
+  group: string;
+  description: string;
+  default: unknown;
+  value: unknown;
+  is_default: boolean;
+  updated_at: string | null;
+};
+
+export type AuditEntry = {
+  id: string;
+  created_at: string;
+  actor_kind: "owner" | "helper" | "ai" | "system" | "customer";
+  actor_user_id: string | null;
+  actor_name: string | null;
+  action: string;
+  entity_type: string | null;
+  entity_id: string | null;
+  summary: string | null;
+  data: Record<string, unknown>;
+};
+
+export type Integration = { kind: string; label: string; driver: string; is_mock: boolean; available: string[] };
+
+export type Intent = { key: string; label: string; description: string; examples: string[] };
+
+export type CommandResult = {
+  text: string;
+  status: "done" | "needs_clarification" | "unknown" | "failed";
+  intent: string | null;
+  label: string | null;
+  message: string;
+  href: string | null;
+  data: Record<string, unknown> | null;
+};
+
+export type BatchResult = { approved: number; failed: number; results: { id: string; status: ApprovalStatus | null; error: string | null }[] };
+
+/* ---------- khoá truy vấn ---------- */
+
+const BASE = "/api/desk/control";
+
+export const controlKeys = {
+  all: ["control"] as const,
+  today: () => ["control", "today"] as const,
+  approvals: (q: object) => ["control", "approvals", q] as const,
+  approval: (id: string) => ["control", "approval", id] as const,
+  groups: () => ["control", "approval-groups"] as const,
+  activity: (q: object) => ["control", "activity", q] as const,
+  autonomy: () => ["control", "autonomy"] as const,
+  costs: (month?: string) => ["control", "ai-costs", month ?? "now"] as const,
+  settings: () => ["control", "settings"] as const,
+  audit: (q: object) => ["control", "audit", q] as const,
+  integrations: () => ["control", "integrations"] as const,
+  intents: () => ["control", "intents"] as const,
+  users: () => ["control", "users"] as const,
+};
+
+/** Duyệt / hoàn tác / đổi mức làm thay đổi nhiều khối cùng lúc: làm mới cả nhóm control (và số liệu finance). */
+function useInvalidateControl() {
+  const qc = useQueryClient();
+  return () => {
+    void qc.invalidateQueries({ queryKey: controlKeys.all });
+    void qc.invalidateQueries({ queryKey: ["finance"] });
+  };
+}
+
+/* ---------- Hôm nay (i1) ---------- */
+
+export function useToday() {
+  return useQuery({ queryKey: controlKeys.today(), queryFn: () => api.get<Today>(`${BASE}/today`), refetchInterval: 60_000 });
+}
+
+/* ---------- hàng chờ duyệt (i2) ---------- */
+
+export type ApprovalQuery = { status?: ApprovalStatus[]; action?: string; page?: number; size?: number };
+
+export function useApprovals(query: ApprovalQuery = {}) {
+  return useQuery({
+    queryKey: controlKeys.approvals(query),
+    queryFn: () => api.get<Paginated<ApprovalItem>>(`${BASE}/approvals`, { query: { ...query, size: query.size ?? 50 } }),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useApproval(id: string | null) {
+  return useQuery({
+    queryKey: controlKeys.approval(id ?? ""),
+    queryFn: () => api.get<ApprovalItem>(`${BASE}/approvals/${id}`),
+    enabled: !!id,
+  });
+}
+
+export function useApprovalGroups() {
+  return useQuery({ queryKey: controlKeys.groups(), queryFn: () => api.get<ApprovalGroup[]>(`${BASE}/approvals/groups`) });
+}
+
+export function useApprove() {
+  const invalidate = useInvalidateControl();
+  return useMutation({
+    mutationFn: ({ id, payload, note }: { id: string; payload?: Record<string, unknown>; note?: string }) =>
+      api.post<ApprovalItem>(`${BASE}/approvals/${id}/approve`, { payload: payload ?? null, note: note ?? null }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useReturnApproval() {
+  const invalidate = useInvalidateControl();
+  return useMutation({
+    mutationFn: ({ id, note }: { id: string; note: string }) => api.post<ApprovalItem>(`${BASE}/approvals/${id}/return`, { note }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useApproveBatch() {
+  const invalidate = useInvalidateControl();
+  return useMutation({
+    mutationFn: (ids: string[]) => api.post<BatchResult>(`${BASE}/approvals/approve-batch`, { ids }),
+    onSuccess: invalidate,
+  });
+}
+
+/* ---------- nhật ký AI (i4) ---------- */
+
+export type ActivityQuery = { module?: string; action?: string; mode?: "auto" | "approved"; date_from?: string; date_to?: string; page?: number };
+
+export function useActivity(query: ActivityQuery) {
+  return useQuery({
+    queryKey: controlKeys.activity(query),
+    queryFn: () => api.get<Paginated<Activity>>(`${BASE}/activity`, { query: { ...query, size: 30 } }),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useUndo() {
+  const invalidate = useInvalidateControl();
+  return useMutation({
+    mutationFn: (id: string) => api.post<Activity>(`${BASE}/activity/${id}/undo`),
+    onSuccess: invalidate,
+  });
+}
+
+/* ---------- mức tự chủ (i3) ---------- */
+
+export function useAutonomy() {
+  return useQuery({ queryKey: controlKeys.autonomy(), queryFn: () => api.get<AutonomyRow[]>(`${BASE}/autonomy`) });
+}
+
+export function useSetAutonomy() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ action, level }: { action: string; level: "auto" | "ask" | "off" }) =>
+      api.patch<AutonomyRow>(`${BASE}/autonomy/${encodeURIComponent(action)}`, { level }),
+    onMutate: async ({ action, level }) => {
+      await qc.cancelQueries({ queryKey: controlKeys.autonomy() });
+      const prev = qc.getQueryData<AutonomyRow[]>(controlKeys.autonomy());
+      qc.setQueryData<AutonomyRow[]>(controlKeys.autonomy(), (rows) =>
+        rows?.map((r) => (r.action === action ? { ...r, level, suggest_auto: false } : r)),
+      );
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(controlKeys.autonomy(), ctx.prev);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: controlKeys.autonomy() }),
+  });
+}
+
+/* ---------- chi phí AI (k2) ---------- */
+
+export function useAICosts(month?: string) {
+  return useQuery({
+    queryKey: controlKeys.costs(month),
+    queryFn: () => api.get<AICosts>(`${BASE}/ai/costs`, { query: { month } }),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useSetBudget() {
+  const invalidate = useInvalidateControl();
+  return useMutation({
+    mutationFn: (monthly_budget_vnd: number) => api.patch<AICosts>(`${BASE}/ai/budget`, { monthly_budget_vnd }),
+    onSuccess: invalidate,
+  });
+}
+
+/* ---------- cài đặt, lưu vết, tích hợp (k3, k4) ---------- */
+
+export function useSettings() {
+  return useQuery({ queryKey: controlKeys.settings(), queryFn: () => api.get<Setting[]>(`${BASE}/settings`) });
+}
+
+export function useSaveSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (values: Record<string, unknown>) => api.patch<Setting[]>(`${BASE}/settings`, { values }),
+    onSuccess: (rows) => qc.setQueryData(controlKeys.settings(), rows),
+  });
+}
+
+export function useAudit(query: { actions?: string[]; page?: number }, enabled = true) {
+  return useQuery({
+    queryKey: controlKeys.audit(query),
+    queryFn: () => api.get<Paginated<AuditEntry>>(`${BASE}/audit`, { query: { ...query, size: 30 } }),
+    placeholderData: keepPreviousData,
+    enabled,
+  });
+}
+
+export function useIntegrations() {
+  return useQuery({ queryKey: controlKeys.integrations(), queryFn: () => api.get<Integration[]>(`${BASE}/integrations`) });
+}
+
+/* ---------- lệnh bằng lời (i6) ---------- */
+
+export function useIntents(enabled: boolean) {
+  return useQuery({
+    queryKey: controlKeys.intents(),
+    queryFn: () => api.get<Intent[]>(`${BASE}/commands`),
+    enabled,
+    staleTime: 10 * 60_000,
+  });
+}
+
+export function useCommand() {
+  const invalidate = useInvalidateControl();
+  return useMutation({
+    mutationFn: (input: { text: string; context?: Record<string, unknown> }) =>
+      api.post<CommandResult>(`${BASE}/command`, { text: input.text, context: input.context ?? {} }),
+    meta: { silentError: true },
+    onSuccess: invalidate,
+  });
+}
+
+/* ---------- người phụ giúp (k4) ---------- */
+
+export function useUsers(enabled: boolean) {
+  return useQuery({ queryKey: controlKeys.users(), queryFn: () => api.get<SessionUser[]>("/api/desk/users"), enabled });
+}
+
+export function useCreateUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { email: string; name: string; password: string }) =>
+      api.post<SessionUser>("/api/desk/users", { ...input, role: "helper" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: controlKeys.users() }),
+  });
+}
+
+export function useUpdateUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: string; name?: string; password?: string; is_active?: boolean }) =>
+      api.patch<SessionUser>(`/api/desk/users/${id}`, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: controlKeys.users() }),
+  });
+}
+
+/* ---------- nhãn dùng chung ---------- */
+
+/** Tên tiếng Việt của module backend (lọc nhật ký, nhãn nhóm). */
+export const MODULE_LABELS: Record<string, string> = {
+  control: "Hệ thống",
+  sourcing: "Săn hàng",
+  assessment: "Thẩm định",
+  selection: "Bàn chọn",
+  supply: "Nguồn cung",
+  catalog: "Sản phẩm",
+  orders: "Đơn hàng",
+  assistant: "Trợ lý web",
+  content: "Nội dung",
+  inbox: "Hộp thư",
+  crm: "Khách",
+  finance: "Sổ sách",
+  demo: "Mẫu",
+};
+
+export function moduleLabel(m: string): string {
+  return MODULE_LABELS[m] ?? m;
+}

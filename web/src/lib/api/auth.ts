@@ -9,7 +9,15 @@ export type SessionUser = {
   email: string;
   name: string;
   role: "owner" | "helper" | (string & {});
+  is_active: boolean;
+  last_login_at: string | null;
+  created_at: string;
 };
+
+/** Chỉ chị (`owner`) mới duyệt, đổi mức tự chủ, cài đặt, sao lưu; người phụ giúp xem được. */
+export function isOwner(user: SessionUser | null | undefined): boolean {
+  return user?.role === "owner";
+}
 
 export type LoginInput = { email: string; password: string };
 
@@ -19,6 +27,8 @@ export const authApi = {
   me: () => api.get<SessionUser>("/api/desk/auth/me"),
   login: (input: LoginInput) => api.post<SessionUser>("/api/desk/auth/login", input),
   logout: () => api.post<void>("/api/desk/auth/logout"),
+  changePassword: (input: { current_password: string; new_password: string }) =>
+    api.post<void>("/api/desk/auth/password", input),
 };
 
 export type SessionStatus = "loading" | "authenticated" | "unauthenticated" | "error";

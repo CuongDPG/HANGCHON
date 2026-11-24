@@ -241,7 +241,14 @@ async def test_ai_costs_and_budget(owner_client: httpx.AsyncClient) -> None:
         await s.commit()
     body = (await owner_client.get("/api/desk/control/ai/costs")).json()
     assert body["spent_vnd"] == 1700 and body["run_count"] == 4 and body["error_count"] == 1
-    assert body["by_task"][0] == {"task": "a.x", "runs": 2, "cost_vnd": 1500, "input_tokens": 0, "output_tokens": 0}
+    assert body["by_task"][0] == {
+        "task": "a.x",
+        "label": "a.x",
+        "runs": 2,
+        "cost_vnd": 1500,
+        "input_tokens": 0,
+        "output_tokens": 0,
+    }
     assert len(body["by_day"]) == 1
     r = await owner_client.patch("/api/desk/control/ai/budget", json={"monthly_budget_vnd": 3_000_000})
     assert r.status_code == 200 and r.json()["budget_vnd"] == 3_000_000

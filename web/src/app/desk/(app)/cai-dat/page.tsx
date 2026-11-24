@@ -1,7 +1,7 @@
-import { DeskPlaceholder } from "@/components/desk/desk-placeholder";
+import { SettingsIndex } from "@/components/control/settings-screens";
 
 export const metadata = { title: "Cài đặt" };
 
 export default function DeskSettingsPage() {
-  return <DeskPlaceholder navKey="settings" />;
+  return <SettingsIndex />;
 }

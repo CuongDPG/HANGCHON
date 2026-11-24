@@ -10,7 +10,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.modules.finance.models import (
     BackupKind,
@@ -142,3 +142,89 @@ class BackupOut(ORM):
     error: str | None
     triggered_by_id: uuid.UUID | None
     created_at: datetime
+
+
+# ---- schema tạo / sửa / tổng hợp (k1, k4, k5, i5) ------------------------------------------------------------------
+
+
+class ExpenseUpdate(BaseModel):
+    incurred_on: date | None = None
+    category: ExpenseCategory | None = None
+    amount_vnd: int | None = Field(default=None, gt=0)
+    description: str | None = Field(default=None, min_length=1, max_length=2000)
+    vendor: str | None = Field(default=None, max_length=200)
+    payment_method: str | None = Field(default=None, max_length=30)
+    is_deductible: bool | None = None
+
+
+class LedgerTotals(BaseModel):
+    revenue_vnd: int
+    refund_vnd: int
+    net_revenue_vnd: int
+    expense_vnd: int
+    entry_count: int
+
+
+class LedgerPeriodRow(LedgerTotals):
+    period: str
+
+
+class LedgerCategoryRow(BaseModel):
+    category: str
+    amount_vnd: int
+    count: int
+
+
+class LedgerSummaryOut(BaseModel):
+    """Tổng hợp một kỳ: tháng (`2026-11`), quý (`2026-Q4`) hoặc năm (`2026`)."""
+
+    period: str
+    label: str
+    date_from: date
+    date_to: date
+    totals: LedgerTotals
+    by_month: list[LedgerPeriodRow]
+    expenses_by_category: list[LedgerCategoryRow]
+
+
+class InvoiceCreate(BaseModel):
+    order_id: uuid.UUID
+    buyer_name: str | None = Field(default=None, max_length=200)
+    buyer_tax_code: str | None = Field(default=None, max_length=20)
+    buyer_address: str | None = Field(default=None, max_length=500)
+    buyer_email: str | None = Field(default=None, max_length=254)
+
+
+class InvoiceListOut(InvoiceOut):
+    approval_item_id: uuid.UUID | None = None
+    approval_status: str | None = None
+    approval_error: str | None = None
+
+
+class InvoiceProposeOut(BaseModel):
+    invoice: InvoiceListOut
+    outcome: str  # applied | pending | blocked | failed
+    approval_item_id: uuid.UUID | None
+    error: str | None = None
+
+
+class InvoiceCandidateOut(BaseModel):
+    """Đơn đã thanh toán, chưa có hoá đơn đã phát hành."""
+
+    order_id: uuid.UUID
+    code: str
+    recipient_name: str
+    total_vnd: int
+    paid_at: datetime | None
+    invoice_status: InvoiceStatus | None
+
+
+class ReportGenerateIn(BaseModel):
+    week_start: date | None = Field(default=None, description="Thứ Hai đầu tuần; bỏ trống = tuần này")
+
+
+class BackupConfigOut(BaseModel):
+    pg_dump: str | None
+    keep: int
+    schedule: str
+    last_success_at: datetime | None
