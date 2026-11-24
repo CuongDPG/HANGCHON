@@ -1,7 +1,7 @@
-import { DeskPlaceholder } from "@/components/desk/desk-placeholder";
+import { ContentHome } from "@/components/content/content-home";
 
 export const metadata = { title: "Nội dung" };
 
 export default function DeskContentPage() {
-  return <DeskPlaceholder navKey="content" />;
+  return <ContentHome />;
 }
