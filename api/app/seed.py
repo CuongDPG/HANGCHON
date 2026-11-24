@@ -1,4 +1,5 @@
-"""Dữ liệu khởi đầu: `uv run python -m app.seed` (chạy lại nhiều lần không sinh trùng).
+"""Dữ liệu khởi đầu: `uv run python -m app.seed` (chạy lại nhiều lần không sinh trùng); thêm `--demo` để dựng câu
+chuyện mẫu dùng chung cho mọi module (`app/demo.py`).
 
 Tạo tài khoản chị (OWNER_EMAIL / OWNER_PASSWORD) và dữ liệu mẫu tối thiểu: nhóm hàng, khung chấm điểm 7 tiêu chí,
 giọng viết mặc định, vài nguyên tắc chọn, tài khoản kênh giả. Dữ liệu mẫu đầy đủ do các module bổ sung sau."""
@@ -94,16 +95,23 @@ async def seed(db: AsyncSession) -> dict[str, int]:
     return counts
 
 
-async def main() -> None:
+async def main(demo: bool = False) -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     discover_modules()
     async with SessionLocal() as db:
         counts = await seed(db)
         await db.commit()
     log.info("Đã tạo: %s", ", ".join(f"{k}={v}" for k, v in counts.items()))
+    if demo:
+        from app.demo import seed_demo
+
+        made = await seed_demo()
+        log.info("Dữ liệu mẫu: %s", ", ".join(f"{k}={v}" for k, v in made.items()) if made else "đã có sẵn, bỏ qua")
     if settings.owner_email:
         log.info("Đăng nhập bàn làm việc bằng %s", settings.owner_email)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import sys
+
+    asyncio.run(main(demo="--demo" in sys.argv[1:]))

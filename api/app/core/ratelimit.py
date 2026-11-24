@@ -22,6 +22,7 @@ log = logging.getLogger("app.ratelimit")
 _local: dict[str, deque[float]] = defaultdict(deque)
 _client: Any = None
 _down_until = 0.0
+_force_local = False
 
 
 def _hit_local(key: str, max_hits: int, window: float) -> bool:
@@ -47,7 +48,7 @@ async def _redis() -> Any:
 async def hit(key: str, max_hits: int, window_seconds: float) -> bool:
     """Ghi một lượt; trả False nếu đã vượt `max_hits` lượt trong `window_seconds` giây gần nhất."""
     global _down_until
-    if settings.is_test or time.monotonic() < _down_until:
+    if settings.is_test or _force_local or time.monotonic() < _down_until:
         return _hit_local(key, max_hits, window_seconds)
     rk = f"rl:{key}"
     now = time.time()
@@ -68,6 +69,12 @@ async def hit(key: str, max_hits: int, window_seconds: float) -> bool:
         _down_until = time.monotonic() + 30  # thử lại Redis sau 30 giây
         log.warning("Redis không tới được, tạm đếm giới hạn trong tiến trình", exc_info=True)
         return _hit_local(key, max_hits, window_seconds)
+
+
+def force_local(on: bool) -> None:
+    """Đếm trong tiến trình (dựng dữ liệu mẫu: không để lượt thử của máy ảnh hưởng tới Redis dùng chung)."""
+    global _force_local
+    _force_local = on
 
 
 def reset() -> None:

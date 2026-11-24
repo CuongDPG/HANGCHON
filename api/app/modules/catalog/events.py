@@ -14,6 +14,7 @@ from app.core.jobs import enqueue
 from app.modules.catalog import inventory
 from app.modules.catalog import products as product_svc
 from app.modules.catalog import reviews as review_svc
+from app.modules.catalog.models import Product
 
 log = logging.getLogger("app.catalog")
 
@@ -50,10 +51,19 @@ async def on_candidate_selected(db: AsyncSession, payload: dict[str, Any]) -> No
 
 @events.on("price.approved")
 async def on_price_approved(db: AsyncSession, payload: dict[str, Any]) -> None:
-    cid = _id(payload, "candidate_id")
-    if cid is None:
-        return
-    await product_svc.apply_price(db, cid, int(payload.get("price_vnd") or 0))
+    price = int(payload.get("price_vnd") or 0)
+    if payload.get("candidate_id"):
+        cid = _id(payload, "candidate_id")
+        if cid is not None:
+            await product_svc.apply_price(db, cid, price)
+    elif payload.get("product_id"):  # đề xuất giá cho sản phẩm đã có (không gắn ứng viên)
+        pid = _id(payload, "product_id")
+        p = await db.get(Product, pid) if pid else None
+        if p is not None and p.candidate_id:
+            await product_svc.apply_price(db, p.candidate_id, price)
+        elif p is not None and price > 0:
+            p.price_vnd = price
+            await db.flush()
 
 
 @events.on("order.delivered")

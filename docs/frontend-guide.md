@@ -94,7 +94,7 @@ Tất cả nằm trong `src/lib/api/`:
   `isNetwork` = không tới được máy chủ (kể cả khi Next trả 500 dạng chữ vì API chưa chạy). `isUnauthorized` = 401.
 - Mutation lỗi tự hiện toast (`notifyError`). Màn hình tự hiện lỗi tại chỗ thì đặt `meta: { silentError: true }`.
 - Query không thử lại lỗi 4xx; lỗi mạng/5xx thử lại 1 lần.
-- `Paginated<T>` = `{ items: T[]; total: number }` (khớp `Paginated[T]` của PMAI). Backend thêm trường thì bổ sung ở đây.
+- `Paginated<T>` = `{ items: T[]; total: number; page: number; size: number; pages: number }` (khớp `Paginated[T]` ở `api/app/core/pagination.py`; tham số `?page=&size=`).
 
 Mẫu một file module:
 
