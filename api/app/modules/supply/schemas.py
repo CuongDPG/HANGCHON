@@ -8,9 +8,9 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.enums import Language, SourcePlatform
 from app.modules.supply.models import (
@@ -237,3 +237,249 @@ class ProvenanceDocumentOut(ORM):
     notes: str | None
     uploaded_by_id: uuid.UUID | None
     created_at: datetime
+
+
+# ---- schema tạo/sửa và schema cho màn hình (d1–d7) ----------------------------------------------------------------
+
+
+class SupplierIn(BaseModel):
+    name: str = Field(min_length=2, max_length=200)
+    name_original: str | None = Field(default=None, max_length=200)
+    kind: SupplierKind = SupplierKind.SHOP
+    platform: SourcePlatform | None = None
+    shop_url: str | None = None
+    country: str | None = Field(default=None, min_length=2, max_length=2)
+    language: Language = Language.ZH
+    contact: dict[str, Any] = Field(default_factory=dict)
+    agent_fee_pct: Decimal | None = Field(default=None, ge=0, le=100)
+    tags: list[str] = Field(default_factory=list)
+    notes: str | None = None
+
+
+class SupplierUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=200)
+    name_original: str | None = None
+    kind: SupplierKind | None = None
+    platform: SourcePlatform | None = None
+    shop_url: str | None = None
+    country: str | None = Field(default=None, min_length=2, max_length=2)
+    language: Language | None = None
+    contact: dict[str, Any] | None = None
+    agent_fee_pct: Decimal | None = Field(default=None, ge=0, le=100)
+    tags: list[str] | None = None
+    notes: str | None = None
+    is_blocked: bool | None = None
+
+
+class SupplierView(SupplierOut):
+    trust_label: str
+    trust_basis: str
+    open_orders: int
+
+
+class CostParams(BaseModel):
+    """Tham số mặc định tính giá vốn về tay (d2). Lưu ở `app_settings["supply.cost_params"]`."""
+
+    fx_rates: dict[str, Decimal] = Field(description="VND cho 1 đơn vị ngoại tệ: CNY, JPY, USD")
+    intl_vnd_per_kg: dict[str, int] = Field(description="Cước quốc tế theo nước gửi: CN, JP")
+    agent_fee_pct: Decimal = Field(ge=0, le=100)
+    domestic_shipping_vnd: int = Field(ge=0, description="Cước nội địa bên bán, chia cho mỗi cái")
+    import_tax_pct: Decimal = Field(ge=0, le=100)
+    vat_pct: Decimal = Field(ge=0, le=100)
+    loss_pct: Decimal = Field(ge=0, le=100, description="Hao hụt, đổi trả dự phòng")
+    packaging_vnd: int = Field(ge=0)
+    target_margin_pct: Decimal = Field(ge=0, lt=100, description="Biên lợi nhuận mục tiêu khi đề xuất giá bán")
+
+
+class CostParamsOut(CostParams):
+    recalculated: int = 0
+
+
+class CostSheetIn(BaseModel):
+    candidate_id: uuid.UUID | None = None
+    product_id: uuid.UUID | None = None
+    supplier_id: uuid.UUID | None = None
+    unit_price_amount: Decimal = Field(gt=0)
+    currency: str = Field(default="CNY", min_length=3, max_length=3)
+    weight_grams: int | None = Field(default=None, ge=0)
+    domestic_shipping_vnd: int | None = Field(default=None, ge=0)
+    packaging_vnd: int | None = Field(default=None, ge=0)
+    other_fees_vnd: int = Field(default=0, ge=0)
+    moq: int | None = Field(default=None, ge=1)
+    auto_update: bool = True
+    country: str | None = Field(default=None, min_length=2, max_length=2, description="Nước gửi; trống = theo tiền tệ")
+    # chỉ dùng khi auto_update = false (tham số riêng cho món này)
+    fx_rate: Decimal | None = Field(default=None, gt=0)
+    intl_shipping_vnd_per_kg: int | None = Field(default=None, ge=0)
+    agent_fee_pct: Decimal | None = Field(default=None, ge=0, le=100)
+    import_tax_pct: Decimal | None = Field(default=None, ge=0, le=100)
+    vat_pct: Decimal | None = Field(default=None, ge=0, le=100)
+    loss_pct: Decimal | None = Field(default=None, ge=0, le=100)
+    assumptions: str | None = None
+
+
+class CostLine(BaseModel):
+    key: str
+    label: str
+    amount_vnd: int
+    formula: str
+
+
+class CostPreview(BaseModel):
+    landed_cost_vnd: int
+    breakdown: list[CostLine]
+
+
+class PriceProposalIn(BaseModel):
+    candidate_id: uuid.UUID
+    target_margin_pct: Decimal | None = Field(default=None, ge=0, lt=100)
+
+
+class PriceProposalView(PriceProposalOut):
+    market_samples: int
+
+
+class POLineIn(BaseModel):
+    candidate_id: uuid.UUID | None = None
+    product_id: uuid.UUID | None = None
+    description: str = Field(min_length=1)
+    source_url: str | None = None
+    variant_spec: dict[str, Any] = Field(default_factory=dict)
+    quantity: int = Field(ge=1)
+    unit_price_amount: Decimal = Field(ge=0)
+
+
+class PurchaseOrderIn(BaseModel):
+    kind: POKind = POKind.SAMPLE
+    supplier_id: uuid.UUID | None = None
+    agent_supplier_id: uuid.UUID | None = None
+    candidate_id: uuid.UUID | None = None
+    currency: str = Field(default="CNY", min_length=3, max_length=3)
+    shipping_amount: Decimal = Field(default=Decimal(0), ge=0)
+    fees_vnd: int = Field(default=0, ge=0)
+    expected_at: date | None = None
+    notes: str | None = None
+    lines: list[POLineIn] = Field(min_length=1)
+
+
+class SampleOrderIn(BaseModel):
+    candidate_id: uuid.UUID
+    quantity: int = Field(default=1, ge=1, le=50)
+    supplier_id: uuid.UUID | None = None
+
+
+class PurchaseOrderUpdate(BaseModel):
+    message_draft: str | None = None
+    notes: str | None = None
+    expected_at: date | None = None
+    supplier_id: uuid.UUID | None = None
+    agent_supplier_id: uuid.UUID | None = None
+    shipping_amount: Decimal | None = Field(default=None, ge=0)
+    fees_vnd: int | None = Field(default=None, ge=0)
+
+
+class POStatusIn(BaseModel):
+    to: Literal["sent", "confirmed", "cancelled"]
+    note: str | None = None
+
+
+class PaymentIn(BaseModel):
+    amount_vnd: int = Field(gt=0)
+    kind: Literal["deposit", "payment", "shipping", "fee"] = "payment"
+    paid_on: date | None = None
+    note: str | None = Field(default=None, max_length=500)
+
+
+class ReceiveLine(BaseModel):
+    line_id: uuid.UUID
+    received_qty: int = Field(ge=0)
+    defect_qty: int = Field(default=0, ge=0)
+
+
+class ReceiveIn(BaseModel):
+    lines: list[ReceiveLine] = Field(min_length=1)
+
+
+class InboundLite(BaseModel):
+    id: uuid.UUID
+    status: InboundStatus
+    tracking_code: str | None
+    eta: date | None
+
+
+class PurchaseOrderView(PurchaseOrderOut):
+    lines: list[PurchaseOrderLineOut]
+    supplier_name: str | None
+    agent_name: str | None
+    candidate_title: str | None
+    inbound: list[InboundLite]
+    document_kinds: list[str]
+    missing_documents: list[str]
+
+
+class InboundIn(BaseModel):
+    purchase_order_id: uuid.UUID | None = None
+    code: str | None = Field(default=None, max_length=60)
+    carrier: str | None = Field(default=None, max_length=80)
+    tracking_code: str | None = Field(default=None, max_length=120)
+    eta: date | None = None
+    package_count: int | None = Field(default=None, ge=0)
+    weight_kg: Decimal | None = Field(default=None, ge=0)
+
+
+class InboundUpdate(InboundIn):
+    shipping_cost_vnd: int | None = Field(default=None, ge=0)
+    customs_cost_vnd: int | None = Field(default=None, ge=0)
+    problem_note: str | None = None
+
+
+class MilestoneIn(BaseModel):
+    status: InboundStatus
+    note: str | None = Field(default=None, max_length=500)
+    at: datetime | None = None
+
+
+class InboundView(InboundShipmentOut):
+    po_code: str | None
+    supplier_name: str | None
+    document_kinds: list[str]
+    missing_documents: list[str]
+
+
+class DocumentView(ProvenanceDocumentOut):
+    url: str | None
+
+
+class DocumentWarning(BaseModel):
+    purchase_order_id: uuid.UUID
+    po_code: str
+    kind: POKind
+    status: POStatus
+    supplier_name: str | None
+    missing: list[str]
+    missing_labels: list[str]
+
+
+class InquiryIn(BaseModel):
+    candidate_id: uuid.UUID | None = None
+    purchase_order_id: uuid.UUID | None = None
+    topics: list[Literal["price", "moq", "lead_time", "shipping", "sample", "custom"]] = Field(
+        default_factory=lambda: ["price", "moq", "lead_time"]
+    )
+    quantity: int | None = Field(default=None, ge=1)
+    extra: str | None = Field(default=None, max_length=1000, description="Điều chị muốn hỏi thêm, viết tiếng Việt")
+
+
+class ReplyIn(BaseModel):
+    body_original: str = Field(min_length=1, max_length=8000)
+    candidate_id: uuid.UUID | None = None
+    purchase_order_id: uuid.UUID | None = None
+
+
+class MessageSentIn(BaseModel):
+    channel: SupplierChannel = SupplierChannel.MANUAL
+
+
+class CostSheetView(CostSheetOut):
+    candidate_title: str | None
+    candidate_stage: str | None
