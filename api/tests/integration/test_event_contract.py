@@ -195,3 +195,22 @@ async def test_restock_inbound_adds_stock_once(db) -> None:
     await db.commit()
     inv = (await db.execute(select(InventoryItem).where(InventoryItem.product_id == p.id))).scalar_one()
     assert inv.on_hand == 12 and inv.unit_cost_vnd == 120_000
+
+
+async def test_drop_posts_not_composed_after_drop_closed(db) -> None:
+    """Đợt đã đóng trước khi kịp soạn bài báo mở đợt → bản nháp được cất, không lên lịch."""
+    from app.modules.catalog.models import DropStatus
+    from app.modules.content.models import DraftStatus
+    from app.modules.content.service import compose_pending
+
+    p = await make_product()
+    d = await make_drop([(p, 300_000, 20)])
+    await events.emit("drop.opened", {"drop_id": str(d.id)}, db=db)
+    from app.modules.catalog.models import Drop
+
+    (await db.get(Drop, d.id)).status = DropStatus.CLOSED
+    await db.flush()
+    await compose_pending(db)
+    await db.commit()
+    statuses = set((await db.execute(select(ContentDraft.status).where(ContentDraft.drop_id == d.id))).scalars())
+    assert statuses == {DraftStatus.ARCHIVED}

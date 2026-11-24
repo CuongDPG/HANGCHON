@@ -226,6 +226,7 @@ class Story:
                     seller_name={"rakuten": "Shop Osaka (ví dụ)", "amazon_jp": "Amazon Nhật (ví dụ)"}.get(plat, "Xưởng ví dụ"),
                     rank_reason="Khớp đề: đúng chất liệu, nhiều đánh giá thật, giá về tay trong ngân sách.",
                     description_vi=f"{title}. Thông tin dịch từ trang gốc (ví dụ).",
+                    specs=dict(SPECS[key][1]) if key in SPECS else {},
                 )  # fmt: skip
                 s.add(c)
                 await s.flush()
@@ -355,6 +356,15 @@ class Story:
             await self.approve(res["approval_item_id"])
         self.ids[key] = d["id"]
         self.bump("drops")
+        await JOBS["content.compose_pending"](job_context())  # bài báo mở đợt (f1)
+        if not opens_in_days:  # đợt mở ngay: bài Facebook báo mở đợt được duyệt và đăng
+            studio = await self.call("GET", f"{OWNER}/content/studio/drop/{d['id']}")
+            for dr in studio["drafts"]:
+                if dr["channel"] == "facebook" and dr["status"] == "pending_review":
+                    out = await self.call("POST", f"{OWNER}/content/drafts/{dr['id']}/approve", json={})
+                    if (out.get("post") or {}).get("id"):
+                        await self.call("POST", f"{OWNER}/content/posts/{out['post']['id']}/publish-now")
+                        self.bump("posts_published")
         return d
 
     async def order(self, key: str, who: str, lines: list[tuple[str, int, str | None]], *, pay: bool = True,
@@ -460,6 +470,7 @@ class Story:
         with at(1, 15):  # hàng giữ sẵn: một đơn đã giao cho hãng, một đơn mới sáng nay chờ gói
             await self.order("s_thao", "thao", [("p_kep", 2, None)])
         await self.order("s_lan", "lan", [("p_kep", 1, None)])
+        await self.order("s_huong", "huong", [("p_kep", 2, None)])
         with at(0.15):
             shipping = await self.ship(["s_thao"])
         for sid in shipping:  # hãng giả đã lấy hàng, đang giao
@@ -640,6 +651,9 @@ class Story:
             res = await self.call("POST", f"{OWNER}/crm/tester-invites",
                                   json={"candidate_id": self.ids["c_aochoang"], "customer_ids": [str(i) for i in ids]})  # fmt: skip
             invites = res if isinstance(res, list) else res.get("items", [])
+            if len(invites) > 1 and invites[1].get("id"):  # khách thứ hai đã nhận mẫu, chưa gửi cảm nhận
+                await self.call("POST", f"{OWNER}/crm/tester-invites/{invites[1]['id']}/status", json={"status": "sample_sent"},
+                                ok=(200, 400, 409))  # fmt: skip
             first = next((i for i in invites if i.get("link")), None)
             if first:
                 token = first["link"].rsplit("/", 1)[1]
