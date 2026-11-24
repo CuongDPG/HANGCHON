@@ -1,0 +1,88 @@
+[project]
+name = "hangchon-api"
+version = "0.1.0"
+description = "Hàng Chọn — API (FastAPI + arq)"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    # web + dữ liệu
+    "fastapi>=0.120",
+    "uvicorn[standard]>=0.32",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "asyncpg>=0.30",
+    "alembic>=1.14",
+    "pydantic>=2.10",
+    "pydantic-settings>=2.6",
+    "email-validator>=2.2",
+    "python-multipart>=0.0.18",
+    "orjson>=3.10",
+    # xác thực
+    "argon2-cffi>=23.1",
+    "pyjwt>=2.10",
+    # việc nền
+    "arq>=0.26",
+    "redis>=5.2",
+    "croniter>=5.0",
+    # AI + HTTP
+    "anthropic>=1.0",
+    "httpx>=0.28",
+    "tenacity>=9.0",
+    # ảnh, tệp, tài liệu
+    "pillow>=11.0",
+    "aiofiles>=24.1",
+    "qrcode>=8.0",
+    "openpyxl>=3.1",
+    "jinja2>=3.1",
+    "beautifulsoup4>=4.12",
+    "lxml>=5.3",
+    # tiện ích chữ Việt, số, thời gian
+    "python-slugify>=8.0",
+    "unidecode>=1.3",
+    "rapidfuzz>=3.10",
+    "phonenumbers>=8.13",
+    "python-dateutil>=2.9",
+    "tzdata>=2024.2",
+    # tích hợp
+    "aiosmtplib>=3.0",
+    "boto3>=1.35",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-xdist>=3.6",
+    "respx>=0.21",
+    "time-machine>=2.16",
+    "ruff>=0.8",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "ASYNC", "RUF"]
+ignore = [
+    "B008",    # Depends(...) trong tham số mặc định là cách dùng chuẩn của FastAPI
+    "RUF001",  # chuỗi tiếng Việt có ký tự giống chữ Latin
+    "RUF002",
+    "RUF003",
+    "RUF012",
+    "E501",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "tests"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning:passlib.*"]

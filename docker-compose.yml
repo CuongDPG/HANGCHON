@@ -1,0 +1,36 @@
+# Hạ tầng chạy máy cho Hàng Chọn. Tên dự án cố định «hangchon» để mọi worktree dùng chung một bộ container
+# (mỗi worktree có CSDL test riêng, xem docs/ARCHITECTURE.md mục 3).
+name: hangchon
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: hangchon
+      POSTGRES_PASSWORD: hangchon
+      POSTGRES_DB: hangchon
+    ports:
+      - "5442:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hangchon -d hangchon"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6382:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  pgdata:
+  redisdata:
