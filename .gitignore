@@ -1,0 +1,31 @@
+# bí mật và cấu hình máy
+.env
+.env.*
+!.env.example
+*.pem
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# node
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+playwright-report/
+test-results/
+
+# dữ liệu chạy máy
+/data/
+/api/data/
+/api/storage/
+*.log
+.DS_Store
+.logs/
+.pids/

@@ -1,0 +1,1832 @@
+<title>Bản thiết kế Hàng Chọn</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,500..800&display=swap">
+<style>
+/* Bố cục: khung ứng dụng toàn màn hình. Máy tính: cột điều hướng dính bên trái, nội dung chiếm hết bề ngang.
+   Điện thoại: tiêu đề gọn và thanh bốn phần dính trên đầu.
+   Màu mang nghĩa: đỏ son = chị quyết, xanh cổ vịt = AI tự làm, vàng nâu = AI làm rồi chị duyệt. */
+:root{
+  --bg:#F6F8F5; --surface:#FFFFFF; --wash:#E7EEE8; --line:#C9D5CC; --hatch:#D5DFD8;
+  --ink:#12211B; --ink-2:#40554B;
+  --seal:#B83224; --seal-wash:#F8E3DE; --on-seal:#FFFFFF;
+  --auto:#17655F; --auto-wash:#D9ECE9;
+  --review:#7E550B; --review-wash:#F6E9C9;
+  --display:"Bricolage Grotesque","Be Vietnam Pro",system-ui,sans-serif;
+  --body:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --gl:max(16px,env(safe-area-inset-left,0px)); --gr:max(16px,env(safe-area-inset-right,0px));
+  --stick:calc(env(safe-area-inset-top,0px) + 48px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E1815; --surface:#15231E; --wash:#1B2D27; --line:#2F453C; --hatch:#24372F;
+    --ink:#E6F0EA; --ink-2:#A9BDB3;
+    --seal:#F07264; --seal-wash:#46201B; --on-seal:#2A0F0B;
+    --auto:#62C7BF; --auto-wash:#153B38;
+    --review:#E2B45C; --review-wash:#3F3113;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E1815; --surface:#15231E; --wash:#1B2D27; --line:#2F453C; --hatch:#24372F;
+  --ink:#E6F0EA; --ink-2:#A9BDB3;
+  --seal:#F07264; --seal-wash:#46201B; --on-seal:#2A0F0B;
+  --auto:#62C7BF; --auto-wash:#153B38;
+  --review:#E2B45C; --review-wash:#3F3113;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.65;-webkit-text-size-adjust:100%}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+h1,h2,h3,h4{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.15}
+p,ul,ol,dl,figure{margin:0}
+p,li,dd,td{overflow-wrap:break-word}
+a{color:inherit}
+button{font:inherit}
+:focus-visible{outline:2px solid var(--seal);outline-offset:2px}
+button[disabled]{cursor:default;opacity:.65}
+.eyebrow{font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);font-weight:600}
+
+/* ===== Khung: điện thoại ===== */
+.shell{display:flex;flex-direction:column}
+.side{display:contents}
+.brand-b{order:1;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 14px;align-items:center;padding:20px var(--gr) 12px var(--gl)}
+.brand-b .eyebrow{grid-column:1/-1}
+.brand-b h1{grid-column:1;font-size:clamp(40px,11vw,54px);font-weight:800;letter-spacing:-.025em}
+.brand-b .seal{--sz:66px;grid-column:2;grid-row:2/4}
+.lead{grid-column:1;font-family:var(--display);font-size:18px;font-weight:500;line-height:1.3;max-width:26ch}
+.legend{order:2;display:flex;flex-wrap:wrap;gap:6px;padding:0 var(--gr) 14px var(--gl)}
+.legend>div{display:contents}
+.legend .eyebrow,.legend .lg-x,.legend .lg-note{display:none}
+.nav{order:3;position:sticky;top:env(safe-area-inset-top,0px);z-index:9;background:var(--bg);display:grid;grid-template-columns:repeat(4,1fr);border-bottom:2px solid var(--ink);margin:0 var(--gr) 0 var(--gl)}
+.nav-part{display:contents}
+.nav-part>a{padding:12px 2px 10px;text-align:center;text-decoration:none;font-weight:600;font-size:14px;line-height:24px;color:var(--ink-2);border-radius:10px 10px 0 0}
+.nav-part>a i{display:none}
+.nav-part>a[aria-current="page"]{background:var(--ink);color:var(--bg)}
+.nav-sub{display:none}
+.save-note{order:4;font-size:13px;color:var(--ink-2);padding:8px var(--gr) 0 var(--gl);min-height:30px}
+.main{order:5;min-width:0;padding:12px var(--gr) 72px var(--gl)}
+
+/* ===== Khung: máy tính ===== */
+@media (min-width:1080px){
+  :root{--stick:env(safe-area-inset-top,0px)}
+  .shell{display:grid;grid-template-columns:320px minmax(0,1fr);align-items:start}
+  .side{display:flex;flex-direction:column;gap:22px;position:sticky;top:env(safe-area-inset-top,0px);height:calc(100vh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));height:calc(100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));overflow-y:auto;padding:28px 20px 22px max(22px,env(safe-area-inset-left,0px));background:var(--wash);border-right:1px solid var(--line)}
+  .brand-b{padding:0}
+  .brand-b h1{font-size:37px}
+  .brand-b .seal{--sz:60px}
+  .lead{font-size:16.5px}
+  .nav{order:2;position:static;display:flex;flex-direction:column;gap:4px;border:0;background:transparent;margin:0}
+  .nav-part{display:block}
+  .nav-part>a{display:grid;grid-template-columns:30px minmax(0,1fr);gap:10px;align-items:center;text-align:left;padding:10px 12px;border-radius:12px;font-size:16.5px;line-height:1.4;color:var(--ink)}
+  .nav-part>a:hover{background:var(--surface)}
+  .nav-part>a i{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;border:1.5px solid currentColor;font-style:normal;font-family:var(--display);font-weight:800;font-size:15px}
+  .nav-part>a[aria-current="page"]{background:var(--ink);color:var(--bg)}
+  .nav-part.on .nav-sub{display:grid}
+  .nav-sub{list-style:none;padding:6px 0 10px 40px;gap:1px}
+  .nav-sub button{width:100%;text-align:left;background:transparent;border:0;border-radius:8px;padding:5px 10px;font-size:14.5px;line-height:1.4;color:var(--ink-2);cursor:pointer}
+  .nav-sub button:hover{color:var(--ink)}
+  .nav-sub button.lvl2{padding-left:24px;font-size:13.5px}
+  .nav-sub button[aria-current="true"]{background:var(--surface);color:var(--ink);font-weight:600}
+  .legend{order:3;display:grid;gap:8px;padding:14px;background:var(--surface);border:1px solid var(--line);border-radius:12px;font-size:13.5px;color:var(--ink-2)}
+  .legend>div{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center}
+  .legend .eyebrow,.legend .lg-x,.legend .lg-note{display:block}
+  .legend .lg-note{border-top:1px solid var(--line);padding-top:8px;line-height:1.45}
+  .save-note{margin-top:auto;padding:0;min-height:0;line-height:1.45}
+  .main{padding:40px max(clamp(28px,3.2vw,60px),env(safe-area-inset-right,0px)) 96px clamp(28px,3.2vw,60px)}
+}
+
+/* ===== Con dấu, nhãn ===== */
+.seal{--sz:44px;width:var(--sz);height:var(--sz);flex:none;border-radius:50%;border:2px solid var(--seal);color:var(--seal);display:grid;place-items:center;text-align:center;font-family:var(--display);font-weight:800;line-height:1;transform:rotate(-8deg);position:relative;background:var(--surface)}
+.seal::after{content:"";position:absolute;inset:3px;border:1px dashed var(--seal);border-radius:50%;opacity:.55}
+.seal b{display:block;font-size:calc(var(--sz)*.3);font-variant-numeric:tabular-nums}
+.seal small{display:block;font-size:calc(var(--sz)*.16);letter-spacing:.05em;font-weight:700;margin-bottom:1px}
+.lv{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:2px 9px 2px 7px;border-radius:999px;white-space:nowrap}
+.lv::before{content:"";width:9px;height:9px;border-radius:50%;flex:none}
+.lv.a{background:var(--auto-wash);color:var(--auto)} .lv.a::before{background:var(--auto)}
+.lv.r{background:var(--review-wash);color:var(--review)} .lv.r::before{background:linear-gradient(90deg,var(--review) 50%,transparent 50%);box-shadow:inset 0 0 0 1.5px var(--review)}
+.lv.h{background:var(--seal-wash);color:var(--seal)} .lv.h::before{border-radius:2px;background:var(--seal);transform:rotate(-8deg)}
+.gd{font-size:12px;font-weight:600;color:var(--ink-2);border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.cf{font-size:12px;padding:1px 7px;border-radius:4px;background:var(--review-wash);color:var(--review);font-weight:600;white-space:nowrap}
+.src{font-size:13px;color:var(--ink-2);text-underline-offset:2px;white-space:nowrap}
+
+/* ===== Phần, mục ===== */
+.view{display:flex;flex-direction:column;gap:56px}
+.part-h{display:grid;gap:10px;padding-bottom:26px;border-bottom:2px solid var(--ink)}
+.part-t{font-size:clamp(34px,4.6vw,58px);font-weight:800;letter-spacing:-.02em}
+.part-d{font-size:clamp(17px,1.4vw,20px);color:var(--ink-2);max-width:74ch}
+.sec{display:flex;flex-direction:column;gap:20px;min-width:0;scroll-margin-top:calc(var(--stick) + 84px)}
+.sec>h2{font-size:clamp(24px,2.3vw,32px);font-weight:700;letter-spacing:-.01em;display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline}
+.num{font-size:.62em;font-weight:800;color:var(--seal);font-variant-numeric:tabular-nums;letter-spacing:.03em}
+.sec>h3{font-size:21px;font-weight:700;margin-top:10px}
+.intro{max-width:74ch;color:var(--ink-2);font-size:16.5px}
+.prose{max-width:76ch;display:grid;gap:10px}
+.prose ul{padding-left:20px;display:grid;gap:8px}
+.toolbar{background:var(--bg);padding-block:12px;border-bottom:1px solid var(--line);display:grid;gap:10px;z-index:6}
+.toolbar.pin{position:sticky;top:var(--stick)}
+@media (min-width:1080px){.toolbar{position:sticky;top:var(--stick)}}
+.next{align-self:flex-start;display:grid;gap:2px;text-decoration:none;border:1.5px solid var(--ink);border-radius:14px;padding:14px 22px}
+.next span{font-size:13px;color:var(--ink-2)}
+.next b{font-family:var(--display);font-size:20px}
+.next:hover{background:var(--ink);color:var(--bg)}
+.next:hover span{color:inherit}
+
+/* ===== Phần 1 ===== */
+.finds{display:grid;gap:24px;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}
+.find{background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--ink);border-radius:0 0 14px 14px;padding:18px 20px 20px;display:grid;gap:10px;align-content:start}
+.find h3{font-size:21px;font-weight:700}
+.find p{color:var(--ink-2)}
+.models{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(min(100%,360px),1fr))}
+.model{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.model h3{font-size:20px;font-weight:700}
+.origin{font-size:13px;color:var(--ink-2);font-weight:600}
+.kv{display:grid;gap:10px}
+.kv dt{font-size:11.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-2);font-weight:600;margin-bottom:-6px}
+.kv dd{margin:0;font-size:15px}
+.kv dd.take{font-weight:600;background:var(--wash);border-radius:8px;padding:8px 12px}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:600px;font-size:15px}
+th{text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-2);font-weight:600;padding:0 18px 10px 0;vertical-align:bottom;border-bottom:2px solid var(--ink)}
+td{border-bottom:1px solid var(--line);padding:12px 18px 12px 0;vertical-align:top}
+td:first-child{font-weight:600}
+.shift{display:grid}
+.shift>div{display:grid;gap:6px;border-top:1px solid var(--line);padding-block:16px}
+.shift>.shift-h{display:none}
+.shift b{font-family:var(--display);font-size:19px}
+.shift p{font-size:15.5px}
+.shift .so{font-weight:600;background:var(--wash);border-radius:10px;padding:10px 14px}
+.shift .so::before{content:"Với Hàng Chọn";display:block;font-size:11.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-2);margin-bottom:2px}
+@media (min-width:1280px){
+  .shift>div{grid-template-columns:230px minmax(0,1.25fr) minmax(0,1fr);gap:28px;align-items:start}
+  .shift>.shift-h{display:grid;border-top:0;padding-block:0 10px;border-bottom:2px solid var(--ink);font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-2);font-weight:600}
+  .shift>.shift-h+div{border-top:0}
+  .shift .so::before{display:none}
+}
+.funnel{display:grid;max-width:1040px}
+.fstep{display:grid;grid-template-columns:72px minmax(0,1fr);gap:4px 16px;padding:14px 0;border-top:1px solid var(--line)}
+.fnum{font-family:var(--display);font-size:34px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1;grid-row:1/3}
+.fstep h4{font-size:18px;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+.fstep p{color:var(--ink-2);font-size:15.5px}
+.fstep.key .fnum{color:var(--seal)}
+.two{display:grid;gap:28px 40px}
+@media (min-width:900px){.two{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.wbars{display:grid;gap:12px}
+.wbar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 10px;font-size:15px}
+.wbar span:nth-child(2){font-variant-numeric:tabular-nums;font-weight:700}
+.bar{grid-column:1/-1;height:9px;border-radius:5px;background:var(--wash)}
+.bar>i{display:block;height:100%;width:calc(var(--w)*4%);background:var(--ink);border-radius:5px}
+.formula{background:var(--wash);border-radius:12px;padding:16px 18px;font-weight:500;font-size:16.5px}
+.share{display:grid;gap:8px;max-width:760px}
+.share-row{display:grid;grid-template-columns:48px minmax(0,1fr);gap:10px;align-items:center;font-size:14px;font-variant-numeric:tabular-nums}
+.stack{display:flex;height:30px;border-radius:6px;overflow:hidden;background:var(--hatch)}
+.stack i{display:grid;place-items:center;font-style:normal;font-size:13px;font-weight:700;color:var(--bg);width:calc(var(--p)*1%)}
+.stack .s1{background:var(--ink)} .stack .s2{background:var(--auto)}
+.keyline{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13.5px;color:var(--ink-2)}
+.keyline i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.facts{list-style:none;padding:0;display:grid;gap:0 40px;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr))}
+.facts li{border-top:1px solid var(--line);padding-block:12px}
+.rules{list-style:none;padding:0;display:grid;gap:16px 40px;counter-reset:r;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr))}
+.rules li{display:grid;grid-template-columns:40px minmax(0,1fr);gap:12px;counter-increment:r}
+.rules li::before{content:counter(r);font-family:var(--display);font-weight:800;font-size:28px;color:var(--seal);line-height:1.05}
+.rules b{display:block;font-size:17px}
+.srcs{list-style:none;padding:0;columns:3 280px;column-gap:28px;font-size:13.5px;color:var(--ink-2)}
+.srcs li{break-inside:avoid;padding:3px 0}
+
+/* ===== Phần 2 ===== */
+.flow{list-style:none;padding:0;display:grid;gap:8px}
+.fl{display:grid;grid-template-columns:30px minmax(0,1fr);gap:2px 10px;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:12px 14px;align-items:start;align-content:start}
+.fl i{font-style:normal;font-family:var(--display);font-weight:800;font-size:21px;line-height:1.2;grid-row:1/4;color:var(--ink-2)}
+.fl b{font-size:16.5px}
+.fl span.t{font-size:14px;color:var(--ink-2)}
+.fl.key{background:var(--seal-wash);border-color:var(--seal)}
+.fl.key i{color:var(--seal)}
+.fl .lv{justify-self:start;margin-top:6px}
+@media (min-width:700px){.flow{grid-template-columns:repeat(3,minmax(0,1fr))}.fl{grid-template-columns:1fr;gap:4px}.fl i{grid-row:auto}}
+@media (min-width:1400px){.flow{grid-template-columns:repeat(9,minmax(0,1fr))}.fl{padding:12px}.fl .lv{white-space:normal;border-radius:10px}}
+.mix{display:grid;gap:8px;max-width:820px}
+.mixbar{display:flex;height:16px;border-radius:8px;overflow:hidden;background:var(--wash)}
+.mixbar i{display:block;height:100%}
+.mixbar .a{background:var(--auto)} .mixbar .r{background:var(--review)} .mixbar .h{background:var(--seal)}
+.filters{display:flex;flex-wrap:wrap;gap:10px 26px;align-items:center}
+.fgroup{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.fgroup>span{font-size:13px;color:var(--ink-2);font-weight:600;margin-right:4px}
+.fchip{font-size:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:6px 14px;cursor:pointer}
+.fchip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg);font-weight:600}
+.tally{font-size:14.5px;font-variant-numeric:tabular-nums;color:var(--ink-2)}
+.mods{display:block}
+@media (min-width:1760px){.mods{columns:2;column-gap:22px}}
+.mod{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:22px;break-inside:avoid;scroll-margin-top:calc(var(--stick) + 132px)}
+.mod-h{padding:16px 20px;display:grid;gap:2px;background:var(--wash);border-bottom:1px solid var(--line)}
+.mod-h h3{font-size:21px;font-weight:700}
+.mod-h p{color:var(--ink-2);font-size:14.5px}
+.mod-n{font-size:13px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.feats{list-style:none;padding:0}
+.feat{padding:14px 20px;display:grid;gap:6px;border-top:1px solid var(--line)}
+.feat:first-child{border-top:0}
+.feat:hover{background:var(--bg)}
+.feat-t{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+.feat-t b{font-weight:600;font-size:16.5px;margin-right:2px}
+.feat>p{color:var(--ink-2);font-size:14.5px;max-width:78ch}
+.feat.is-skip .feat-t b{text-decoration:line-through;color:var(--ink-2)}
+.pick{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line);border-radius:999px;overflow:hidden;width:100%;max-width:300px;margin-top:4px;background:var(--surface)}
+.pick button{background:transparent;border:0;padding:8px 8px;font-size:13.5px;color:var(--ink-2);cursor:pointer;white-space:nowrap}
+.pick button+button{border-left:1px solid var(--line)}
+.pick button:hover{color:var(--ink)}
+.pick button[aria-pressed="true"]{background:var(--ink);color:var(--bg);font-weight:600}
+@media (min-width:820px){.feat{grid-template-columns:minmax(0,1fr) 300px;column-gap:28px;align-items:center}.feat .pick{grid-column:2;grid-row:1/3;margin-top:0}}
+
+/* ===== Phần 3: bộ vẽ wireframe ===== */
+.seg{display:inline-grid;grid-auto-flow:column;border:1.5px solid var(--ink);border-radius:999px;overflow:hidden;justify-self:start;max-width:100%;background:var(--surface)}
+.seg button{background:transparent;border:0;padding:9px clamp(11px,2vw,18px);font-size:clamp(13.5px,1.2vw,15px);font-weight:600;color:var(--ink);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.wf-group{display:flex;flex-direction:column;gap:56px}
+.wf-grid{display:grid;gap:40px 28px;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));align-items:start}
+.wf{display:flex;flex-direction:column;gap:12px;min-width:0;width:100%;max-width:410px}
+.wf figcaption b{font-family:var(--display);font-size:19px;display:block;line-height:1.2;margin-bottom:2px}
+.wf figcaption span{font-size:14.5px;color:var(--ink-2)}
+.notes{list-style:none;padding:0;counter-reset:n;display:grid;gap:8px;font-size:14.5px}
+.notes li{counter-increment:n;display:grid;grid-template-columns:20px minmax(0,1fr);gap:9px}
+.notes li::before{content:counter(n);width:19px;height:19px;border-radius:50%;background:var(--seal);color:var(--on-seal);font-size:11px;font-weight:700;display:grid;place-items:center;margin-top:3px}
+.choose{font-weight:600;font-size:15px;border:1.5px solid var(--ink);background:var(--surface);color:var(--ink);border-radius:999px;padding:10px 16px;cursor:pointer}
+.choose[aria-pressed="true"]{background:var(--seal);border-color:var(--seal);color:var(--on-seal)}
+.choose[aria-pressed="true"]::before{content:"✓ "}
+.ph{width:100%;border:2px solid var(--ink);border-radius:28px;background:var(--surface);overflow:hidden;display:flex;flex-direction:column;font-size:12.5px;line-height:1.42}
+.ph-top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 16px 9px;border-bottom:1px solid var(--line);font-weight:700}
+.ph-top .brand{font-family:var(--display);font-size:15.5px;font-weight:800}
+.ph-body{padding:14px;display:flex;flex-direction:column;gap:11px}
+.ph-nav{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;border-top:1px solid var(--line);text-align:center;font-size:10.5px;color:var(--ink-2)}
+.ph-nav span{padding:9px 1px 11px}
+.ph-nav .on{color:var(--ink);font-weight:700;box-shadow:inset 0 2px 0 var(--ink)}
+.ph-cta{padding:11px 14px 14px;border-top:1px solid var(--line)}
+.ph .lv{font-size:10.5px;padding:1px 7px 1px 6px}
+.ph .lv::before{width:7px;height:7px}
+.im{position:relative;background:repeating-linear-gradient(135deg,var(--hatch) 0 6px,transparent 6px 12px),var(--wash);border-radius:8px;display:grid;place-items:center;min-height:44px;text-align:center;padding:4px;max-width:100%}
+.im>span{background:var(--surface);color:var(--ink-2);font-size:10.5px;padding:1px 7px;border-radius:4px}
+.im.sq{aspect-ratio:1} .im.wd{aspect-ratio:16/10} .im.tl{aspect-ratio:5/4} .im.rd{border-radius:50%}
+.im .seal{position:absolute;right:6px;bottom:6px;--sz:40px}
+.w-th{width:54px;flex:none;min-height:0}
+.w-h{font-family:var(--display);font-weight:700;font-size:16.5px;line-height:1.2}
+.w-b{font-weight:700}
+.w-s{color:var(--ink-2);font-size:11.5px}
+.w-row{display:flex;gap:8px;align-items:center}
+.w-row.top{align-items:flex-start}
+.w-row>.grow{flex:1;min-width:0}
+.w-sp{justify-content:space-between}
+.w-col{display:flex;flex-direction:column;gap:4px;min-width:0}
+.w-g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.w-g3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.w-bx{border:1px solid var(--line);border-radius:10px;padding:9px 10px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.w-bx.tint{background:var(--wash);border-color:transparent}
+.w-bx.sl{border-color:var(--seal)}
+.w-bt{border-radius:999px;padding:8px 12px;background:var(--ink);color:var(--surface);font-weight:700;text-align:center;flex:1}
+.w-bt.o{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--ink)}
+.w-bt.s{background:var(--seal);color:var(--on-seal)}
+.w-bt.fit{flex:none}
+.w-chips{display:flex;gap:5px;flex-wrap:wrap}
+.w-chip{border:1px solid var(--line);border-radius:999px;padding:2px 9px;font-size:11px;white-space:nowrap}
+.w-chip.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.w-chip.ok{background:var(--auto-wash);color:var(--auto);border-color:transparent}
+.w-in{border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink-2)}
+.w-pb{height:7px;border-radius:4px;background:var(--wash);overflow:hidden}
+.w-pb>i{display:block;height:100%;border-radius:4px;background:var(--ink);width:var(--p)}
+.w-n{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;background:var(--seal);color:var(--on-seal);font-size:10px;font-weight:700;flex:none;vertical-align:1px}
+.w-hr{height:1px;background:var(--line)}
+.w-ul{padding-left:16px;display:grid;gap:3px}
+.w-fn{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;text-align:center;font-size:10.5px;color:var(--ink-2)}
+.w-fn b{display:block;font-family:var(--display);font-size:17px;color:var(--ink);font-variant-numeric:tabular-nums}
+.w-fn div:last-child b{color:var(--seal)}
+.w-tl{display:grid;gap:10px}
+.w-tl>div{display:grid;grid-template-columns:12px minmax(0,1fr);gap:9px}
+.w-tl i{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--ink-2);margin-top:4px}
+.w-tl .done i{background:var(--ink);border-color:var(--ink)}
+.w-tl .now i{background:var(--seal);border-color:var(--seal)}
+.w-tl .todo{color:var(--ink-2)}
+.w-bub{max-width:86%;padding:8px 11px;border-radius:12px;background:var(--wash);align-self:flex-start}
+.w-bub.me{align-self:flex-end;background:var(--ink);color:var(--surface)}
+.w-sc{display:grid;grid-template-columns:86px minmax(0,1fr) 38px;gap:6px;align-items:center;font-variant-numeric:tabular-nums}
+.w-sc span:last-child{text-align:right;color:var(--ink-2)}
+.w-seg{display:inline-grid;grid-auto-flow:column;border:1px solid var(--line);border-radius:999px;overflow:hidden;font-size:10.5px;justify-self:start;align-self:flex-start}
+.w-seg span{padding:3px 8px;color:var(--ink-2)}
+.w-seg .on{background:var(--ink);color:var(--surface);font-weight:700}
+.w-kv{display:flex;justify-content:space-between;gap:8px;font-variant-numeric:tabular-nums}
+.w-big{font-family:var(--display);font-weight:800;font-size:19px;font-variant-numeric:tabular-nums;line-height:1.1}
+
+/* Mẫu phong cách: màu cố định vì là mẫu thương hiệu, không theo giao diện sáng tối */
+.styles{display:grid;gap:28px;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr))}
+.spec{display:flex;flex-direction:column;gap:12px;min-width:0;max-width:410px}
+.spec-card{background:var(--s-bg);color:var(--s-fg);border-radius:var(--s-r,14px);padding:20px;display:grid;gap:12px;border:1px solid var(--line)}
+.spec-name{font-family:var(--display);font-weight:800;font-size:30px;line-height:1;letter-spacing:var(--s-ls,-.02em)}
+.spec-prod{background:var(--s-soft);border-radius:var(--s-r,14px);padding:12px 14px;display:grid;gap:2px;font-size:14px}
+.spec-prod b{font-size:15.5px}
+.spec-btn{background:var(--s-ac);color:var(--s-on);border-radius:var(--s-br,999px);padding:9px 16px;font-weight:700;font-size:14px;justify-self:start}
+.spec-sw{display:flex;gap:6px}
+.spec-sw i{width:28px;height:28px;border-radius:50%;border:1px solid rgba(0,0,0,.15)}
+.spec figcaption{font-size:14.5px;color:var(--ink-2)}
+.spec figcaption b{display:block;font-family:var(--display);font-size:19px;color:var(--ink)}
+
+/* ===== Phần 4 ===== */
+.sum{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;display:grid;gap:12px}
+.sum ul{list-style:none;padding:0;display:grid;gap:8px 32px;font-size:15.5px;grid-template-columns:repeat(auto-fill,minmax(min(100%,380px),1fr))}
+.sum li{display:grid;grid-template-columns:minmax(0,11.5em) minmax(0,1fr);gap:10px;border-bottom:1px solid var(--line);padding-bottom:8px}
+.sum li span:first-child{color:var(--ink-2)}
+.sum li span:last-child{font-weight:600}
+.sum li .none{color:var(--ink-2);font-style:italic;font-weight:400}
+.qs{display:grid;gap:18px;grid-template-columns:repeat(auto-fill,minmax(min(100%,560px),1fr));align-items:start}
+.q{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;display:grid;gap:12px}
+.q h3{font-size:21px;font-weight:700}
+.q>p{color:var(--ink-2);font-size:15px;max-width:76ch}
+.opts{display:grid;gap:8px}
+.opt{text-align:left;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;padding:12px 14px;cursor:pointer;display:grid;gap:3px;align-content:start}
+.opt:hover{border-color:var(--ink-2)}
+.opt b{font-weight:600;font-size:15.5px}
+.opt span{font-size:14px;color:var(--ink-2)}
+.opt em{font-style:normal;font-size:11.5px;font-weight:700;color:var(--seal);letter-spacing:.03em;text-transform:uppercase}
+.opt[aria-pressed="true"]{border-color:var(--seal);box-shadow:inset 0 0 0 1.5px var(--seal);background:var(--seal-wash)}
+.phases{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))}
+.phase{background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--ink);border-radius:0 0 14px 14px;padding:16px 20px 20px;display:grid;gap:8px;align-content:start}
+.phase h3{font-size:20px}
+.phase ul{padding-left:20px;display:grid;gap:6px;font-size:15px}
+.phase p{font-size:14.5px;color:var(--ink-2)}
+.foot{border-top:1px solid var(--line);margin-top:56px;padding-top:18px;font-size:14px;color:var(--ink-2);max-width:76ch}
+@media (prefers-reduced-motion:no-preference){.nav-part>a,.nav-sub button,.pick button,.opt,.choose,.fchip,.next{transition:background-color .15s,color .15s,border-color .15s}}
+</style>
+
+<div class="shell">
+<aside class="side">
+  <div class="brand-b">
+    <p class="eyebrow">Bản thiết kế sản phẩm · 25/11/2026</p>
+    <h1>Hàng Chọn</h1>
+    <div class="seal" aria-hidden="true"><span><small>ĐÃ CHỌN</small><b>1/24</b></span></div>
+    <p class="lead">Chị chọn hàng. AI làm những việc còn lại và chờ chị duyệt.</p>
+  </div>
+  <nav class="nav" aria-label="Các phần của tài liệu">
+    <div class="nav-part on"><a href="#xu-huong" data-tab="xu-huong" aria-current="page"><i>1</i><span>Xu hướng</span></a>
+      <ul class="nav-sub">
+        <li><button type="button" id="go-s-ba-dieu" data-goto="s-ba-dieu">Ba điều rút ra</button></li>
+        <li><button type="button" id="go-s-mo-hinh" data-goto="s-mo-hinh">Mô hình bán hàng cá nhân</button></li>
+        <li><button type="button" id="go-s-ai" data-goto="s-ai">AI đổi cuộc chơi ở đâu</button></li>
+        <li><button type="button" id="go-s-tim-chon" data-goto="s-tim-chon">Tìm và đánh giá sản phẩm</button></li>
+        <li><button type="button" id="go-s-viet-nam" data-goto="s-viet-nam">Thị trường và luật Việt Nam</button></li>
+        <li><button type="button" id="go-s-de-xuat" data-goto="s-de-xuat">Mô hình đề xuất</button></li>
+        <li><button type="button" id="go-s-nguon" data-goto="s-nguon">Nguồn tham khảo</button></li>
+      </ul></div>
+    <div class="nav-part"><a href="#chuc-nang" data-tab="chuc-nang"><i>2</i><span>Chức năng</span></a>
+      <ul class="nav-sub" id="sub-chuc-nang">
+        <li><button type="button" id="go-s-quy-trinh" data-goto="s-quy-trinh">Quy trình chín bước</button></li>
+        <li><button type="button" id="go-s-danh-muc" data-goto="s-danh-muc">Danh mục chức năng</button></li>
+      </ul></div>
+    <div class="nav-part"><a href="#wireframe" data-tab="wireframe"><i>3</i><span>Wireframe</span></a>
+      <ul class="nav-sub">
+        <li><button type="button" id="go-s-trang-chu" data-goto="s-trang-chu">Trang chủ: ba hướng</button></li>
+        <li><button type="button" id="go-s-phong-cach" data-goto="s-phong-cach">Phong cách hình ảnh</button></li>
+        <li><button type="button" id="go-s-web" data-goto="s-web">Màn hình website</button></li>
+        <li><button type="button" id="go-s-ban-lam-viec" data-goto="s-ban-lam-viec">Bàn làm việc của chị</button></li>
+      </ul></div>
+    <div class="nav-part"><a href="#can-chot" data-tab="can-chot"><i>4</i><span>Cần chốt</span></a>
+      <ul class="nav-sub">
+        <li><button type="button" id="go-s-lua-chon" data-goto="s-lua-chon">Lựa chọn hiện tại</button></li>
+        <li><button type="button" id="go-s-bay-viec" data-goto="s-bay-viec">Bảy việc cần chốt</button></li>
+        <li><button type="button" id="go-s-lo-trinh" data-goto="s-lo-trinh">Lộ trình ba giai đoạn</button></li>
+        <li><button type="button" id="go-s-chi-phi" data-goto="s-chi-phi">Chi phí vận hành</button></li>
+        <li><button type="button" id="go-s-ky-thuat" data-goto="s-ky-thuat">Thành phần kỹ thuật</button></li>
+        <li><button type="button" id="go-s-rui-ro" data-goto="s-rui-ro">Rủi ro chính</button></li>
+      </ul></div>
+  </nav>
+  <div class="legend">
+    <p class="eyebrow">Ai làm việc gì</p>
+    <div><span class="lv h">Chị quyết</span><span class="lg-x">AI chỉ hỗ trợ</span></div>
+    <div><span class="lv r">AI làm, chị duyệt</span><span class="lg-x">chị sửa hoặc gật</span></div>
+    <div><span class="lv a">AI tự làm</span><span class="lg-x">chị xem nhật ký</span></div>
+    <p class="lg-note">«Chị» là người chọn hàng, «em» là người soạn tài liệu.</p>
+  </div>
+  <p class="save-note" id="save-note" role="status">Đang kết nối nơi lưu lựa chọn…</p>
+</aside>
+
+<main class="main" id="views">
+
+<!-- ============ PHẦN 1 ============ -->
+<div class="view" id="v-xu-huong">
+
+<header class="part-h">
+  <p class="eyebrow">Phần 1 / 4</p>
+  <h2 class="part-t">Xu hướng đáng học</h2>
+  <p class="part-d">Thế giới đang bán hàng cá nhân thế nào, AI thay đổi điều gì, và Hàng Chọn nên học phần nào.</p>
+</header>
+
+<section class="sec" id="s-ba-dieu" data-spy>
+  <h2><span class="num">1.1</span>Ba điều rút ra</h2>
+  <div class="finds">
+    <div class="find">
+      <h3>Người mua tin người chọn hơn tin sàn</h3>
+      <p>Tiểu Hồng Thư ở Trung Quốc đã đóng mảng tự bán hàng để dồn sức cho «mua thủ» (买手): người có gu, chọn hàng và kể được vì sao chọn. Ở phương Tây, các nền tảng bán theo tủ đồ của người chọn như LTK, ShopMy đạt doanh số hàng tỷ USD mỗi năm. Thế mạnh của chị trùng với thứ thị trường đang trả tiền.</p>
+    </div>
+    <div class="find">
+      <h3>Người bán một mình không ôm kho</h3>
+      <p>Trưởng nhóm gom đơn ở Trung Quốc và «gonggu» ở Hàn Quốc đều mở bán theo đợt: gom đủ đơn rồi mới đặt nguồn. Ở Nhật, khoảng 70% chủ shop trên BASE mở shop với vốn dưới 100.000 yên, và 71,5% chủ shop là cá nhân.</p>
+    </div>
+    <div class="find">
+      <h3>AI đã đủ rẻ cho các việc lặp lại</h3>
+      <p>Soạn trang sản phẩm, viết bài, trả lời câu hỏi thường gặp và xử lý đơn cho khoảng 100 sản phẩm ước tốn 100–250 USD tiền AI mỗi tháng. Khâu chọn hàng và khâu chịu trách nhiệm với khách vẫn cần người. <span class="cf">ước lượng</span></p>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="s-mo-hinh" data-spy>
+  <h2><span class="num">1.2</span>Các mô hình bán hàng cá nhân đáng học</h2>
+  <p class="intro">Bảy mô hình dưới đây đều do một người hoặc nhóm rất nhỏ vận hành. Mỗi mô hình có một phần Hàng Chọn dùng được và một phần nên tránh.</p>
+  <div class="models">
+    <article class="model">
+      <div><p class="origin">Trung Quốc · Tiểu Hồng Thư</p><h3>Mua thủ (买手)</h3></div>
+      <dl class="kv">
+        <dt>Cách làm</dt><dd>Một người có gu chọn ít món, kể lý do chọn bằng bài viết và livestream chậm rãi. Khách mua vì tin mắt nhìn của người đó.</dd>
+        <dt>Con số</dt><dd>Zhang Xiaohui có buổi livestream vượt 100 triệu NDT (10/2023). Wu Qianyu đạt 150 triệu NDT trong 11 giờ (07/12/2025). <a class="src" href="https://www.jiemian.com/article/10370088.html" target="_blank" rel="noopener">Jiemian</a> <a class="src" href="https://eu.36kr.com/en/p/3601870266811651" target="_blank" rel="noopener">36Kr</a></dd>
+        <dt>Học gì</dt><dd class="take">Gu chọn là thương hiệu. Công khai tiêu chí chọn và cả lý do loại món khác.</dd>
+      </dl>
+    </article>
+    <article class="model">
+      <div><p class="origin">Trung Quốc · Hàn Quốc</p><h3>Gom đơn theo đợt (团长, 공구)</h3></div>
+      <dl class="kv">
+        <dt>Cách làm</dt><dd>Người dẫn nhóm mở một đợt bán có hạn chót. Hết hạn mới cộng số lượng và đặt nhà cung cấp.</dd>
+        <dt>Con số</dt><dd>Chưa có số liệu thị trường đáng tin. Rủi ro đã ghi nhận: nền tảng Kuaituantuan giữ tiền trong thời hạn bảo vệ đơn, trưởng nhóm khó rút. <a class="src" href="https://news.qq.com/rain/a/20251124A04ZDH00" target="_blank" rel="noopener">QQ News</a></dd>
+        <dt>Học gì</dt><dd class="take">Bán theo đợt để không ôm kho. Tự nhận thanh toán trên website của mình để không phụ thuộc dòng tiền của nền tảng.</dd>
+      </dl>
+    </article>
+    <article class="model">
+      <div><p class="origin">Trung Quốc · WeChat</p><h3>Miền riêng (私域)</h3></div>
+      <dl class="kv">
+        <dt>Cách làm</dt><dd>Kéo khách từ kênh công cộng về nhóm kín của mình, rồi bán lại nhiều lần cho nhóm đó.</dd>
+        <dt>Con số</dt><dd>Tỉ lệ mua lại 45–66% ở vài thương hiệu <span class="cf">tự công bố</span>. Năm 2025 báo chí Trung Quốc ghi nhận khách mệt vì bị nhắn quá nhiều. <a class="src" href="https://m.huxiu.com/aibrief/11171.html" target="_blank" rel="noopener">Huxiu</a></dd>
+        <dt>Học gì</dt><dd class="take">Một nhóm Zalo kín cho khách quen. Nhắn ít, đúng lúc, và đo tỉ lệ mua lại.</dd>
+      </dl>
+    </article>
+    <article class="model">
+      <div><p class="origin">Nhật Bản · BASE, STORES</p><h3>Select shop cá nhân</h3></div>
+      <dl class="kv">
+        <dt>Cách làm</dt><dd>Một website nhỏ với bộ sưu tập nhất quán theo gu chủ shop. Mạng xã hội dẫn khách về.</dd>
+        <dt>Con số</dt><dd>BASE có hơn 2,5 triệu shop (11/2025). 61,3% chủ shop nói mạng xã hội là cách hiệu quả nhất để có đơn đầu tiên. <a class="src" href="https://netshop.impress.co.jp/n/2025/11/27/15193" target="_blank" rel="noopener">Impress</a></dd>
+        <dt>Học gì</dt><dd class="take">Website riêng gọn cộng mạng xã hội là đủ để bắt đầu. Chưa cần lên sàn.</dd>
+      </dl>
+    </article>
+    <article class="model">
+      <div><p class="origin">Mỹ, châu Âu · LTK, ShopMy, Whatnot</p><h3>Tủ đồ của người chọn</h3></div>
+      <dl class="kv">
+        <dt>Cách làm</dt><dd>Người chọn lập «kệ» các món mình dùng, bán theo đợt (drop) và livestream nhỏ cho người theo dõi.</dd>
+        <dt>Con số</dt><dd>LTK khoảng 5–6 tỷ USD doanh số mỗi năm, ShopMy hơn 1 tỷ USD <span class="cf">ước tính</span>. Whatnot hơn 8 tỷ USD trong nửa đầu 2026. <a class="src" href="https://www.axios.com/2026/09/25/creator-commerce-ai-ltk-con" target="_blank" rel="noopener">Axios</a></dd>
+        <dt>Học gì</dt><dd class="take">Trang «kệ hàng» mang tên người chọn. Mỗi đợt mở bán là một sự kiện.</dd>
+      </dl>
+    </article>
+    <article class="model">
+      <div><p class="origin">Trung Quốc · 1688</p><h3>Gửi thẳng từ xưởng (一件代发)</h3></div>
+      <dl class="kv">
+        <dt>Cách làm</dt><dd>Người bán không giữ hàng. Có đơn thì nhà cung cấp gửi thẳng cho khách.</dd>
+        <dt>Con số</dt><dd>Lượt tìm kiếm này không có số liệu riêng.</dd>
+        <dt>Học gì</dt><dd class="take">Chị không cầm được món hàng nên không dùng cho hàng mang dấu Đã chọn. Chỉ dùng để thăm dò nhu cầu.</dd>
+      </dl>
+    </article>
+    <article class="model">
+      <div><p class="origin">Trung Quốc · JD, Taobao</p><h3>Livestream bằng người số</h3></div>
+      <dl class="kv">
+        <dt>Cách làm</dt><dd>Hình người do AI tạo đứng bán 24 giờ mỗi ngày.</dd>
+        <dt>Con số</dt><dd>JD có hơn 7.500 phòng livestream dùng người số, chi phí bằng một phần mười người thật <span class="cf">tự công bố</span>. Trung Quốc buộc dán nhãn AI từ 02/2026. <a class="src" href="https://www.tmtpost.com/8036757.html" target="_blank" rel="noopener">TMTPost</a></dd>
+        <dt>Học gì</dt><dd class="take">Không làm. Mô hình của chị bán niềm tin vào một người thật.</dd>
+      </dl>
+    </article>
+  </div>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Mô hình</th><th>Vốn hàng</th><th>Niềm tin đến từ</th><th>Vai trò trong Hàng Chọn</th></tr></thead>
+      <tbody>
+        <tr><td>Mua thủ</td><td>Thấp đến vừa</td><td>Gu của người chọn</td><td>Lõi của mô hình</td></tr>
+        <tr><td>Gom đơn theo đợt</td><td>Rất thấp</td><td>Quan hệ trong nhóm</td><td>Cách bán chính</td></tr>
+        <tr><td>Miền riêng</td><td>Không cần</td><td>Sự quen thuộc</td><td>Nhóm Zalo khách quen</td></tr>
+        <tr><td>Select shop cá nhân</td><td>Vừa</td><td>Bộ sưu tập nhất quán</td><td>Hình thức website</td></tr>
+        <tr><td>Tủ đồ của người chọn</td><td>Không cần</td><td>Người chọn dùng thật</td><td>Trang kệ hàng, đợt mở bán</td></tr>
+        <tr><td>Gửi thẳng từ xưởng</td><td>Không cần</td><td>Không có</td><td>Chỉ để thăm dò nhu cầu</td></tr>
+        <tr><td>Người số livestream</td><td>Thấp</td><td>Không có</td><td>Không dùng</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="sec" id="s-ai" data-spy>
+  <h2><span class="num">1.3</span>AI đang đổi cuộc chơi ở đâu</h2>
+  <div class="shift">
+    <div class="shift-h"><span>Xu hướng</span><span>Đang diễn ra</span><span>Ý nghĩa với Hàng Chọn</span></div>
+    <div>
+      <b>AI mua hàng thay người</b>
+      <p>ChatGPT cho mua ngay trong khung chat từ 29/09/2025, Google công bố giao thức UCP đầu 2026, trợ lý Rufus của Amazon mang về khoảng 12 tỷ USD doanh số tăng thêm trong 2025. Shopify nói đơn hàng đến từ tìm kiếm AI tăng gần 13 lần trong quý 1/2026 <span class="cf">tự công bố</span>. <a class="src" href="https://openai.com/index/buy-it-in-chatgpt/" target="_blank" rel="noopener">OpenAI</a> <a class="src" href="https://shopify.com/news/agentic-commerce-momentum" target="_blank" rel="noopener">Shopify</a> <a class="src" href="https://ppc.land/amazons-ai-shopping-assistant-drove-12-billion-in-sales-for-2025/" target="_blank" rel="noopener">PPC Land</a></p>
+      <p class="so">Thanh toán trong chat mới mở ở Mỹ, Canada, Úc. Việc cần làm ở Việt Nam là để AI đọc được website: dữ liệu sản phẩm có cấu trúc, nội dung dạng hỏi và đáp.</p>
+    </div>
+    <div>
+      <b>AI tìm nguồn hàng</b>
+      <p>Alibaba ra Accio cuối 2024. Từ 07/2026 tác tử của Accio hỏi giá nhiều nhà cung cấp cùng lúc, còn người dùng duyệt giá, điều khoản và thanh toán. FastMoss, Kalodata bán dữ liệu món đang chạy trên TikTok Shop với giá khoảng 49–139 USD mỗi tháng. <a class="src" href="https://www.digitalcommerce360.com/2026/07/24/alibaba-accio-work-agentic-ai-b2b-sourcing/" target="_blank" rel="noopener">Digital Commerce 360</a></p>
+      <p class="so">Chính Alibaba cũng giữ người ở khâu duyệt. Hàng Chọn đi cùng hướng: AI gom và so, chị quyết.</p>
+    </div>
+    <div>
+      <b>AI làm nội dung</b>
+      <p>Một ảnh do AI tạo giá khoảng 0,04–0,15 USD, một giây video khoảng 0,03–0,40 USD (giá qua đại lý, chênh nhau nhiều). Luật Trí tuệ nhân tạo của Việt Nam có hiệu lực từ 01/03/2026, yêu cầu gắn nhãn nội dung do AI tạo. <a class="src" href="https://english.luatvietnam.vn/legal-updates/ai-generated-images-and-videos-must-be-labelled-starting-march-1-2026-892-107386-article.html" target="_blank" rel="noopener">LuatVietnam</a></p>
+      <p class="so">Ảnh và clip thật do chị quay là chính. AI cắt dựng, cân sáng, viết lời, và hệ thống tự gắn nhãn khi có phần do AI tạo.</p>
+    </div>
+    <div>
+      <b>AI chăm sóc khách</b>
+      <p>Meta mở trợ lý AI cho doanh nghiệp trên Messenger và WhatsApp toàn cầu từ 06/2026, đã triển khai ở Việt Nam. Khảo sát Baymard 06/2026: hai phần ba người mua muốn gặp người thật khi đơn hàng có vấn đề. <a class="src" href="https://about.fb.com/news/2026/06/meta-business-agent/" target="_blank" rel="noopener">Meta</a> <a class="src" href="https://www.retailcustomerexperience.com/news/most-online-shoppers-want-a-human-not-a-chatbot-when-needing-help/" target="_blank" rel="noopener">Retail CX</a></p>
+      <p class="so">AI trả lời giá, tồn kho, phí giao. Khiếu nại, đổi trả và câu hỏi về sức khoẻ luôn chuyển cho chị.</p>
+    </div>
+    <div>
+      <b>Một người cùng AI</b>
+      <p>Chưa có trường hợp bán hàng một người chạy bằng AI nào được kiểm chứng độc lập. Số liệu Stripe Atlas: doanh thu trung vị 6 tháng đầu của công ty một người giảm 23% trong 2025, còn nhóm 10% dẫn đầu tăng 19%. <a class="src" href="https://fortune.com/2026/05/18/solo-founders-ai-automation-entire-teams-entrepreneurs/" target="_blank" rel="noopener">Fortune</a></p>
+      <p class="so">Ai cũng có AI nên AI không tạo ra khác biệt. Khác biệt của Hàng Chọn là mắt chọn hàng của chị, và phần mềm phải làm cho điều đó lộ rõ.</p>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="s-tim-chon" data-spy>
+  <h2><span class="num">1.4</span>Tìm, đánh giá và so sánh sản phẩm</h2>
+  <p class="intro">Người bán chuyên nghiệp đi qua năm chặng. Con số bên trái là ví dụ cho một lần tìm bình giữ nhiệt, để thấy mức sàng lọc.</p>
+  <div class="funnel">
+    <div class="fstep"><span class="fnum">240</span><h4>Tín hiệu <span class="lv a">AI tự làm</span></h4><p>Món đang lên trên Tiểu Hồng Thư, @cosme, TikTok Shop Việt Nam; lời khách nhờ tìm; đề bài chị đưa ra.</p></div>
+    <div class="fstep"><span class="fnum">24</span><h4>Ứng viên <span class="lv a">AI tự làm</span></h4><p>Quét 1688, Taobao, Rakuten, Amazon Nhật bằng từ khoá đã dịch sang tiếng Trung, tiếng Nhật. Tìm bằng ảnh để ra đúng mẫu và các xưởng bán cùng mẫu.</p></div>
+    <div class="fstep"><span class="fnum">5</span><h4>Thẩm định <span class="lv r">AI làm, chị duyệt</span></h4><p>Đọc đánh giá 1–2 sao trước, so thông số, kiểm chất liệu, tính giá vốn về tay, so với giá đang bán ở Việt Nam.</p></div>
+    <div class="fstep"><span class="fnum">3</span><h4>Mua mẫu, dùng thử <span class="lv h">Chị quyết</span></h4><p>Chị dùng thật, ghi lại bằng giọng nói và ảnh. Đây là phần không máy nào thay được.</p></div>
+    <div class="fstep key"><span class="fnum">1</span><h4>Chọn <span class="lv h">Chị quyết</span></h4><p>Đóng dấu, viết lý do chọn và điều chưa ưng. Lý do loại 23 món còn lại cũng được lưu để cho khách xem.</p></div>
+  </div>
+
+  <div class="two">
+    <div class="sec">
+      <h3>Khung chấm điểm, tổng 100</h3>
+      <p class="intro">Trọng số là đề xuất của em. Chị chỉnh theo từng nhóm hàng.</p>
+      <div class="wbars">
+        <div class="wbar"><span>Chất lượng qua đánh giá thật</span><span>25</span><div class="bar" style="--w:25"><i></i></div></div>
+        <div class="wbar"><span>An toàn, chất liệu</span><span>20</span><div class="bar" style="--w:20"><i></i></div></div>
+        <div class="wbar"><span>Biên lợi nhuận sau giá vốn về tay</span><span>15</span><div class="bar" style="--w:15"><i></i></div></div>
+        <div class="wbar"><span>Độ khác biệt so với hàng đang bán ở Việt Nam</span><span>15</span><div class="bar" style="--w:15"><i></i></div></div>
+        <div class="wbar"><span>Ít rủi ro hàng nhái</span><span>10</span><div class="bar" style="--w:10"><i></i></div></div>
+        <div class="wbar"><span>Nguồn ổn định</span><span>10</span><div class="bar" style="--w:10"><i></i></div></div>
+        <div class="wbar"><span>Dễ vận chuyển (không pin, không lỏng, không dễ vỡ)</span><span>5</span><div class="bar" style="--w:5"><i></i></div></div>
+      </div>
+    </div>
+    <div class="sec">
+      <h3>Giá vốn về tay</h3>
+      <p class="formula">Giá gốc × tỷ giá + phí mua hộ + cước nội địa bên bán + cước quốc tế (cân nặng × đơn giá) + thuế nhập khẩu + thuế GTGT + hao hụt, đổi trả</p>
+      <div class="prose">
+        <ul>
+          <li>Từ 18/02/2025 hàng nhập giá trị nhỏ gửi chuyển phát nhanh không còn được miễn thuế GTGT (Quyết định 01/2025/QĐ-TTg). <a class="src" href="https://www.ey.com/content/dam/ey-unified-site/ey-com/vi-vn/technical/tax/documents/customs-global-trade-alert-march-2025-repeal-of-the-threshold.pdf" target="_blank" rel="noopener">EY</a></li>
+          <li>Cước gom hàng Nhật về Việt Nam tham khảo 190–240 nghìn đồng mỗi kg, 3–6 ngày. <span class="cf">nguồn cũ, cần hỏi báo giá</span></li>
+          <li>Cước đường bộ từ Quảng Châu, Bằng Tường: không tìm được nguồn đáng tin, cần xin báo giá của 3–5 đơn vị.</li>
+          <li>Biên lợi nhuận tính sau cả phí thanh toán, phí giao và thuế của người bán.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <h3>Mỗi nguồn dùng vào việc gì</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Nguồn</th><th>Mạnh về</th><th>Hàng Chọn dùng để</th></tr></thead>
+      <tbody>
+        <tr><td>1688</td><td>Giá xưởng, mua sỉ, có số lượng tối thiểu</td><td>Đặt lô sau khi đã chọn</td></tr>
+        <tr><td>Taobao, Tmall</td><td>Bán lẻ từng chiếc, nhiều đánh giá có ảnh</td><td>Mua mẫu, đọc đánh giá</td></tr>
+        <tr><td>Pinduoduo</td><td>Giá thấp</td><td>Đối chiếu giá, dè chừng chất lượng</td></tr>
+        <tr><td>Douyin, Tiểu Hồng Thư</td><td>Xu hướng, trải nghiệm dùng thật</td><td>Tín hiệu, ý tưởng</td></tr>
+        <tr><td>Rakuten, Amazon Nhật, Yahoo Shopping</td><td>Hàng nội địa Nhật</td><td>Mua mẫu, đặt hàng</td></tr>
+        <tr><td>@cosme, LIPS, Kakaku</td><td>Bảng xếp hạng, so giá</td><td>Tín hiệu, kiểm chứng</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="intro">Bảng trên là hiểu biết phổ biến trong nghề; lượt tìm kiếm này không tìm được nguồn riêng để dẫn. Về kỹ thuật, 1688 có cổng API chính thức và có dịch vụ API bên thứ ba, nhưng điều khoản dùng dữ liệu chưa kiểm được.</p>
+</section>
+
+<section class="sec" id="s-viet-nam" data-spy>
+  <h2><span class="num">1.5</span>Việt Nam: thị trường và luật chơi</h2>
+  <div class="share" role="img" aria-label="Thị phần GMV bốn sàn: năm 2024 Shopee 64%, TikTok Shop 29%; năm 2025 Shopee 56%, TikTok Shop 41%">
+    <div class="share-row"><span>2024</span><div class="stack"><i class="s1" style="--p:64">64</i><i class="s2" style="--p:29">29</i></div></div>
+    <div class="share-row"><span>2025</span><div class="stack"><i class="s1" style="--p:56">56</i><i class="s2" style="--p:41.3">41</i></div></div>
+    <p class="keyline"><span><i style="background:var(--ink)"></i>Shopee</span><span><i style="background:var(--auto)"></i>TikTok Shop</span><span><i style="background:var(--hatch)"></i>Sàn khác</span><span>% GMV bốn sàn lớn, theo Metric <a class="src" href="https://e.vnexpress.net/news/business/data-speaks/tiktok-shop-zooms-up-to-narrow-gap-with-ecommerce-leader-shopee-4918958.html" target="_blank" rel="noopener">VnExpress</a></span></p>
+  </div>
+  <ul class="facts">
+    <li>Thương mại điện tử Việt Nam đạt khoảng 31 tỷ USD năm 2025, tăng 25,5% theo Bộ Công Thương. <a class="src" href="https://ecomobi.com/vi/bao-cao-thuong-mai-dien-tu-viet-nam-2025/" target="_blank" rel="noopener">Ecomobi</a></li>
+    <li>92% người mua dùng điện thoại, 35% vẫn thích trả tiền khi nhận hàng, khoảng một nửa mua hằng tuần (TGM Research 2025, 1.142 người). <a class="src" href="https://tgmresearch.com/vietnam-ecommerce-trends-2025.html" target="_blank" rel="noopener">TGM</a></li>
+    <li>Hơn 80.000 shop online không có đơn nào trong nửa đầu 2025. Bán thứ ai cũng bán thì rất khó sống. <a class="src" href="https://theinvestor.vn/over-80000-online-shops-in-vietnam-record-no-orders-in-h1-d16481.html" target="_blank" rel="noopener">The Investor</a></li>
+    <li>Chương trình giới thiệu bạn làm tăng số đơn khoảng 20% nhưng gần như không tăng tỉ lệ mua lại (ReferralCandy 2026). Nên đo trước khi đầu tư. <a class="src" href="https://www.referralcandy.com/blog/referral-program-benchmarks-whats-a-good-conversion-rate-in-2025" target="_blank" rel="noopener">ReferralCandy</a></li>
+  </ul>
+
+  <h3>Quy định ảnh hưởng tới thiết kế</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Quy định</th><th>Trạng thái</th><th>Hệ thống phải làm gì</th></tr></thead>
+      <tbody>
+        <tr><td>Hàng nhập giá trị nhỏ hết miễn thuế GTGT</td><td>Hiệu lực 18/02/2025</td><td>Tính thuế vào giá vốn về tay của từng món</td></tr>
+        <tr><td>Bỏ thuế khoán, hộ kinh doanh tự khai theo doanh thu thật</td><td>Từ 01/01/2026. Ngưỡng doanh thu và mốc bắt buộc hoá đơn điện tử <span class="cf">cần kế toán xác nhận</span></td><td>Sổ doanh thu, chi phí ghi tự động theo từng đơn</td></tr>
+        <tr><td>Luật Thương mại điện tử 2025</td><td>Hiệu lực 01/07/2026. Người livestream bán hàng phải xác thực danh tính; cấm hàng không rõ nguồn gốc</td><td>Lưu chứng từ nguồn gốc theo từng lô hàng</td></tr>
+        <tr><td>Luật Quảng cáo sửa đổi</td><td>Hiệu lực 01/01/2026. Người chuyển tải sản phẩm quảng cáo chịu trách nhiệm về nội dung</td><td>AI soát lời quảng cáo, không nói quá công dụng; chị duyệt trước khi đăng</td></tr>
+        <tr><td>Luật Trí tuệ nhân tạo</td><td>Hiệu lực 01/03/2026</td><td>Tự gắn nhãn nội dung do AI tạo, lưu vết ai duyệt</td></tr>
+        <tr><td>Mỹ phẩm nhập khẩu, thực phẩm</td><td>Mỹ phẩm cần số tiếp nhận phiếu công bố; thực phẩm cần tự công bố</td><td>Cảnh báo khi ứng viên thuộc nhóm cần giấy tờ</td></tr>
+        <tr><td>Hạ ngưỡng miễn thuế nhập khẩu xuống 100.000 đồng</td><td>Mới là dự thảo</td><td>Công thức giá vốn cho đổi tham số</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="intro">Nhóm dễ bắt đầu: đồ gia dụng nhỏ, đồ tiện ích không điện, văn phòng phẩm. Nhóm nên để sau: mỹ phẩm, thực phẩm, đồ có pin hoặc chất lỏng, hàng hiệu dễ bị làm nhái.</p>
+</section>
+
+<section class="sec" id="s-de-xuat" data-spy>
+  <h2><span class="num">1.6</span>Mô hình em đề xuất cho Hàng Chọn</h2>
+  <ol class="rules">
+    <li><div><b>Chọn ít, nói rõ vì sao</b>Mỗi món có hồ sơ chọn: đã xem bao nhiêu món, thử bao lâu, vì sao chọn, điều gì chưa ưng. Đây là thứ sàn lớn không làm được.</div></li>
+    <li><div><b>Mở bán theo đợt</b>Gom đơn trước, đặt nguồn sau. Vài món bán chạy thì giữ sẵn một ít.</div></li>
+    <li><div><b>Website là nhà, mạng xã hội là cửa đón, nhóm Zalo là phòng khách</b>Khách gặp chị trên Facebook, Instagram, TikTok; đọc kỹ và đặt hàng trên website; ở lại trong nhóm kín.</div></li>
+    <li><div><b>AI làm, chị duyệt, nới dần</b>Lúc đầu mọi thứ khách nhìn thấy đều qua tay chị. Việc nào AI làm ổn thì chị cho tự làm.</div></li>
+    <li><div><b>Mọi thứ có chứng từ</b>Nguồn gốc lô hàng, hoá đơn, nhãn AI, lịch sử duyệt đều được lưu tự động.</div></li>
+  </ol>
+</section>
+
+<section class="sec" id="s-nguon" data-spy>
+  <h2><span class="num">1.7</span>Nguồn và độ tin cậy</h2>
+  <p class="intro">Số liệu lấy từ kết quả tìm kiếm ngày 25/11/2026; phần lớn chưa được đối chiếu với trang gốc. Những chỗ ghi «tự công bố», «ước tính», «cần xác minh» phải kiểm lại trước khi dùng để quyết định, nhất là phần thuế và pháp lý.</p>
+  <ul class="srcs" id="srcs"></ul>
+</section>
+<a class="next" href="#chuc-nang"><span>Phần tiếp theo</span><b>2 · Chức năng →</b></a>
+</div>
+
+<!-- ============ PHẦN 2 ============ -->
+<div class="view" id="v-chuc-nang" hidden>
+
+<header class="part-h">
+  <p class="eyebrow">Phần 2 / 4</p>
+  <h2 class="part-t">Chức năng của hệ thống</h2>
+  <p class="part-d">Hệ thống cần làm được gì; việc nào AI tự làm, việc nào chờ chị duyệt, việc nào chị quyết.</p>
+</header>
+
+<section class="sec" id="s-quy-trinh" data-spy>
+  <h2><span class="num">2.1</span>Một món hàng đi qua hệ thống</h2>
+  <p class="intro">Chín bước từ lúc chị ra đề tới lúc khách quay lại. Chị quyết ở hai bước, duyệt ở ba bước, AI tự làm bốn bước.</p>
+  <ol class="flow">
+    <li class="fl"><i>1</i><b>Ra đề</b><span class="t">Chị nói món cần tìm và tiêu chí</span><span class="lv h">Chị quyết</span></li>
+    <li class="fl"><i>2</i><b>Săn</b><span class="t">Quét các nguồn, gom ứng viên</span><span class="lv a">AI tự làm</span></li>
+    <li class="fl"><i>3</i><b>Thẩm định</b><span class="t">Lập hồ sơ, chấm điểm nháp</span><span class="lv a">AI tự làm</span></li>
+    <li class="fl key"><i>4</i><b>Chọn</b><span class="t">Chị dùng thử và đóng dấu</span><span class="lv h">Chị quyết</span></li>
+    <li class="fl"><i>5</i><b>Lên web</b><span class="t">Dựng trang sản phẩm</span><span class="lv r">AI làm, chị duyệt</span></li>
+    <li class="fl"><i>6</i><b>Nội dung</b><span class="t">Soạn bài cho từng kênh</span><span class="lv r">AI làm, chị duyệt</span></li>
+    <li class="fl"><i>7</i><b>Đăng</b><span class="t">Đăng theo lịch đã duyệt</span><span class="lv a">AI tự làm</span></li>
+    <li class="fl"><i>8</i><b>Đơn</b><span class="t">Gom đơn, khớp tiền, báo khách</span><span class="lv a">AI tự làm</span></li>
+    <li class="fl"><i>9</i><b>Chăm khách</b><span class="t">Trả lời; việc khó chuyển chị</span><span class="lv r">AI làm, chị duyệt</span></li>
+  </ol>
+  <p class="intro">Mục tiêu thiết kế: việc duyệt hằng ngày của chị gói trong khoảng 30 phút trên điện thoại. Thời gian còn lại dành cho xem hàng và dùng thử.</p>
+</section>
+
+<section class="sec" id="s-danh-muc" data-spy>
+  <h2><span class="num">2.2</span>Danh mục chức năng</h2>
+  <p class="intro"><span id="n-feat">73</span> chức năng chia 10 nhóm. Mỗi chức năng ghi ai làm và nên làm ở giai đoạn nào. Anh chị bấm Làm ngay, Để sau hoặc Bỏ. Chức năng nào không bấm, em hiểu là theo giai đoạn em đề xuất.</p>
+  <div class="mix">
+    <div class="mixbar" id="mixbar" role="img" aria-label="Tỉ lệ chức năng theo mức tự động"></div>
+    <p class="keyline" id="mixkey"></p>
+  </div>
+  <div class="toolbar">
+  <div class="filters">
+    <div class="fgroup" role="group" aria-label="Lọc theo người làm"><span>Ai làm</span>
+      <button type="button" class="fchip" id="flv-all" data-flv="all" aria-pressed="true">Tất cả</button>
+      <button type="button" class="fchip" id="flv-h" data-flv="h" aria-pressed="false">Chị quyết</button>
+      <button type="button" class="fchip" id="flv-r" data-flv="r" aria-pressed="false">Chị duyệt</button>
+      <button type="button" class="fchip" id="flv-a" data-flv="a" aria-pressed="false">AI tự làm</button>
+    </div>
+    <div class="fgroup" role="group" aria-label="Lọc theo giai đoạn"><span>Giai đoạn</span>
+      <button type="button" class="fchip" id="fgd-all" data-fgd="all" aria-pressed="true">Tất cả</button>
+      <button type="button" class="fchip" id="fgd-1" data-fgd="1" aria-pressed="false">GĐ1</button>
+      <button type="button" class="fchip" id="fgd-2" data-fgd="2" aria-pressed="false">GĐ2</button>
+      <button type="button" class="fchip" id="fgd-3" data-fgd="3" aria-pressed="false">GĐ3</button>
+    </div>
+  </div>
+  <p class="tally" id="tally"></p>
+  </div>
+  <div class="mods" id="mods"></div>
+</section>
+<a class="next" href="#wireframe"><span>Phần tiếp theo</span><b>3 · Wireframe →</b></a>
+</div>
+
+<!-- ============ PHẦN 3 ============ -->
+<div class="view" id="v-wireframe" hidden>
+
+<header class="part-h">
+  <p class="eyebrow">Phần 3 / 4</p>
+  <h2 class="part-t">Wireframe</h2>
+  <p class="part-d">Bản phác bố cục, chưa phải thiết kế cuối. Ô gạch chéo là chỗ đặt ảnh. Số trong chấm đỏ ứng với ghi chú bên dưới mỗi màn hình. Tên khách, giá và số liệu đều là ví dụ.</p>
+</header>
+
+<div class="toolbar pin">
+  <div class="seg" role="group" aria-label="Nhóm màn hình">
+    <button type="button" id="wfg-btn-web" data-wfg="web" aria-pressed="true">Website cho khách</button>
+    <button type="button" id="wfg-btn-desk" data-wfg="desk" aria-pressed="false">Bàn làm việc của chị</button>
+  </div>
+</div>
+
+<div class="wf-group" id="wfg-web">
+
+<section class="sec" id="s-trang-chu" data-spy>
+  <h2><span class="num">3.1</span>Trang chủ: ba hướng để chọn một</h2>
+  <p class="intro">Cả ba đều đặt việc chọn lọc lên trước, khác nhau ở thứ khách thấy đầu tiên: câu chuyện, kệ hàng, hay đợt đang mở.</p>
+  <div class="wf-grid" data-pick="home">
+
+    <figure class="wf">
+      <figcaption><b>A · Nhật ký chọn hàng</b><span>Trang chủ là các bài kể chuyện thử hàng. Hợp khi chị thích viết và quay.</span></figcaption>
+      <div class="ph">
+        <div class="ph-top"><span>≡</span><span class="brand">Hàng Chọn</span><span>Giỏ 2</span></div>
+        <div class="ph-body">
+          <span class="w-s">Tuần 48 · 3 món mới được chọn</span>
+          <div class="im tl"><span>Ảnh chị đang dùng thử</span></div>
+          <div class="w-h">Thử 5 chiếc bình giữ nhiệt trong 3 tuần, mình giữ lại 1 <span class="w-n">1</span></div>
+          <span class="w-s">Chiếc được chọn giữ nóng 9 tiếng, nắp không ám mùi. Hai chiếc bị loại vì gioăng…</span>
+          <div class="w-row"><span class="seal"><span><small>CHỌN</small><b>1/24</b></span></span><span class="w-b grow">Xem món được chọn →</span> <span class="w-n">2</span></div>
+          <div class="w-hr"></div>
+          <div class="w-row"><div class="im sq w-th"></div><div class="w-col grow"><span class="w-b">Hộp cơm inox: vì sao mình bỏ loại 4 ngăn</span><span class="w-s">Thứ ba, 18/11</span></div></div>
+          <div class="w-row"><div class="im sq w-th"></div><div class="w-col grow"><span class="w-b">Khăn tắm cho bé: 6 mẫu, 1 mẫu qua được 30 lần giặt</span><span class="w-s">Thứ sáu, 14/11</span></div></div>
+        </div>
+        <div class="ph-nav"><span class="on">Nhật ký</span><span>Kệ hàng</span><span>Đợt gom</span><span>Nhờ tìm</span><span>Đơn</span></div>
+      </div>
+      <ol class="notes">
+        <li>Tiêu đề nói thẳng mức sàng lọc: thử mấy món, giữ mấy món.</li>
+        <li>Con dấu ghi tỉ lệ chọn, đi theo món hàng ở mọi nơi nó xuất hiện.</li>
+      </ol>
+      <button type="button" class="choose" id="home-a" data-v="a" aria-pressed="false">Chọn hướng A</button>
+    </figure>
+
+    <figure class="wf">
+      <figcaption><b>B · Kệ hàng đã chọn</b><span>Vào là thấy hàng. Hợp với khách đã biết mình cần gì.</span></figcaption>
+      <div class="ph">
+        <div class="ph-top"><span>≡</span><span class="brand">Hàng Chọn</span><span>Giỏ 2</span></div>
+        <div class="ph-body">
+          <div class="w-in">Bạn đang cần gì? vd. bình nước cho bé <span class="w-n">1</span></div>
+          <div class="w-chips"><span class="w-chip on">Tất cả 38</span><span class="w-chip">Bếp</span><span class="w-chip">Cho bé</span><span class="w-chip">Bàn làm việc</span><span class="w-chip">Đi xa</span></div>
+          <div class="w-g2">
+            <div class="w-col"><div class="im sq"><span class="seal"><span><small>CHỌN</small><b>1/24</b></span></span></div><span class="w-b">Bình giữ nhiệt 480 ml</span><span>385.000đ</span><span class="w-s">Thử 3 tuần · Nhật</span></div>
+            <div class="w-col"><div class="im sq"><span class="seal"><span><small>CHỌN</small><b>1/17</b></span></span></div><span class="w-b">Hộp cơm inox 3 ngăn</span><span>245.000đ</span><span class="w-s">Thử 2 tuần · Trung Quốc</span></div>
+            <div class="w-col"><div class="im sq"><span class="seal"><span><small>CHỌN</small><b>1/31</b></span></span></div><span class="w-b">Khăn tắm cho bé</span><span>168.000đ</span><span class="w-s">30 lần giặt · Nhật <span class="w-n">2</span></span></div>
+            <div class="w-col"><div class="im sq"><span class="seal"><span><small>CHỌN</small><b>1/12</b></span></span></div><span class="w-b">Đèn kẹp đọc sách</span><span>219.000đ</span><span class="w-s">Thử 2 tuần · Trung Quốc</span></div>
+          </div>
+        </div>
+        <div class="ph-nav"><span>Nhật ký</span><span class="on">Kệ hàng</span><span>Đợt gom</span><span>Nhờ tìm</span><span>Đơn</span></div>
+      </div>
+      <ol class="notes">
+        <li>Ô tìm hiểu câu nói thường ngày; AI dẫn tới món phù hợp hoặc mời gửi «Nhờ tìm».</li>
+        <li>Dưới mỗi món là bằng chứng đã thử, đứng ở chỗ sàn khác đặt số sao.</li>
+      </ol>
+      <button type="button" class="choose" id="home-b" data-v="b" aria-pressed="false">Chọn hướng B</button>
+    </figure>
+
+    <figure class="wf">
+      <figcaption><b>C · Đợt gom đơn</b><span>Trang chủ là đợt đang mở. Hợp nhất với cách bán gom đơn rồi mới nhập.</span></figcaption>
+      <div class="ph">
+        <div class="ph-top"><span>≡</span><span class="brand">Hàng Chọn</span><span>Giỏ 2</span></div>
+        <div class="ph-body">
+          <div class="w-bx sl">
+            <span class="w-s">ĐỢT 12 · ĐANG MỞ</span>
+            <div class="w-h">Đồ bếp gọn cho nhà nhỏ</div>
+            <div class="im wd"><span>4 món trong đợt</span></div>
+            <div class="w-row w-sp"><span class="w-b">Còn 2 ngày 14 giờ <span class="w-n">1</span></span><span>86/120 suất</span></div>
+            <div class="w-pb" style="--p:72%"><i></i></div>
+            <span class="w-s">Hàng về dự kiến 12/12 <span class="w-n">2</span></span>
+            <div class="w-bt s">Xem 4 món trong đợt</div>
+          </div>
+          <span class="w-s">SẮP MỞ</span>
+          <div class="w-row"><div class="im sq w-th"></div><div class="w-col grow"><span class="w-b">Đợt 13 · Đồ cho bé đi học</span><span class="w-s">Mở 02/12</span></div><div class="w-bt o fit">Nhắc mình</div></div>
+          <span class="w-s">ĐÃ VỀ</span>
+          <div class="w-row"><div class="im sq w-th"></div><div class="w-col grow"><span class="w-b">Đợt 11 · Đồ đi xa</span><span class="w-s">214 đơn · 4,8/5 từ 96 đánh giá <span class="w-n">3</span></span></div></div>
+        </div>
+        <div class="ph-nav"><span>Nhật ký</span><span>Kệ hàng</span><span class="on">Đợt gom</span><span>Nhờ tìm</span><span>Đơn</span></div>
+      </div>
+      <ol class="notes">
+        <li>Hạn chót và số suất là lý do thật để quyết định sớm.</li>
+        <li>Ngày hàng về nói ngay từ đầu, khách biết mình phải chờ.</li>
+        <li>Đợt đã về kèm đánh giá: bằng chứng cho người mua lần đầu.</li>
+      </ol>
+      <button type="button" class="choose" id="home-c" data-v="c" aria-pressed="false">Chọn hướng C</button>
+    </figure>
+  </div>
+</section>
+
+<section class="sec" id="s-phong-cach" data-spy>
+  <h2><span class="num">3.2</span>Phong cách hình ảnh: ba mẫu để chọn một</h2>
+  <p class="intro">Wireframe chỉ là bố cục. Ba mẫu dưới đây gợi ý cảm giác màu và nét cho website thật.</p>
+  <div class="styles" data-pick="style">
+    <figure class="spec">
+      <div class="spec-card" style="--s-bg:#EAF2EC;--s-fg:#17332B;--s-ac:#B83224;--s-on:#FFFFFF;--s-soft:#CFE0D4">
+        <span class="spec-name">Hàng Chọn</span>
+        <div class="spec-prod"><b>Bình giữ nhiệt 480 ml</b><span>385.000đ · chọn 1 trong 24</span></div>
+        <span class="spec-btn">Đặt trong đợt 12</span>
+        <div class="spec-sw"><i style="background:#EAF2EC"></i><i style="background:#CFE0D4"></i><i style="background:#17332B"></i><i style="background:#B83224"></i></div>
+      </div>
+      <figcaption><b>Men ngọc</b>Xanh ngọc nhạt, chữ xanh thông, dấu đỏ son. Tĩnh, sạch, gợi đồ gốm.</figcaption>
+      <button type="button" class="choose" id="style-1" data-v="men-ngoc" aria-pressed="false">Chọn Men ngọc</button>
+    </figure>
+    <figure class="spec">
+      <div class="spec-card" style="--s-bg:#FFFDF4;--s-fg:#1F2A1B;--s-ac:#F0B429;--s-on:#1F2A1B;--s-soft:#E2EFCB;--s-r:22px">
+        <span class="spec-name">Hàng Chọn</span>
+        <div class="spec-prod"><b>Bình giữ nhiệt 480 ml</b><span>385.000đ · chọn 1 trong 24</span></div>
+        <span class="spec-btn">Đặt trong đợt 12</span>
+        <div class="spec-sw"><i style="background:#FFFDF4"></i><i style="background:#E2EFCB"></i><i style="background:#1F2A1B"></i><i style="background:#F0B429"></i></div>
+      </div>
+      <figcaption><b>Chợ sớm</b>Nền sáng, vàng nghệ và xanh lá non, góc bo tròn. Vui, gần gũi, hợp video ngắn.</figcaption>
+      <button type="button" class="choose" id="style-2" data-v="cho-som" aria-pressed="false">Chọn Chợ sớm</button>
+    </figure>
+    <figure class="spec">
+      <div class="spec-card" style="--s-bg:#F6F6F2;--s-fg:#1C1D22;--s-ac:#2E3F8F;--s-on:#FFFFFF;--s-soft:#E1E3EC;--s-r:4px;--s-br:4px;--s-ls:.01em">
+        <span class="spec-name">Hàng Chọn</span>
+        <div class="spec-prod"><b>Bình giữ nhiệt 480 ml</b><span>385.000đ · chọn 1 trong 24</span></div>
+        <span class="spec-btn">Đặt trong đợt 12</span>
+        <div class="spec-sw"><i style="background:#F6F6F2"></i><i style="background:#E1E3EC"></i><i style="background:#1C1D22"></i><i style="background:#2E3F8F"></i></div>
+      </div>
+      <figcaption><b>Chàm</b>Trắng xám, đen mực, điểm xanh chàm, góc vuông. Tối giản kiểu cửa hàng Nhật.</figcaption>
+      <button type="button" class="choose" id="style-3" data-v="cham" aria-pressed="false">Chọn Chàm</button>
+    </figure>
+  </div>
+</section>
+
+<section class="sec" id="s-web" data-spy>
+  <h2><span class="num">3.3</span>Các màn hình còn lại của website</h2>
+  <div class="wf-grid">
+
+    <figure class="wf">
+      <figcaption><b>Trang sản phẩm</b><span>Lý do chọn đứng trước thông số. Có cả điều chưa ưng.</span></figcaption>
+      <div class="ph">
+        <div class="ph-top"><span>←</span><span class="brand">Hàng Chọn</span><span>Giỏ 2</span></div>
+        <div class="ph-body">
+          <div class="im wd"><span>Ảnh thật, chị chụp · 1/6</span></div>
+          <div class="w-row top"><div class="w-col grow"><div class="w-h">Bình giữ nhiệt 480 ml</div><span class="w-s">Nhật Bản · inox 316 · 310 g</span></div><span class="seal"><span><small>CHỌN</small><b>1/24</b></span></span></div>
+          <div class="w-row w-sp"><span class="w-big">385.000đ</span><span class="w-chip">Đợt 12 · còn 34 suất</span></div>
+          <div class="w-bx tint"><span class="w-b">Vì sao mình chọn <span class="w-n">1</span></span>
+            <ul class="w-ul"><li>Giữ nóng 9 tiếng, mình đo 3 lần</li><li>Nắp tháo rời, không ám mùi</li><li>Nhẹ hơn 60 g so với mẫu bán chạy nhất</li></ul></div>
+          <div class="w-fn"><div><b>24</b>đã xem</div><div><b>5</b>so kỹ</div><div><b>3</b>mua thử</div><div><b>1</b>chọn</div></div>
+          <span class="w-b">Xem hồ sơ chọn → <span class="w-n">2</span></span>
+          <div class="w-bx"><span class="w-b">Điều mình chưa ưng <span class="w-n">3</span></span><span>Chỉ có 2 màu. Miệng bình hẹp, khó cho đá viên to.</span></div>
+          <div class="w-in">Hỏi về món này… <span class="w-n">4</span></div>
+          <span class="w-b">Đánh giá có ảnh · 38</span>
+          <div class="w-g3"><div class="im sq"></div><div class="im sq"></div><div class="im sq"></div></div>
+        </div>
+        <div class="ph-cta"><div class="w-bt s">Đặt trong đợt 12</div></div>
+      </div>
+      <ol class="notes">
+        <li>Lời của chị, AI soạn từ ghi chú thử hàng rồi chị sửa.</li>
+        <li>Dải số sàng lọc dẫn sang hồ sơ chọn đầy đủ.</li>
+        <li>Nói thẳng nhược điểm. Đây là thứ tạo niềm tin mạnh nhất.</li>
+        <li>Trợ lý AI trả lời từ hồ sơ thẩm định, không biết thì chuyển chị.</li>
+      </ol>
+    </figure>
+
+    <figure class="wf">
+      <figcaption><b>Hồ sơ chọn</b><span>Món được chọn đặt cạnh các món bị loại, kèm lý do.</span></figcaption>
+      <div class="ph">
+        <div class="ph-top"><span>←</span><span>Hồ sơ chọn</span><span></span></div>
+        <div class="ph-body">
+          <div class="w-h">Bình giữ nhiệt: xem 24, mua thử 3, chọn 1</div>
+          <div class="w-bx sl"><div class="w-row"><div class="im sq w-th"></div><div class="w-col grow"><span class="w-b">Mẫu A · Nhật · 385.000đ</span><span class="w-s">Giữ nóng 9 giờ · 310 g · nắp tháo rời</span></div><span class="seal" style="--sz:34px"><span><small>CHỌN</small></span></span></div></div>
+          <div class="w-bx"><div class="w-row"><div class="im sq w-th"></div><div class="w-col grow"><span class="w-b">Mẫu B · Trung Quốc · 210.000đ</span><span class="w-s">Giữ nóng 7 giờ · 340 g</span></div></div><span>Loại: gioăng ám mùi sau 1 tuần dùng. <span class="w-n">1</span></span></div>
+          <div class="w-bx"><div class="w-row"><div class="im sq w-th"></div><div class="w-col grow"><span class="w-b">Mẫu C · Nhật · 520.000đ</span><span class="w-s">Giữ nóng 10 giờ · 420 g</span></div></div><span>Loại: nặng, đắt hơn 35% mà chỉ hơn 1 giờ.</span></div>
+          <span class="w-b">21 mẫu loại từ vòng đọc đánh giá <span class="w-n">2</span></span>
+          <div class="w-chips"><span class="w-chip">Rò nước · 8</span><span class="w-chip">Bong sơn · 6</span><span class="w-chip">Nghi hàng nhái · 4</span><span class="w-chip">Lý do khác · 3</span></div>
+          <span class="w-s">AI đọc 412 đánh giá tiếng Nhật và tiếng Trung, chị kiểm lại phần tóm tắt. <span class="w-n">3</span></span>
+        </div>
+      </div>
+      <ol class="notes">
+        <li>Lý do loại lấy từ ghi chú của chị trong lúc thử.</li>
+        <li>Món bị loại không nêu tên thương hiệu, chỉ nêu lý do.</li>
+        <li>Nói rõ phần nào AI làm, phần nào chị làm.</li>
+      </ol>
+    </figure>
+
+    <figure class="wf">
+      <figcaption><b>Đặt hàng</b><span>Một trang, không cần tạo tài khoản.</span></figcaption>
+      <div class="ph">
+        <div class="ph-top"><span>←</span><span>Đặt hàng</span><span></span></div>
+        <div class="ph-body">
+          <div class="w-bx"><div class="w-row"><div class="im sq w-th"></div><div class="w-col grow"><span class="w-b">Bình giữ nhiệt 480 ml</span><span class="w-s">Xanh rêu · 385.000đ</span></div><span class="w-chip">− 1 +</span></div></div>
+          <div class="w-in">Số điện thoại <span class="w-n">1</span></div>
+          <div class="w-in">Họ tên</div>
+          <div class="w-in">Địa chỉ nhận hàng</div>
+          <div class="w-bx"><span class="w-b">Thanh toán</span><span>● Chuyển khoản bằng mã QR, tự xác nhận <span class="w-n">2</span></span><span>○ Trả tiền khi nhận hàng</span></div>
+          <div class="w-bx tint"><span>Hàng về dự kiến 12/12, giao cho bạn 13–15/12 <span class="w-n">3</span></span></div>
+          <div class="w-kv"><span>Tạm tính</span><span>385.000đ</span></div>
+          <div class="w-kv"><span>Phí giao</span><span>22.000đ</span></div>
+          <div class="w-kv w-b"><span>Tổng</span><span>407.000đ</span></div>
+        </div>
+        <div class="ph-cta"><div class="w-bt s">Đặt hàng</div></div>
+      </div>
+      <ol class="notes">
+        <li>Số điện thoại là khoá tra đơn về sau.</li>
+        <li>Hệ thống khớp khoản chuyển tới và báo khách ngay.</li>
+        <li>Nhắc lại ngày hàng về trước khi khách bấm đặt.</li>
+      </ol>
+    </figure>
+
+    <figure class="wf">
+      <figcaption><b>Theo dõi đơn</b><span>Khách thấy cả chặng hàng từ nước ngoài về.</span></figcaption>
+      <div class="ph">
+        <div class="ph-top"><span>←</span><span>Đơn HC-1248</span><span></span></div>
+        <div class="ph-body">
+          <div class="w-h">Hàng đang trên đường về Việt Nam</div>
+          <div class="w-tl">
+            <div class="done"><i></i><div><span class="w-b">Đã nhận đơn, đã thanh toán</span><br><span class="w-s">25/11</span></div></div>
+            <div class="done"><i></i><div><span class="w-b">Chốt đợt 12, đã đặt nhà cung cấp</span><br><span class="w-s">28/11</span></div></div>
+            <div class="now"><i></i><div><span class="w-b">Rời kho Osaka</span> <span class="w-n">1</span><br><span class="w-s">04/12</span></div></div>
+            <div class="todo"><i></i><div>Về tới Hà Nội, chị kiểm từng món <span class="w-n">2</span><br><span class="w-s">Dự kiến 10/12</span></div></div>
+            <div class="todo"><i></i><div>Giao cho bạn<br><span class="w-s">Dự kiến 12/12</span></div></div>
+          </div>
+          <div class="w-row"><div class="w-bt o">Hỏi về đơn này</div><div class="w-bt o">Đổi địa chỉ</div></div>
+          <span class="w-s">Mỗi mốc bạn sẽ nhận một tin nhắn Zalo. <span class="w-n">3</span></span>
+        </div>
+      </div>
+      <ol class="notes">
+        <li>Mốc lô hàng do AI cập nhật từ đơn vị vận chuyển.</li>
+        <li>Bước chị kiểm hàng nằm trong hành trình, khách thấy rõ.</li>
+        <li>Tin báo tự động, khách không phải hỏi «hàng tới đâu rồi».</li>
+      </ol>
+    </figure>
+
+    <figure class="wf">
+      <figcaption><b>Về người chọn</b><span>Trang bảo lãnh: chị là ai, chọn theo nguyên tắc nào, AI làm gì.</span></figcaption>
+      <div class="ph">
+        <div class="ph-top"><span>≡</span><span class="brand">Hàng Chọn</span><span>Giỏ 2</span></div>
+        <div class="ph-body">
+          <div class="w-row"><div class="im sq rd" style="width:64px;flex:none"><span>Ảnh</span></div><div class="w-h grow">Mình là ▁▁▁, người chọn từng món ở đây <span class="w-n">1</span></div></div>
+          <span>Mình không bán nhiều. Món nào ở đây mình cũng đã mua bằng tiền của mình và dùng ít nhất 2 tuần.</span>
+          <div class="w-g3"><div class="w-col"><span class="w-big">1.240</span><span class="w-s">món đã xem</span></div><div class="w-col"><span class="w-big">38</span><span class="w-s">món được chọn</span></div><div class="w-col"><span class="w-big">3%</span><span class="w-s">tỉ lệ chọn <span class="w-n">2</span></span></div></div>
+          <div class="w-bx"><span class="w-b">Cách mình chọn</span><ul class="w-ul"><li>Đọc đánh giá xấu trước</li><li>Mua mẫu, dùng thật ít nhất 2 tuần</li><li>Nói rõ điều chưa ưng</li></ul></div>
+          <div class="w-bx"><span class="w-b">Mình không bán</span><span>Món mình chưa thử. Món không rõ nguồn gốc. Món phải nói quá mới bán được.</span></div>
+          <div class="w-bx tint"><span class="w-b">AI giúp mình việc gì <span class="w-n">3</span></span><span>Tìm và đọc hàng nghìn đánh giá, soạn bài, trả lời câu hỏi thường gặp. Quyết định chọn là của mình.</span></div>
+        </div>
+      </div>
+      <ol class="notes">
+        <li>Tên và mức độ lộ diện do chị quyết, xem phần Cần chốt.</li>
+        <li>Con số lấy thẳng từ Bàn chọn, tự cập nhật.</li>
+        <li>Nói rõ vai trò của AI để khách không thấy bị giấu.</li>
+      </ol>
+    </figure>
+
+    <figure class="wf">
+      <figcaption><b>Nhờ chị tìm</b><span>Khách gửi nhu cầu, người khác bấm «mình cũng cần». Đây là cộng đồng.</span></figcaption>
+      <div class="ph">
+        <div class="ph-top"><span>≡</span><span class="brand">Hàng Chọn</span><span>Giỏ 2</span></div>
+        <div class="ph-body">
+          <div class="w-h">Bạn cần món gì mà chưa tìm được loại ưng?</div>
+          <div class="w-row"><div class="w-in grow">Viết vài chữ…</div><div class="w-bt fit">Gửi</div></div>
+          <div class="w-bx"><span class="w-b">Bình sữa thuỷ tinh cho bé 6 tháng, núm mềm</span><div class="w-row w-sp"><span>▲ 47 người cùng cần <span class="w-n">1</span></span><span class="w-chip on">Chị đang thử 3 mẫu</span></div></div>
+          <div class="w-bx"><span class="w-b">Giá phơi đồ gấp gọn cho ban công 1 m²</span><div class="w-row w-sp"><span>▲ 31 người cùng cần</span><span class="w-chip">AI đang tìm ứng viên <span class="w-n">2</span></span></div></div>
+          <div class="w-bx"><span class="w-b">Máy xay cầm tay không ồn</span><div class="w-row w-sp"><span>▲ 12 người cùng cần</span><span class="w-chip">Chưa có món ưng <span class="w-n">3</span></span></div></div>
+          <span class="w-s">Món nào đủ 30 người cần, chị sẽ mở tìm.</span>
+        </div>
+        <div class="ph-nav"><span>Nhật ký</span><span>Kệ hàng</span><span>Đợt gom</span><span class="on">Nhờ tìm</span><span>Đơn</span></div>
+      </div>
+      <ol class="notes">
+        <li>Số người cùng cần là tín hiệu nhu cầu đưa thẳng vào Săn hàng.</li>
+        <li>Trạng thái lấy từ Bàn chọn, khách thấy việc đang chạy.</li>
+        <li>Không tìm được thì nói không tìm được.</li>
+      </ol>
+    </figure>
+
+    <figure class="wf">
+      <figcaption><b>Hỏi trợ lý</b><span>AI trả lời từ hồ sơ của chị, có dẫn nguồn, biết lúc nào phải chuyển người.</span></figcaption>
+      <div class="ph">
+        <div class="ph-top"><span>←</span><span>Hỏi về Bình giữ nhiệt</span><span></span></div>
+        <div class="ph-body">
+          <div class="w-bub me">Bình có đựng được nước có ga không?</div>
+          <div class="w-bub">Nhà sản xuất ghi không dùng cho đồ uống có ga. Chị cũng chưa thử trường hợp này.<br><span class="w-s">Nguồn: hướng dẫn sử dụng, mục 3 <span class="w-n">1</span></span></div>
+          <div class="w-bub me">Vỡ nắp thì có mua lẻ được không?</div>
+          <div class="w-bub">Câu này mình chưa có thông tin chắc chắn nên chuyển cho chị. Chị thường trả lời trong buổi tối. <span class="w-n">2</span></div>
+          <span class="w-chip" style="align-self:flex-start">Đã chuyển cho chị</span>
+          <div class="w-in">Nhập câu hỏi…</div>
+          <span class="w-s">Trợ lý là AI, trả lời dựa trên hồ sơ thẩm định của chị. <span class="w-n">3</span></span>
+        </div>
+      </div>
+      <ol class="notes">
+        <li>Mỗi câu trả lời dẫn về một dòng trong hồ sơ.</li>
+        <li>Không có dữ liệu thì không đoán, chuyển vào Hộp thư của chị.</li>
+        <li>Luôn ghi rõ đây là AI.</li>
+      </ol>
+    </figure>
+  </div>
+</section>
+</div>
+
+<div class="wf-group" id="wfg-desk" hidden>
+<section class="sec" id="s-ban-lam-viec" data-spy>
+  <h2><span class="num">3.4</span>Bàn làm việc của chị, trên điện thoại</h2>
+  <p class="intro">Mười màn hình. Chị bắt đầu ngày ở «Hôm nay» và hầu hết việc duyệt xong ngay tại đó.</p>
+  <div class="wf-grid">
+
+    <figure class="wf">
+      <figcaption><b>Hôm nay</b><span>Việc chờ chị ở trên, việc AI đã tự làm ở dưới.</span></figcaption>
+      <div class="ph">
+        <div class="ph-top"><span>Thứ tư, 25/11</span><span class="w-chip">● Nói với AI <span class="w-n">1</span></span></div>
+        <div class="ph-body">
+          <div class="w-h">5 việc chờ chị</div>
+          <div class="w-bx"><div class="w-row w-sp"><span class="lv h">Chị quyết</span><span class="w-b">Xem hồ sơ →</span></div><span>Ứng viên mới đạt 86 điểm: giá phơi gấp gọn</span></div>
+          <div class="w-bx"><div class="w-row w-sp"><span class="lv r">Chờ duyệt</span><span class="w-b">Duyệt →</span></div><span>2 bài viết cho Đợt 12 đã soạn xong</span></div>
+          <div class="w-bx"><div class="w-row w-sp"><span class="lv r">Chờ duyệt</span><span class="w-b">Duyệt →</span></div><span>Giá bán hộp cơm inox: 245.000đ, biên 34%</span></div>
+          <div class="w-bx"><div class="w-row w-sp"><span class="lv h">Chị quyết</span><span class="w-b">Xử lý →</span></div><span>Khách báo bình bị móp khi nhận <span class="w-n">2</span></span></div>
+          <div class="w-bx"><div class="w-row w-sp"><span class="lv r">Chờ duyệt</span><span class="w-b">Xem đơn đặt →</span></div><span>Chốt Đợt 11: đặt 214 món ở 3 nhà cung cấp</span></div>
+          <div class="w-bx tint"><div class="w-row w-sp"><span class="lv a">AI đã tự làm · 23 việc</span><span class="w-b">Nhật ký →</span></div><span>Trả lời 14 câu hỏi thường gặp · Khớp 6 khoản chuyển tới · Tạo 3 vận đơn <span class="w-n">3</span></span></div>
+          <div class="w-g3"><div class="w-col"><span class="w-big">9</span><span class="w-s">đơn mới</span></div><div class="w-col"><span class="w-big">3,4 tr</span><span class="w-s">tiền về</span></div><div class="w-col"><span class="w-big">86/120</span><span class="w-s">Đợt 12</span></div></div>
+        </div>
+        <div class="ph-nav"><span class="on">Hôm nay</span><span>Săn hàng</span><span>Bàn chọn</span><span>Nội dung</span><span>Khách</span></div>
+      </div>
+      <ol class="notes">
+        <li>Ra lệnh bằng giọng nói từ bất kỳ màn hình nào.</li>
+        <li>Khiếu nại luôn về tay chị, AI chỉ chuẩn bị phương án.</li>
+        <li>Việc AI tự làm gom một dòng, bấm vào xem chi tiết và hoàn tác.</li>
+      </ol>
+    </figure>
+
+    <figure class="wf">
+      <figcaption><b>Săn hàng</b><span>Chị ra đề bằng lời thường. AI cho biết nó hiểu thế nào rồi mới tìm.</span></figcaption>
+      <div class="ph">
+        <div class="ph-top"><span>Săn hàng</span><span class="w-s">3 đề đang chạy</span></div>
+        <div class="ph-body">
+          <div class="w-bx"><span>Tìm giá phơi đồ gấp gọn cho ban công nhỏ, inox không gỉ, dưới 300k, ưu tiên hàng Nhật hoặc xưởng Trung Quốc có đánh giá tốt</span><div class="w-chips"><span class="w-chip">● Nói</span><span class="w-chip">Chụp ảnh</span><span class="w-chip">Dán link <span class="w-n">1</span></span></div></div>
+          <span class="w-s">AI HIỂU LÀ <span class="w-n">2</span></span>
+          <div class="w-chips"><span class="w-chip on">giá phơi gấp</span><span class="w-chip on">inox 304</span><span class="w-chip on">về tay ≤ 300k</span><span class="w-chip on">Nhật, Trung Quốc</span><span class="w-chip on">đánh giá ≥ 4,7</span></div>
+          <span class="w-s">Đã quét 4 nguồn · 186 món · 9 món đạt ngưỡng</span>
+          <div class="w-bx"><div class="w-row top"><div class="im sq w-th"></div><div class="w-col grow"><span class="w-b">Giá phơi chữ X, inox 304</span><span class="w-s">1688 · xưởng Phật Sơn · 2.140 đánh giá</span><span>Về tay khoảng 172k</span></div><span class="w-big">86</span></div><span class="w-s">Đáng xem vì: mối hàn kín, 3% đánh giá xấu và chủ yếu về đóng gói. <span class="w-n">3</span></span></div>
+          <div class="w-bx"><div class="w-row top"><div class="im sq w-th"></div><div class="w-col grow"><span class="w-b">Giá phơi treo lan can</span><span class="w-s">Rakuten · 318 đánh giá</span><span>Về tay khoảng 265k</span></div><span class="w-big">81</span></div></div>
+          <span class="w-b">Xem 7 món còn lại →</span>
+          <div class="w-bt o">Lưu đề này, chạy lại mỗi tuần</div>
+        </div>
+        <div class="ph-nav"><span>Hôm nay</span><span class="on">Săn hàng</span><span>Bàn chọn</span><span>Nội dung</span><span>Khách</span></div>
+      </div>
+      <ol class="notes">
+        <li>Ba cách ra đề: nói, chụp ảnh món thấy ngoài đời, dán link.</li>
+        <li>Chị sửa từng tiêu chí trước khi AI chạy tiếp.</li>
+        <li>Mỗi ứng viên kèm một câu lý do, không chỉ có điểm.</li>
+      </ol>
+    </figure>
+
+    <figure class="wf">
+      <figcaption><b>Hồ sơ thẩm định</b><span>Một trang đủ để chị quyết: loại, mua mẫu hay chọn.</span></figcaption>
+      <div class="ph">
+        <div class="ph-top"><span>←</span><span>Giá phơi chữ X</span><span></span></div>
+        <div class="ph-body">
+          <div class="w-row"><div class="im sq" style="width:70px;flex:none"></div><div class="w-col grow"><span class="w-big">86/100</span><span class="w-s">AI chấm nháp, chị sửa được từng dòng <span class="w-n">1</span></span></div></div>
+          <div class="w-col">
+            <div class="w-sc"><span>Chất lượng</span><div class="w-pb" style="--p:88%"><i></i></div><span>22/25</span></div>
+            <div class="w-sc"><span>An toàn</span><div class="w-pb" style="--p:90%"><i></i></div><span>18/20</span></div>
+            <div class="w-sc"><span>Biên lợi nhuận</span><div class="w-pb" style="--p:87%"><i></i></div><span>13/15</span></div>
+            <div class="w-sc"><span>Khác biệt</span><div class="w-pb" style="--p:60%"><i></i></div><span>9/15</span></div>
+            <div class="w-sc"><span>Hàng nhái</span><div class="w-pb" style="--p:90%"><i></i></div><span>9/10</span></div>
+            <div class="w-sc"><span>Nguồn</span><div class="w-pb" style="--p:100%"><i></i></div><span>10/10</span></div>
+            <div class="w-sc"><span>Vận chuyển</span><div class="w-pb" style="--p:100%"><i></i></div><span>5/5</span></div>
+          </div>
+          <div class="w-bx"><span class="w-b">AI đã đọc 2.140 đánh giá <span class="w-n">2</span></span><span>Khen: chắc, không gỉ sau 1 năm (412 lượt nhắc)</span><span>Chê: hộp móp khi giao (58), ốc lỏng (21)</span></div>
+          <div class="w-bx"><span class="w-b">Giá vốn về tay · 172.000đ</span><span class="w-s">Giá xưởng 31 tệ ≈ 113k · Mua hộ, cước nội địa 14k · Cước về Việt Nam 2,1 kg ≈ 29k · Thuế, hao hụt 16k</span><span>Hàng tương tự ở Việt Nam: 289–350k. Bán 279k thì biên 38%.</span></div>
+          <div class="w-bx sl"><span class="w-b">Cần chị để ý <span class="w-n">3</span></span><span>Nặng 2,1 kg nên cước cao. Chưa rõ tải trọng thật.</span></div>
+        </div>
+        <div class="ph-cta"><div class="w-row"><div class="w-bt o">Loại</div><div class="w-bt o">Mua mẫu</div><div class="w-bt s">Chọn</div></div></div>
+      </div>
+      <ol class="notes">
+        <li>Bảy tiêu chí theo khung chấm điểm, trọng số chị đặt.</li>
+        <li>Con số trong ngoặc là số lượt nhắc, bấm vào đọc đánh giá gốc đã dịch.</li>
+        <li>AI nêu chỗ nó không chắc để chị kiểm khi thử.</li>
+      </ol>
+    </figure>
+
+    <figure class="wf">
+      <figcaption><b>Bàn chọn</b><span>Nơi chị thử hàng và ghi lại. Phần quan trọng nhất của cả hệ thống.</span></figcaption>
+      <div class="ph">
+        <div class="ph-top"><span>Bàn chọn</span><span class="w-s">38 món đã chọn</span></div>
+        <div class="ph-body">
+          <div class="w-chips"><span class="w-chip">Ứng viên 12</span><span class="w-chip">Mua mẫu 3</span><span class="w-chip on">Đang thử 2</span><span class="w-chip">Đã chọn</span><span class="w-chip">Đã loại</span></div>
+          <div class="w-bx"><div class="w-row"><div class="im sq w-th"></div><div class="w-col grow"><span class="w-b">Giá phơi chữ X</span><span class="w-s">Ngày thử thứ 9 trong 14</span><div class="w-pb" style="--p:64%"><i></i></div></div></div>
+            <span class="w-s">GHI CHÚ CỦA CHỊ · 3</span>
+            <span>«Phơi chăn mùa đông không võng.» <span class="w-s">22/11, kèm 2 ảnh</span></span>
+            <div class="w-row"><div class="w-bt o">● Ghi âm nhận xét <span class="w-n">1</span></div><div class="w-bt o">Thêm ảnh</div></div>
+          </div>
+          <div class="w-bx tint"><span class="lv r">AI soạn từ ghi chú</span><span class="w-b">Vì sao mình chọn</span><span>Chịu được chăn mùa đông mà không võng. Gấp lại dày 6 cm, dựng sau cửa. <span class="w-n">2</span></span><span class="w-b">Sửa lời →</span></div>
+          <div class="w-row"><div class="w-bt o">Loại, ghi lý do <span class="w-n">3</span></div><div class="w-bt s">Đóng dấu Đã chọn</div></div>
+          <div class="w-bx"><div class="w-row"><div class="im sq w-th"></div><div class="w-col grow"><span class="w-b">Khăn tắm cho bé, mẫu 4</span><span class="w-s">Ngày thử thứ 12 trong 14</span><div class="w-pb" style="--p:86%"><i></i></div></div></div></div>
+        </div>
+        <div class="ph-nav"><span>Hôm nay</span><span>Săn hàng</span><span class="on">Bàn chọn</span><span>Nội dung</span><span>Khách</span></div>
+      </div>
+      <ol class="notes">
+        <li>Chị nói vài câu trong lúc dùng, AI chép và xếp vào đúng món.</li>
+        <li>Lời giới thiệu trên website được soạn từ chính ghi chú này.</li>
+        <li>Lý do loại cũng được lưu để hiện ở trang Hồ sơ chọn.</li>
+      </ol>
+    </figure>
+
+    <figure class="wf">
+      <figcaption><b>Xưởng nội dung</b><span>Một sản phẩm, mỗi kênh một bản. Chị duyệt từng bản hoặc yêu cầu viết lại.</span></figcaption>
+      <div class="ph">
+        <div class="ph-top"><span>←</span><span>Bình giữ nhiệt 480 ml</span><span class="w-s">3/5 đã duyệt</span></div>
+        <div class="ph-body">
+          <div class="w-chips"><span class="w-chip ok">Web ✓</span><span class="w-chip on">Facebook</span><span class="w-chip ok">Instagram ✓</span><span class="w-chip">TikTok</span><span class="w-chip ok">Zalo ✓</span></div>
+          <div class="w-bx"><div class="im wd"><span>Ảnh chị chụp, AI cân sáng</span></div><span>Mình thử 5 chiếc bình trong 3 tuần. Chiếc này ở lại vì sáng pha trà, 5 giờ chiều vẫn còn nóng. Nắp tháo rời nên rửa xong không còn mùi… <span class="w-n">1</span></span><span class="w-s">Đợt 12 mở tới 28/11 · link về trang sản phẩm</span></div>
+          <div class="w-chips"><span class="w-chip ok">✓ Đúng số liệu trong hồ sơ</span><span class="w-chip ok">✓ Không nói quá công dụng <span class="w-n">2</span></span></div>
+          <span class="w-s">VIẾT LẠI NHANH <span class="w-n">3</span></span>
+          <div class="w-chips"><span class="w-chip">Ngắn hơn</span><span class="w-chip">Ấm hơn</span><span class="w-chip">Thêm giá</span><span class="w-chip">● Nói ý của chị</span></div>
+          <span class="w-s">TikTok: AI dựng video 24 giây từ 4 clip chị quay, chờ chị xem.</span>
+        </div>
+        <div class="ph-cta"><div class="w-row"><div class="w-bt o">Sửa tay</div><div class="w-bt s">Duyệt, xếp lịch</div></div></div>
+      </div>
+      <ol class="notes">
+        <li>Giọng viết học từ bài cũ và ghi âm của chị.</li>
+        <li>Hai bước soát tự động trước khi tới tay chị.</li>
+        <li>Không cần gõ: bấm một nút hoặc nói ý muốn sửa.</li>
+      </ol>
+    </figure>
+
+    <figure class="wf">
+      <figcaption><b>Lịch đăng</b><span>AI xếp lịch tuần, chị kéo đổi chỗ.</span></figcaption>
+      <div class="ph">
+        <div class="ph-top"><span>Lịch đăng</span><span class="w-s">Tuần 48</span></div>
+        <div class="ph-body">
+          <div class="w-chips"><span class="w-chip ok">Đã đăng</span><span class="w-chip on">Đã duyệt, chờ giờ</span><span class="w-chip">Chờ chị duyệt</span></div>
+          <div class="w-row top"><span class="w-b" style="width:34px">T2</span><div class="w-col grow"><span class="w-chip ok">20:00 Facebook · 3 tuần thử bình</span></div></div>
+          <div class="w-row top"><span class="w-b" style="width:34px">T3</span><div class="w-col grow"><span class="w-chip ok">12:00 Instagram · 6 ảnh</span></div></div>
+          <div class="w-row top"><span class="w-b" style="width:34px">T4</span><div class="w-col grow"><span class="w-chip on">19:30 Nhóm Zalo · mở Đợt 12</span><span class="w-chip">TikTok · bản nháp chờ chị đăng <span class="w-n">1</span></span></div></div>
+          <div class="w-row top"><span class="w-b" style="width:34px">T5</span><div class="w-col grow"><span class="w-s">Trống. AI gợi ý: bài hỏi đáp về hộp cơm <span class="w-n">2</span></span></div></div>
+          <div class="w-row top"><span class="w-b" style="width:34px">T6</span><div class="w-col grow"><span class="w-chip on">20:00 Facebook · hồ sơ chọn khăn tắm</span></div></div>
+          <div class="w-row top"><span class="w-b" style="width:34px">T7</span><div class="w-col grow"><span class="w-chip">11:00 Instagram · video ngắn</span></div></div>
+          <div class="w-row top"><span class="w-b" style="width:34px">CN</span><div class="w-col grow"><span class="w-s">Nghỉ</span></div></div>
+          <span class="w-s">Giờ đăng chọn theo lúc khách của chị hay xem. <span class="w-n">3</span></span>
+        </div>
+        <div class="ph-nav"><span>Hôm nay</span><span>Săn hàng</span><span>Bàn chọn</span><span class="on">Nội dung</span><span>Khách</span></div>
+      </div>
+      <ol class="notes">
+        <li>TikTok chỉ cho ứng dụng chưa được duyệt đăng riêng tư, nên hệ thống đẩy bản nháp vào app để chị bấm đăng.</li>
+        <li>AI đề xuất bài lấp chỗ trống, chị gật thì mới soạn.</li>
+        <li>Giai đoạn đầu dùng giờ mặc định, sau đó học từ số liệu.</li>
+      </ol>
+    </figure>
+
+    <figure class="wf">
+      <figcaption><b>Hộp thư gộp</b><span>Bình luận và tin nhắn mọi kênh ở một chỗ, AI soạn sẵn.</span></figcaption>
+      <div class="ph">
+        <div class="ph-top"><span>Hộp thư</span><span class="w-s">4 chờ chị</span></div>
+        <div class="ph-body">
+          <div class="w-chips"><span class="w-chip on">Chờ chị 4</span><span class="w-chip">AI đã trả lời 14</span><span class="w-chip">Tất cả</span></div>
+          <div class="w-bx"><div class="w-row w-sp"><span><span class="w-chip">Facebook</span> <span class="w-b">Thu Hà</span></span><span class="w-s">10 phút</span></div><span>Bình này cho bé 3 tuổi dùng được không chị?</span>
+            <div class="w-bx tint"><span class="lv r">AI soạn</span><span>Dạ được chị ạ. Bình không có ống hút nên bé cần người lớn rót giúp, và nước nóng thì nên để nguội bớt… <span class="w-n">1</span></span></div>
+            <div class="w-row"><div class="w-bt o">Sửa</div><div class="w-bt">Gửi</div></div></div>
+          <div class="w-bx sl"><div class="w-row w-sp"><span><span class="w-chip">Zalo</span> <span class="w-b">anh Minh</span></span><span class="w-s">32 phút</span></div><span>Đơn HC-1231 mình nhận bị móp nắp.</span>
+            <span class="lv h">Khiếu nại · AI không tự trả lời <span class="w-n">2</span></span>
+            <span class="w-s">AI đề xuất: gửi nắp thay miễn phí, hoặc hoàn 50.000đ.</span>
+            <div class="w-row"><div class="w-bt o">Hoàn tiền</div><div class="w-bt">Gửi nắp thay</div></div></div>
+          <div class="w-bx"><div class="w-row w-sp"><span><span class="w-chip">Instagram</span> <span class="w-b">Ngọc</span></span><span class="w-s">1 giờ</span></div><span>Còn màu xanh không shop?</span><span class="lv a">AI đã trả lời · còn 12 chiếc <span class="w-n">3</span></span></div>
+        </div>
+        <div class="ph-nav"><span>Hôm nay</span><span>Săn hàng</span><span>Bàn chọn</span><span>Nội dung</span><span class="on">Khách</span></div>
+      </div>
+      <ol class="notes">
+        <li>Câu về cách dùng: AI soạn, chị bấm Gửi.</li>
+        <li>Khiếu nại: AI chỉ đưa phương án, chị chọn.</li>
+        <li>Câu về giá, tồn kho: AI trả lời ngay và ghi vào nhật ký.</li>
+      </ol>
+    </figure>
+
+    <figure class="wf">
+      <figcaption><b>Đơn hàng và đợt gom</b><span>Đợt đang mở, đơn theo trạng thái, lô hàng đang về.</span></figcaption>
+      <div class="ph">
+        <div class="ph-top"><span>Đơn hàng</span><span class="w-s">9 đơn mới</span></div>
+        <div class="ph-body">
+          <div class="w-bx sl"><div class="w-row w-sp"><span class="w-b">Đợt 12 · đang mở</span><span>còn 2 ngày</span></div><div class="w-pb" style="--p:72%"><i></i></div><div class="w-kv"><span>86/120 suất</span><span>33,1 triệu</span></div><span class="w-s">Khi chốt: đặt 4 món ở 2 nhà cung cấp, AI đã soạn đơn. <span class="w-n">1</span></span><div class="w-bt o">Chốt đợt sớm</div></div>
+          <div class="w-chips"><span class="w-chip on">Chờ thanh toán 3</span><span class="w-chip">Chờ hàng về 86</span><span class="w-chip">Đang giao 12</span><span class="w-chip">Xong</span></div>
+          <div class="w-bx"><div class="w-kv"><span class="w-b">HC-1250 · Lan</span><span>407.000đ</span></div><span class="w-s">Chờ chuyển khoản · 12 phút <span class="w-n">2</span></span></div>
+          <div class="w-bx"><div class="w-kv"><span class="w-b">HC-1249 · Tùng</span><span>245.000đ</span></div><span class="w-s">Trả tiền khi nhận hàng</span></div>
+          <span class="w-s">HÀNG ĐANG VỀ <span class="w-n">3</span></span>
+          <div class="w-bx"><span class="w-b">Lô Osaka · Đợt 11</span><span class="w-s">Rời kho 04/12 · về Hà Nội khoảng 10/12</span></div>
+          <div class="w-bx"><span class="w-b">Lô Quảng Châu · Đợt 11</span><span class="w-s">Đang thông quan</span></div>
+        </div>
+        <div class="ph-nav"><span>Hôm nay</span><span>Săn hàng</span><span>Bàn chọn</span><span>Nội dung</span><span class="on">Khách</span></div>
+      </div>
+      <ol class="notes">
+        <li>Hết đợt, AI cộng số lượng và soạn đơn đặt nguồn, chị duyệt.</li>
+        <li>Khoản chuyển tới được khớp tự động, quá hạn thì AI nhắc khách.</li>
+        <li>Mốc lô hàng tự đẩy sang trang Theo dõi đơn của khách.</li>
+      </ol>
+    </figure>
+
+    <figure class="wf">
+      <figcaption><b>AI được tự làm tới đâu</b><span>Chị đặt mức tự chủ cho từng loại việc và đổi lúc nào cũng được.</span></figcaption>
+      <div class="ph">
+        <div class="ph-top"><span>←</span><span>Mức tự chủ của AI</span><span></span></div>
+        <div class="ph-body">
+          <span class="w-s">Mặc định là thận trọng. <span class="w-n">1</span></span>
+          <div class="w-col"><span class="w-b">Trả lời giá, còn hàng, phí giao</span><div class="w-seg"><span class="on">Tự làm</span><span>Hỏi chị</span><span>Tắt</span></div></div>
+          <div class="w-col"><span class="w-b">Đăng bài chị đã duyệt theo lịch</span><div class="w-seg"><span class="on">Tự làm</span><span>Hỏi chị</span><span>Tắt</span></div></div>
+          <div class="w-col"><span class="w-b">Soạn và đăng bài mới</span><div class="w-seg"><span>Tự làm</span><span class="on">Hỏi chị</span><span>Tắt</span></div></div>
+          <div class="w-col"><span class="w-b">Đề xuất giá bán</span><div class="w-seg"><span>Tự làm</span><span class="on">Hỏi chị</span><span>Tắt</span></div></div>
+          <div class="w-col"><span class="w-b">Nhắn nhắc khách mua lại</span><div class="w-seg"><span>Tự làm</span><span class="on">Hỏi chị</span><span>Tắt</span></div></div>
+          <div class="w-hr"></div>
+          <div class="w-col"><span class="w-b">Khiếu nại, đổi trả, hoàn tiền</span><span class="lv h">Luôn hỏi chị <span class="w-n">2</span></span></div>
+          <div class="w-col"><span class="w-b">Đặt hàng và trả tiền nhà cung cấp</span><span class="lv h">Luôn hỏi chị</span></div>
+          <div class="w-bx tint"><span class="w-b">Trần chi phí AI: 5 triệu đồng mỗi tháng</span><span class="w-s">Tháng này đã dùng 2,3 triệu. Chạm trần thì AI dừng và hỏi chị. <span class="w-n">3</span></span></div>
+        </div>
+      </div>
+      <ol class="notes">
+        <li>Việc nào AI làm ổn vài tuần, hệ thống gợi ý chị nới.</li>
+        <li>Hai nhóm việc khoá cứng, không cho AI tự làm.</li>
+        <li>Chi phí AI có trần để không bị bất ngờ.</li>
+      </ol>
+    </figure>
+
+    <figure class="wf">
+      <figcaption><b>Báo cáo tuần</b><span>Bốn con số, món nào và bài nào ra đơn, AI rút ra điều gì.</span></figcaption>
+      <div class="ph">
+        <div class="ph-top"><span>Tuần 48</span><span class="w-s">24–30/11</span></div>
+        <div class="ph-body">
+          <div class="w-g2">
+            <div class="w-bx"><span class="w-big">28,4 tr</span><span class="w-s">doanh thu</span></div>
+            <div class="w-bx"><span class="w-big">9,7 tr</span><span class="w-s">lãi gộp · 34%</span></div>
+            <div class="w-bx"><span class="w-big">41%</span><span class="w-s">đơn từ khách cũ <span class="w-n">1</span></span></div>
+            <div class="w-bx"><span class="w-big">620k</span><span class="w-s">chi phí AI</span></div>
+          </div>
+          <div class="w-bx"><span class="w-b">Món ra đơn nhiều nhất</span><div class="w-kv"><span>Bình giữ nhiệt 480 ml</span><span>34 đơn</span></div><div class="w-kv"><span>Hộp cơm inox 3 ngăn</span><span>21 đơn</span></div><div class="w-kv"><span>Khăn tắm cho bé</span><span>17 đơn</span></div></div>
+          <div class="w-bx"><span class="w-b">Bài kéo đơn nhiều nhất</span><span>«3 tuần thử 5 chiếc bình» · Facebook · 19 đơn</span></div>
+          <div class="w-bx tint"><span class="lv a">AI rút ra</span><span>Bài kể chuyện thử hàng ra đơn gấp 3 bài chỉ có ảnh và giá. Tuần tới nên có 2 bài kiểu này. <span class="w-n">2</span></span></div>
+          <span class="w-s">Tuần này chị dành 3 giờ 10 phút cho việc duyệt. <span class="w-n">3</span></span>
+        </div>
+        <div class="ph-nav"><span class="on">Hôm nay</span><span>Săn hàng</span><span>Bàn chọn</span><span>Nội dung</span><span>Khách</span></div>
+      </div>
+      <ol class="notes">
+        <li>Tỉ lệ mua lại là thước đo chính của cộng đồng.</li>
+        <li>Nhận xét của AI dẫn thẳng tới gợi ý cho lịch đăng tuần sau.</li>
+        <li>Hệ thống đo luôn thời gian của chị để biết đã đỡ việc chưa.</li>
+      </ol>
+    </figure>
+  </div>
+</section>
+</div>
+<a class="next" href="#can-chot"><span>Phần tiếp theo</span><b>4 · Cần chốt →</b></a>
+</div>
+
+<!-- ============ PHẦN 4 ============ -->
+<div class="view" id="v-can-chot" hidden>
+
+<header class="part-h">
+  <p class="eyebrow">Phần 4 / 4</p>
+  <h2 class="part-t">Việc cần chốt</h2>
+  <p class="part-d">Bảy quyết định mở, lộ trình, chi phí và rủi ro. Bấm để chọn, lựa chọn được lưu lại.</p>
+</header>
+
+<section class="sec" id="s-lua-chon" data-spy>
+  <h2><span class="num">4.1</span>Lựa chọn hiện tại</h2>
+  <div class="sum">
+    <ul id="sum-list"></ul>
+    <p class="tally" id="sum-feat"></p>
+  </div>
+</section>
+
+<section class="sec" id="s-bay-viec" data-spy>
+  <h2><span class="num">4.2</span>Bảy việc cần anh chị chốt</h2>
+  <p class="intro">Mỗi câu có một phương án em đề xuất kèm lý do. Bấm để chọn, bấm lần nữa để bỏ chọn.</p>
+  <div class="qs">
+
+    <div class="q">
+      <h3>Bắt đầu với nhóm hàng nào?</h3>
+      <p>Nhóm hàng quyết định giấy tờ và cách vận chuyển. Mỹ phẩm nhập khẩu cần số tiếp nhận phiếu công bố, thực phẩm cần tự công bố, hàng có pin và chất lỏng bị hạn chế khi vận chuyển.</p>
+      <div class="opts" data-pick="q1" data-title="Nhóm hàng khởi đầu">
+        <button type="button" class="opt" id="q1-a" data-v="a" aria-pressed="false"><em>Em đề xuất</em><b>Gia dụng nhỏ, đồ tiện ích không điện</b><span>Ít giấy tờ, dễ vận chuyển, dễ chụp và dùng thử.</span></button>
+        <button type="button" class="opt" id="q1-b" data-v="b" aria-pressed="false"><b>Đồ bàn làm việc, văn phòng phẩm</b><span>Nhẹ, cước thấp, hợp hàng Nhật.</span></button>
+        <button type="button" class="opt" id="q1-c" data-v="c" aria-pressed="false"><b>Đồ cho mẹ và bé</b><span>Nhu cầu lớn, khách kỹ tính. Phải kiểm an toàn kỹ hơn.</span></button>
+        <button type="button" class="opt" id="q1-d" data-v="d" aria-pressed="false"><b>Mỹ phẩm, chăm sóc cá nhân</b><span>Biên cao nhưng phải công bố từng sản phẩm.</span></button>
+      </div>
+    </div>
+
+    <div class="q">
+      <h3>Giữ hàng theo cách nào?</h3>
+      <p>Cách giữ hàng quyết định số vốn cần có và thời gian khách phải chờ.</p>
+      <div class="opts" data-pick="q2" data-title="Cách giữ hàng">
+        <button type="button" class="opt" id="q2-a" data-v="a" aria-pressed="false"><em>Em đề xuất</em><b>Gom đơn theo đợt, giữ sẵn vài món bán chạy</b><span>Vốn thấp. Khách phải chờ hàng về.</span></button>
+        <button type="button" class="opt" id="q2-b" data-v="b" aria-pressed="false"><b>Nhập sẵn rồi bán</b><span>Giao nhanh. Cần vốn, chỗ để hàng, chịu rủi ro tồn.</span></button>
+        <button type="button" class="opt" id="q2-c" data-v="c" aria-pressed="false"><b>Nhà cung cấp gửi thẳng cho khách</b><span>Không cần vốn. Chị không kiểm được từng món.</span></button>
+      </div>
+    </div>
+
+    <div class="q">
+      <h3>Website dựng trên nền nào?</h3>
+      <p>Phần khác biệt của Hàng Chọn (hồ sơ chọn, đợt gom đơn, hàng chờ duyệt của AI) không nền tảng nào có sẵn. Phần bán hàng cơ bản thì nền tảng nào cũng có. Với một người bán, lõi bán hàng khá nhỏ: giỏ hàng, mã QR chuyển khoản, trả tiền khi nhận, tạo vận đơn.</p>
+      <div class="opts" data-pick="q3" data-title="Nền tảng website">
+        <button type="button" class="opt" id="q3-a" data-v="a" aria-pressed="false"><em>Em đề xuất</em><b>Tự xây gọn</b><span>Next.js, FastAPI, Postgres: bộ công nghệ anh đã quen. Tự do về giao diện và AI. Phải tự làm giỏ hàng, thanh toán, vận đơn.</span></button>
+        <button type="button" class="opt" id="q3-b" data-v="b" aria-pressed="false"><b>Medusa mã nguồn mở, giao diện riêng</b><span>Có sẵn lõi đơn hàng, khuyến mãi. Vẫn phải tự nối thanh toán và vận chuyển Việt Nam, thêm một hệ thống phải học.</span></button>
+        <button type="button" class="opt" id="q3-c" data-v="c" aria-pressed="false"><b>Haravan hoặc Shopify, thêm lớp AI riêng</b><span>Ra mắt nhanh nhất. Giao diện kiểu hồ sơ chọn bị giới hạn, trả phí hằng tháng.</span></button>
+      </div>
+    </div>
+
+    <div class="q">
+      <h3>Mở kênh mạng xã hội nào trước?</h3>
+      <p>Facebook, Instagram và Threads cho đăng tự động bằng chính tài khoản của chị. TikTok chỉ cho ứng dụng chưa được duyệt đăng ở chế độ riêng tư, nên lúc đầu hệ thống đẩy bản nháp và chị bấm đăng. Zalo chỉ mở API ở gói trả phí.</p>
+      <div class="opts" data-pick="q4" data-title="Kênh mở đầu">
+        <button type="button" class="opt" id="q4-a" data-v="a" aria-pressed="false"><em>Em đề xuất</em><b>Facebook và Instagram, nhóm Zalo cho khách quen</b><span>Tự động hoá được ngay. TikTok đăng tay từ bản nháp AI dựng.</span></button>
+        <button type="button" class="opt" id="q4-b" data-v="b" aria-pressed="false"><b>TikTok là chính</b><span>Kênh tăng nhanh nhất. Cần video đều và chị lên hình nhiều.</span></button>
+        <button type="button" class="opt" id="q4-c" data-v="c" aria-pressed="false"><b>Cả năm kênh cùng lúc</b><span>Phủ rộng. Nhiều việc duyệt hơn, nhiều tài khoản phải xin quyền.</span></button>
+      </div>
+    </div>
+
+    <div class="q">
+      <h3>Ban đầu AI được tự làm tới đâu?</h3>
+      <p>Theo Luật Quảng cáo sửa đổi, người đăng chịu trách nhiệm về nội dung. Mức tự chủ đổi được bất cứ lúc nào trong màn hình cài đặt.</p>
+      <div class="opts" data-pick="q5" data-title="Mức tự chủ của AI">
+        <button type="button" class="opt" id="q5-a" data-v="a" aria-pressed="false"><em>Em đề xuất</em><b>Thận trọng</b><span>Việc nội bộ AI tự làm. Mọi thứ khách nhìn thấy đều chờ chị duyệt. Nới dần sau một hai tháng.</span></button>
+        <button type="button" class="opt" id="q5-b" data-v="b" aria-pressed="false"><b>Cân bằng</b><span>AI tự trả lời câu thường gặp và tự đăng bài theo mẫu đã duyệt.</span></button>
+        <button type="button" class="opt" id="q5-c" data-v="c" aria-pressed="false"><b>Rộng tay</b><span>AI tự làm hầu hết, chị xem báo cáo. Có rủi ro nói sai với khách.</span></button>
+      </div>
+    </div>
+
+    <div class="q">
+      <h3>Đăng ký kinh doanh lúc nào?</h3>
+      <p>Cổng thanh toán, quyền API của TikTok Shop và Shopee, hoá đơn đầu vào khi nhập chính ngạch thường yêu cầu hộ kinh doanh hoặc công ty. Điều kiện cụ thể cho cá nhân em chưa kiểm chứng được; anh chị nên hỏi kế toán.</p>
+      <div class="opts" data-pick="q6" data-title="Đăng ký kinh doanh">
+        <button type="button" class="opt" id="q6-a" data-v="a" aria-pressed="false"><em>Em đề xuất</em><b>Đăng ký hộ kinh doanh từ đầu</b><span>Mở được cổng thanh toán và API sàn, có tư cách nhập hàng có chứng từ.</span></button>
+        <button type="button" class="opt" id="q6-b" data-v="b" aria-pressed="false"><b>Bán thử dưới tên cá nhân, đăng ký sau</b><span>Nhanh. Chỉ nhận chuyển khoản và trả tiền khi nhận, vài tích hợp chưa dùng được.</span></button>
+      </div>
+    </div>
+
+    <div class="q">
+      <h3>Chị xuất hiện tới đâu?</h3>
+      <p>Mô hình này bán niềm tin vào một người chọn có thật. Khách cần thấy có người thật đứng sau; mức độ thì do chị quyết.</p>
+      <div class="opts" data-pick="q7" data-title="Mức độ lộ diện">
+        <button type="button" class="opt" id="q7-a" data-v="a" aria-pressed="false"><em>Em đề xuất để bắt đầu</em><b>Tên, giọng nói và bàn tay</b><span>Không lộ mặt. Video quay cảnh dùng thử, chị thuyết minh.</span></button>
+        <button type="button" class="opt" id="q7-b" data-v="b" aria-pressed="false"><b>Lên hình, có livestream</b><span>Niềm tin cao nhất, tốn thời gian nhất.</span></button>
+        <button type="button" class="opt" id="q7-c" data-v="c" aria-pressed="false"><b>Chỉ có tên thương hiệu</b><span>Riêng tư nhất. Lời hứa về người chọn yếu đi.</span></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="s-lo-trinh" data-spy>
+  <h2><span class="num">4.3</span>Lộ trình ba giai đoạn</h2>
+  <p class="intro">Thời lượng là ước lượng của em, phụ thuộc thời gian anh dành cho việc này.</p>
+  <div class="phases">
+    <div class="phase">
+      <h3>GĐ1 · Chọn và bán được</h3>
+      <p>Khoảng 6–8 tuần làm tập trung</p>
+      <ul>
+        <li>Săn hàng: ra đề bằng lời, dán link, tìm bằng ảnh</li>
+        <li>Hồ sơ thẩm định, khung chấm điểm, giá vốn về tay</li>
+        <li>Bàn chọn và nhật ký thử hàng bằng giọng nói</li>
+        <li>Website: hồ sơ chọn, đợt gom đơn, mã QR và trả tiền khi nhận, tạo vận đơn</li>
+        <li>Xưởng nội dung và lịch đăng cho Facebook, Instagram</li>
+        <li>Hộp thư gộp, màn hình Hôm nay, mức tự chủ, nhật ký AI</li>
+        <li>Sổ doanh thu, chứng từ nguồn gốc</li>
+      </ul>
+    </div>
+    <div class="phase">
+      <h3>GĐ2 · Bớt việc tay</h3>
+      <p>Khoảng 6–8 tuần tiếp theo</p>
+      <ul>
+        <li>Radar xu hướng, nghe khách muốn gì</li>
+        <li>Trợ lý hỏi đáp trên web, đánh giá có ảnh, trang Nhờ chị tìm</li>
+        <li>Dựng video ngắn từ clip của chị</li>
+        <li>Zalo: nhóm khách quen, tin báo mốc đơn</li>
+        <li>Nhắn hỏi nhà cung cấp, theo dõi lô hàng</li>
+        <li>Báo cáo tuần, AI đo và học từ bài đăng</li>
+      </ul>
+    </div>
+    <div class="phase">
+      <h3>GĐ3 · Mở rộng</h3>
+      <p>Khi đã có khách quay lại đều</p>
+      <ul>
+        <li>Bán trên TikTok Shop, Shopee</li>
+        <li>AI học gu chị để xếp hạng ứng viên</li>
+        <li>Giới thiệu bạn, mời khách quen thử hàng cùng</li>
+        <li>Kịch bản livestream</li>
+        <li>Hoá đơn điện tử</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="s-chi-phi" data-spy>
+  <h2><span class="num">4.4</span>Chi phí vận hành mỗi tháng</h2>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Khoản</th><th>Ước lượng</th><th>Ghi chú</th></tr></thead>
+      <tbody>
+        <tr><td>AI: chữ, ảnh, video, hội thoại</td><td>100–250 USD</td><td>Cho khoảng 100 sản phẩm, 60 bài đăng, 1.000 hội thoại. Tính từ bảng giá do bên thứ ba tổng hợp <span class="cf">cần tính lại</span></td></tr>
+        <tr><td>Dữ liệu xu hướng TikTok Shop</td><td>49–99 USD</td><td>FastMoss hoặc Kalodata. Không bắt buộc ở GĐ1</td></tr>
+        <tr><td>Zalo OA có API</td><td>Khoảng 2,5 triệu đồng mỗi năm</td><td>Gói Tăng trưởng, theo blog bên thứ ba <span class="cf">cần xác minh</span></td></tr>
+        <tr><td>Máy chủ, tên miền, lưu trữ</td><td>Vài trăm nghìn đồng</td><td>Một máy chủ nhỏ là đủ cho giai đoạn đầu (ước lượng của em)</td></tr>
+        <tr><td>Khớp chuyển khoản, phí giao hàng</td><td>Theo giao dịch</td><td>Cần lấy báo giá của SePay, GHN, GHTK</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="sec" id="s-ky-thuat" data-spy>
+  <h2><span class="num">4.5</span>Thành phần kỹ thuật</h2>
+  <div class="prose">
+    <ul>
+      <li><b>Website và bàn làm việc:</b> Next.js, ưu tiên điện thoại; bàn làm việc cài được lên màn hình chính như một ứng dụng.</li>
+      <li><b>Máy chủ:</b> FastAPI, Postgres, hàng đợi tác vụ nền cho các việc AI chạy lâu.</li>
+      <li><b>Tác tử AI:</b> mỗi nhóm việc một tác tử (săn hàng, thẩm định, nội dung, chăm khách, đơn hàng) dùng Claude. Model nhỏ cho việc lặp, model lớn cho thẩm định và viết. Mọi kết quả đi qua hàng chờ duyệt theo mức tự chủ chị đặt.</li>
+      <li><b>Đăng bài và hộp thư:</b> API chính thức của Meta cho Facebook, Instagram, Threads; Zalo OA; TikTok ở chế độ đẩy bản nháp.</li>
+      <li><b>Thanh toán và giao hàng:</b> khớp chuyển khoản qua webhook ngân hàng (SePay hoặc tương đương); GHN, GHTK có API tạo đơn và báo trạng thái.</li>
+      <li><b>Dữ liệu nguồn hàng:</b> phần khó nhất. 1688 và Taobao không mở dữ liệu dễ dàng cho cá nhân, nên cần thử ba đường: API chính thức, dịch vụ API bên thứ ba, hoặc để AI đọc trang mà chị đang mở.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="sec" id="s-rui-ro" data-spy>
+  <h2><span class="num">4.6</span>Rủi ro chính</h2>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Rủi ro</th><th>Cách giảm</th></tr></thead>
+      <tbody>
+        <tr><td>Tài khoản mạng xã hội bị hạn chế vì tự động hoá</td><td>Chỉ dùng API chính thức, đăng dưới hạn mức, tin nhắn do AI soạn và chị gửi</td></tr>
+        <tr><td>Không lấy được dữ liệu ổn định từ 1688, Taobao</td><td>GĐ1 dựa vào dán link và tìm bằng ảnh; quét tự động là phần thử nghiệm</td></tr>
+        <tr><td>AI viết sai công dụng, chị chịu trách nhiệm pháp lý</td><td>Bước soát lời quảng cáo tự động, sau đó chị duyệt mọi bài mới</td></tr>
+        <tr><td>Hàng nhập thiếu chứng từ</td><td>Lưu chứng từ theo lô ngay từ đơn đầu tiên; ưu tiên đường nhập có hoá đơn</td></tr>
+        <tr><td>Mọi thứ phụ thuộc một người</td><td>Chế độ tạm nghỉ: AI báo khách lịch trả lời, dừng mở đợt mới</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <h3>Cần xác minh trước khi bắt tay làm</h3>
+  <div class="prose">
+    <ul>
+      <li>Ngưỡng doanh thu chịu thuế và mốc bắt buộc hoá đơn điện tử cho hộ kinh doanh năm 2026 (các nguồn ghi 500 triệu rồi 1 tỷ đồng mỗi năm).</li>
+      <li>Cá nhân hoặc hộ kinh doanh có được cấp API của TikTok Shop, Shopee và cổng thanh toán hay không.</li>
+      <li>Báo giá cước từ Trung Quốc và Nhật về, theo đường có chứng từ.</li>
+      <li>Điều khoản dùng dữ liệu của 1688 và các dịch vụ API bên thứ ba.</li>
+      <li>Thời gian TikTok duyệt ứng dụng đăng bài.</li>
+    </ul>
+  </div>
+</section>
+</div>
+
+<p class="foot">Anh chị bấm chọn ngay trên trang, hoặc dùng chế độ bình luận của trang để ghi ý kiến vào đúng chỗ. Bước tiếp theo em sẽ dựa trên các lựa chọn này để dựng bản thiết kế chi tiết cho giai đoạn 1.</p>
+</main>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------- Dữ liệu: nguồn tham khảo ---------- */
+var SRC = [
+  ["Jiemian: mua thủ Tiểu Hồng Thư","https://www.jiemian.com/article/10370088.html"],
+  ["36Kr: mua thủ 2025","https://eu.36kr.com/en/p/3601870266811651"],
+  ["TMTPost: Tiểu Hồng Thư đóng mảng tự bán","https://www.tmtpost.com/6548353.html"],
+  ["QQ News: trưởng nhóm Kuaituantuan","https://news.qq.com/rain/a/20251124A04ZDH00"],
+  ["Huxiu: miền riêng 2025","https://m.huxiu.com/aibrief/11171.html"],
+  ["TMTPost: người số của JD","https://www.tmtpost.com/8036757.html"],
+  ["Impress: khảo sát chủ shop BASE","https://netshop.impress.co.jp/n/2025/11/27/15193"],
+  ["Axios: creator commerce 2026","https://www.axios.com/2026/09/25/creator-commerce-ai-ltk-con"],
+  ["Puck: ShopMy và LTK","https://puck.news/fashion/2026/1/affiliate-data-wars-how-shopmy-forced-ltk-to-open-up"],
+  ["OpenAI: Instant Checkout","https://openai.com/index/buy-it-in-chatgpt/"],
+  ["Digital Commerce 360: Shopify và ChatGPT","https://www.digitalcommerce360.com/2026/03/17/shopify-integration-with-chatgpt-changes/"],
+  ["Google: Universal Commerce Protocol","https://developers.google.com/merchant/ucp"],
+  ["Shopify: agentic commerce","https://shopify.com/news/agentic-commerce-momentum"],
+  ["PPC Land: Amazon Rufus","https://ppc.land/amazons-ai-shopping-assistant-drove-12-billion-in-sales-for-2025/"],
+  ["Digital Commerce 360: Alibaba Accio","https://www.digitalcommerce360.com/2026/07/24/alibaba-accio-work-agentic-ai-b2b-sourcing/"],
+  ["Meta: Business Agent","https://about.fb.com/news/2026/06/meta-business-agent/"],
+  ["Retail CX: khảo sát Baymard","https://www.retailcustomerexperience.com/news/most-online-shoppers-want-a-human-not-a-chatbot-when-needing-help/"],
+  ["Fortune: công ty một người","https://fortune.com/2026/05/18/solo-founders-ai-automation-entire-teams-entrepreneurs/"],
+  ["Ecomobi: TMĐT Việt Nam 2025","https://ecomobi.com/vi/bao-cao-thuong-mai-dien-tu-viet-nam-2025/"],
+  ["VnExpress: thị phần Shopee, TikTok Shop","https://e.vnexpress.net/news/business/data-speaks/tiktok-shop-zooms-up-to-narrow-gap-with-ecommerce-leader-shopee-4918958.html"],
+  ["TGM Research: hành vi mua 2025","https://tgmresearch.com/vietnam-ecommerce-trends-2025.html"],
+  ["The Investor: 80.000 shop không có đơn","https://theinvestor.vn/over-80000-online-shops-in-vietnam-record-no-orders-in-h1-d16481.html"],
+  ["ReferralCandy: giới thiệu bạn","https://www.referralcandy.com/blog/referral-program-benchmarks-whats-a-good-conversion-rate-in-2025"],
+  ["EY: Quyết định 01/2025/QĐ-TTg","https://www.ey.com/content/dam/ey-unified-site/ey-com/vi-vn/technical/tax/documents/customs-global-trade-alert-march-2025-repeal-of-the-threshold.pdf"],
+  ["Thư viện pháp luật: Luật Quảng cáo sửa đổi","https://thuvienphapluat.vn/van-ban/Thuong-mai/Luat-Quang-cao-sua-doi-2025-so-75-2025-QH15-555035.aspx"],
+  ["Thư viện pháp luật: Luật TMĐT 2025","https://thuvienphapluat.vn/van-ban/Thuong-mai/Luat-Thuong-mai-dien-tu-2025-so-122-2025-QH15-662035.aspx"],
+  ["LuatVietnam: gắn nhãn nội dung AI","https://english.luatvietnam.vn/legal-updates/ai-generated-images-and-videos-must-be-labelled-starting-march-1-2026-892-107386-article.html"],
+  ["VCCI: dự thảo ngưỡng miễn thuế","https://vcci.com.vn/tin-tuc/de-xuat-giam-manh-nguong-mien-thue-hang-hoa-gia-tri-nho"],
+  ["Meta: Instagram Content Publishing","https://developers.facebook.com/documentation/instagram-platform/content-publishing"],
+  ["TikTok: Content Sharing Guidelines","https://developers.tiktok.com/docs/en/content-sharing-guidelines"],
+  ["Quasa: gói Zalo OA 2026","https://quasa.io/vi/media/chon-goi-zalo-oa-the-nao-khi-api-chi-mo-tu-tang-truong"],
+  ["SePay: tài liệu webhook","https://developer.sepay.vn/en"],
+  ["GHN: tài liệu API","https://developer.ghn.vn/en/docs/getting-started/overview"]
+];
+var srcEl = document.getElementById("srcs");
+SRC.forEach(function(s){
+  var li = document.createElement("li"), a = document.createElement("a");
+  a.href = s[1]; a.target = "_blank"; a.rel = "noopener"; a.textContent = s[0];
+  li.appendChild(a); srcEl.appendChild(li);
+});
+
+/* ---------- Dữ liệu: danh mục chức năng ----------
+   [mã, tên, mô tả, mức (a = AI tự làm, r = AI làm chị duyệt, h = chị quyết), giai đoạn] */
+var MODS = [
+ {t:"Săn hàng", d:"Tìm sản phẩm theo đúng ý chị, từ nhiều nguồn, bằng nhiều thứ tiếng.", f:[
+  ["a1","Ra đề bằng lời","Chị nói hoặc gõ tiêu chí như đang dặn một người giúp việc. AI chuyển thành bộ lọc và cho chị xem nó hiểu thế nào.","h",1],
+  ["a2","Dán link, lấy hồ sơ","Dán link một sản phẩm bất kỳ. AI lấy giá, ảnh, thông số, đánh giá và dịch sang tiếng Việt.","a",1],
+  ["a3","Tìm bằng ảnh","Chị chụp một món thấy ngoài đời hoặc trên mạng. AI tìm đúng mẫu và các xưởng bán cùng mẫu.","a",1],
+  ["a4","Quét nhiều nguồn","AI tìm trên 1688, Taobao, Rakuten, Amazon Nhật bằng từ khoá đã dịch, gom về một danh sách ứng viên.","a",1],
+  ["a5","Radar xu hướng","Mỗi sáng AI báo vài món đang lên ở Tiểu Hồng Thư, @cosme, TikTok Shop Việt Nam, kèm lý do đáng xem.","a",2],
+  ["a6","Nghe khách muốn gì","AI gom câu hỏi và lời nhờ tìm của khách thành danh sách nhu cầu, xếp theo số người hỏi.","a",2],
+  ["a7","Săn theo lịch","Đề tìm kiếm đã lưu chạy lại hằng tuần, chỉ báo khi có ứng viên mới đạt ngưỡng.","a",3]
+ ]},
+ {t:"Thẩm định và so sánh", d:"Biến hàng trăm trang sản phẩm thành một hồ sơ chị đọc trong hai phút.", f:[
+  ["b1","Hồ sơ thẩm định","Một trang cho mỗi ứng viên: thông số, ảnh thật từ người mua, giá ở các nơi, điểm mạnh và yếu.","a",1],
+  ["b2","Đọc hộ đánh giá","AI đọc hàng trăm đánh giá tiếng Trung, tiếng Nhật, tóm tắt lời khen chê lặp lại, tách riêng đánh giá 1–2 sao.","a",1],
+  ["b3","Bảng so sánh cạnh nhau","Xếp 3–5 ứng viên cùng loại theo đúng các tiêu chí chị quan tâm.","a",1],
+  ["b4","Chấm điểm theo khung của chị","Bảy tiêu chí, trọng số chị đặt. AI chấm nháp và nêu căn cứ, chị sửa điểm.","r",1],
+  ["b5","Giá bán ở Việt Nam","AI tìm giá cùng món trên Shopee, TikTok Shop để biết còn chỗ cho mình không.","a",1],
+  ["b6","Kiểm an toàn và giấy tờ","Soát thành phần, chất liệu, hàng có pin hay chất lỏng, có thuộc nhóm phải công bố không.","r",2],
+  ["b7","Cảnh báo hàng nhái, đánh giá ảo","So ảnh và giá giữa các shop, phát hiện đánh giá bất thường.","a",2]
+ ]},
+ {t:"Bàn chọn", d:"Phần của chị. Hệ thống chỉ ghi lại và sắp xếp.", f:[
+  ["c1","Bảng chọn","Ứng viên, Mua mẫu, Đang thử, Đã chọn, Đã loại. Chị chuyển món qua từng cột.","h",1],
+  ["c2","Nhật ký thử hàng bằng giọng nói","Chị nói vài câu và chụp ảnh trong lúc dùng. AI chép lại và xếp vào đúng món.","h",1],
+  ["c3","Lý do chọn và điều chưa ưng","Từ ghi chú của chị, AI soạn hai đoạn này cho trang sản phẩm. Chị sửa lời.","r",1],
+  ["c4","Lý do loại","Ghi vì sao loại từng ứng viên. Thành dữ liệu cho trang Hồ sơ chọn.","h",1],
+  ["c5","Bộ nguyên tắc của chị","Lưu nguyên tắc chọn theo từng nhóm hàng để AI lọc từ đầu.","h",2],
+  ["c6","AI học gu chị","Sau mỗi lần chọn hoặc loại, AI chỉnh cách xếp hạng ứng viên cho giống mắt chị hơn.","a",3]
+ ]},
+ {t:"Nguồn cung và giá vốn", d:"Từ lúc hỏi giá tới lúc hàng về tới nhà.", f:[
+  ["d1","Sổ nhà cung cấp","Mỗi shop hoặc xưởng một hồ sơ: điểm uy tín, lịch sử đặt, tỉ lệ lỗi.","a",1],
+  ["d2","Tính giá vốn về tay","Giá gốc, tỷ giá, phí mua hộ, cước, thuế, hao hụt. Tự cập nhật khi tỷ giá hoặc cước đổi.","a",1],
+  ["d3","Đề xuất giá bán","AI đề xuất giá theo giá vốn, giá thị trường và biên lợi nhuận chị đặt.","r",1],
+  ["d4","Chứng từ nguồn gốc","Lưu hoá đơn, tờ khai, ảnh nhãn gốc theo từng lô hàng.","a",1],
+  ["d5","Đặt mẫu, đặt lô","AI soạn đơn cho đơn vị mua hộ hoặc nhà cung cấp, chị duyệt rồi mới gửi.","r",2],
+  ["d6","Nhắn hỏi nhà cung cấp","AI soạn tin tiếng Trung, tiếng Nhật hỏi giá, số lượng tối thiểu, thời gian; dịch câu trả lời.","r",2],
+  ["d7","Theo dõi lô hàng về","Các mốc: đã đặt, về kho bên bán, thông quan, về nhà.","a",2]
+ ]},
+ {t:"Website Hàng Chọn", d:"Nơi khách đọc kỹ, đặt hàng và theo dõi đơn.", f:[
+  ["e1","Tự dựng trang sản phẩm","Từ hồ sơ đã chọn, AI viết tên, mô tả, thông số, phần hỏi đáp. Chị duyệt rồi đăng.","r",1],
+  ["e2","Con dấu và hồ sơ chọn","Mỗi món hiện tỉ lệ chọn, thời gian thử, lý do chọn, điều chưa ưng và các món đã loại.","a",1],
+  ["e3","Mở bán theo đợt","Đợt gom đơn có hạn chót, số suất, ngày hàng về dự kiến.","r",1],
+  ["e4","Đặt hàng một trang","Không cần tạo tài khoản. Chuyển khoản bằng mã QR tự xác nhận, hoặc trả tiền khi nhận.","a",1],
+  ["e5","Theo dõi đơn","Khách xem hành trình đơn bằng số điện thoại và mã đơn.","a",1],
+  ["e6","Xử lý ảnh sản phẩm","Ảnh thật chị chụp là chính. AI cắt, cân sáng, làm sạch nền; không tạo ảnh giả.","a",1],
+  ["e7","Trợ lý hỏi đáp trên web","Trả lời từ hồ sơ thẩm định, có dẫn nguồn. Không biết thì nói không biết và chuyển chị.","a",2],
+  ["e8","Đánh giá có ảnh của khách","Tự xin đánh giá sau khi khách nhận hàng. AI lọc, chị duyệt hiển thị.","r",2],
+  ["e9","Trang Nhờ chị tìm","Khách gửi nhu cầu, người khác bấm cùng cần. Đủ số người thì mở tìm.","a",2],
+  ["e10","Để AI đọc được","Dữ liệu sản phẩm có cấu trúc và nguồn cấp cho Google, sẵn sàng cho các trợ lý mua sắm AI.","a",2]
+ ]},
+ {t:"Xưởng nội dung và đăng bài", d:"Từ một hồ sơ chọn ra bài cho mọi kênh.", f:[
+  ["f1","Một sản phẩm, nhiều bản","AI soạn bài Facebook, bộ ảnh Instagram, kịch bản TikTok, tin Zalo. Mỗi kênh một cách viết.","r",1],
+  ["f2","Giọng của chị","AI học cách viết từ bài cũ và ghi âm của chị để bài mới nghe giống chị.","a",1],
+  ["f3","Lịch đăng","AI xếp lịch tuần, chị đổi chỗ khi cần.","r",1],
+  ["f4","Đăng tự động","Facebook, Instagram, Threads đăng thẳng. TikTok đẩy bản nháp vào app để chị bấm đăng.","a",1],
+  ["f5","Soát lời quảng cáo","Kiểm câu chữ: đúng số liệu trong hồ sơ, không nói quá công dụng, gắn nhãn khi có phần do AI tạo.","a",1],
+  ["f6","Dựng video ngắn","Từ clip chị quay khi thử hàng, AI cắt, chèn phụ đề, gợi ý nhạc.","r",2],
+  ["f7","Đo và học","Bài nào ra đơn; AI rút ra kiểu bài nên làm tiếp.","a",2],
+  ["f8","Kịch bản livestream","Dàn ý, thứ tự món, câu khách hay hỏi. Chị là người lên hình.","r",3]
+ ]},
+ {t:"Đơn hàng và vận hành", d:"Từ lúc khách bấm đặt tới lúc nhận hàng.", f:[
+  ["g1","Gom đơn mọi kênh","Đơn từ web, bình luận, tin nhắn về một danh sách.","a",1],
+  ["g2","Khớp thanh toán","Tự khớp khoản chuyển tới với đơn, báo khách ngay.","a",1],
+  ["g3","Tổng hợp đợt để đặt nguồn","Hết đợt, AI cộng số lượng và soạn đơn đặt nhà cung cấp. Chị duyệt.","r",1],
+  ["g4","Tạo vận đơn","Chọn hãng theo phí và thời gian, in nhãn.","a",1],
+  ["g5","Báo tin cho khách","Tự nhắn các mốc: đã nhận đơn, hàng đang về, đang giao.","a",1],
+  ["g6","Chốt đơn từ tin nhắn","AI nhận ra khách muốn mua, hỏi đủ thông tin, tạo đơn nháp.","r",2],
+  ["g7","Đổi trả, hoàn tiền","AI kiểm điều kiện, soạn phương án. Chị quyết.","h",2],
+  ["g8","Tồn kho nhỏ","Số lượng các món giữ sẵn, báo khi sắp hết.","a",2],
+  ["g9","Bán trên TikTok Shop, Shopee","Đồng bộ sản phẩm và đơn khi được cấp quyền API.","a",3]
+ ]},
+ {t:"Chăm khách và cộng đồng", d:"Trả lời nhanh, nhớ từng khách, giữ khách ở lại.", f:[
+  ["h1","Hộp thư gộp","Bình luận và tin nhắn Facebook, Instagram, Zalo ở một chỗ.","a",1],
+  ["h2","AI soạn sẵn câu trả lời","Câu về giá, còn hàng, phí giao thì AI trả lời ngay. Câu khác AI soạn nháp chờ chị.","r",1],
+  ["h3","Chuyển cho chị","Khiếu nại, hàng lỗi, câu hỏi về sức khoẻ: AI không tự trả lời.","h",1],
+  ["h4","Sổ khách","Mỗi khách: đã mua gì, hỏi gì, quan tâm gì.","a",1],
+  ["h5","Nhóm khách quen","Nhóm Zalo kín. AI soạn tin báo đợt mới và tóm tắt thảo luận trong nhóm.","r",2],
+  ["h6","Nhắc mua lại đúng lúc","Món tiêu hao sắp hết thì nhắc đúng người. Không nhắn đại trà.","r",2],
+  ["h7","Giới thiệu bạn","Mã giới thiệu, quà cho cả hai. Đo trước rồi mới mở rộng.","a",3],
+  ["h8","Khách thử hàng cùng chị","Mời vài khách quen dùng thử mẫu trước khi chị quyết định chọn.","h",3]
+ ]},
+ {t:"Trung tâm điều khiển", d:"Nơi chị giám sát và can thiệp.", f:[
+  ["i1","Hôm nay","Một màn hình: việc chờ chị, việc AI đã làm, số đơn, tiền về.","a",1],
+  ["i2","Hàng chờ duyệt","Mọi thứ AI làm xong mà cần chị gật: duyệt, sửa, hoặc trả lại kèm lời nhắn.","h",1],
+  ["i3","Mức tự chủ theo từng việc","Chị đặt việc nào AI tự làm, việc nào phải hỏi. Nới dần khi đã tin.","h",1],
+  ["i4","Nhật ký AI","Xem AI đã làm gì, dựa vào đâu. Hoàn tác được.","a",1],
+  ["i5","Báo cáo tuần","Doanh thu, biên lợi nhuận từng món, khách quay lại, bài hiệu quả.","a",2],
+  ["i6","Ra lệnh bằng lời","Nói một câu từ bất kỳ màn hình nào để giao việc cho AI.","a",2]
+ ]},
+ {t:"Nền tảng", d:"Những việc không ai thấy nhưng phải có.", f:[
+  ["k1","Sổ doanh thu, chi phí","Ghi tự động từng đơn, xuất bảng kê phục vụ khai thuế.","a",1],
+  ["k2","Trần chi phí AI","Theo dõi tiền AI theo tháng. Chạm trần thì dừng và hỏi chị.","a",1],
+  ["k3","Nhãn AI và lưu vết","Tự gắn nhãn nội dung do AI tạo. Lưu ai duyệt gì, lúc nào.","a",1],
+  ["k4","Sao lưu và phân quyền","Sao lưu hằng ngày. Tài khoản phụ cho người phụ giúp.","a",2],
+  ["k5","Hoá đơn điện tử","Nối với nhà cung cấp hoá đơn điện tử khi cần.","a",3]
+ ]}
+];
+var LV = {a:"AI tự làm", r:"AI làm, chị duyệt", h:"Chị quyết"};
+var FEAT_IDS = [];
+var count = {a:0, r:0, h:0};
+var html = "";
+MODS.forEach(function(m, mi){
+  html += '<section class="mod" id="m-' + mi + '" data-spy><header class="mod-h"><h3>' + m.t + '</h3><p>' + m.d + '</p><span class="mod-n"></span></header><ul class="feats">';
+  m.f.forEach(function(f){
+    FEAT_IDS.push(f[0]); count[f[3]]++;
+    html += '<li class="feat" data-lv="' + f[3] + '" data-gd="' + f[4] + '"><div class="feat-t"><b>' + f[1] + '</b><span class="lv ' + f[3] + '">' + LV[f[3]] + '</span><span class="gd">GĐ' + f[4] + '</span></div><p>' + f[2] + '</p>' +
+      '<div class="pick" data-pick="' + f[0] + '" role="group" aria-label="Lựa chọn cho ' + f[1] + '">' +
+      '<button type="button" id="p-' + f[0] + '-now" data-v="now" aria-pressed="false">Làm ngay</button>' +
+      '<button type="button" id="p-' + f[0] + '-later" data-v="later" aria-pressed="false">Để sau</button>' +
+      '<button type="button" id="p-' + f[0] + '-skip" data-v="skip" aria-pressed="false">Bỏ</button></div></li>';
+  });
+  html += '</ul></section>';
+});
+document.getElementById("mods").innerHTML = html;
+var subEl = document.getElementById("sub-chuc-nang");
+MODS.forEach(function(m, mi){
+  var li = document.createElement("li"), b = document.createElement("button");
+  b.type = "button"; b.id = "go-m-" + mi; b.className = "lvl2"; b.dataset.goto = "m-" + mi; b.textContent = m.t;
+  li.appendChild(b); subEl.appendChild(li);
+});
+var total = FEAT_IDS.length;
+document.getElementById("n-feat").textContent = total;
+document.getElementById("mixbar").innerHTML = ["a","r","h"].map(function(k){ return '<i class="' + k + '" style="width:' + (count[k] / total * 100).toFixed(2) + '%"></i>'; }).join("");
+document.getElementById("mixkey").innerHTML =
+  '<span><i style="background:var(--auto)"></i>AI tự làm ' + count.a + '</span>' +
+  '<span><i style="background:var(--review)"></i>AI làm, chị duyệt ' + count.r + '</span>' +
+  '<span><i style="background:var(--seal)"></i>Chị quyết ' + count.h + '</span>';
+
+/* ---------- Bốn phần, định tuyến theo hash ---------- */
+var VIEWS = ["xu-huong","chuc-nang","wireframe","can-chot"];
+var tabsEl = document.querySelector(".nav"), viewsEl = document.getElementById("views");
+var curView = VIEWS[0];
+function stickH(){ return getComputedStyle(tabsEl).position === "sticky" ? tabsEl.offsetHeight : 0; }
+function spy(){
+  var view = document.getElementById("v-" + curView); if (!view) return;
+  var line = stickH() + 170, cur = "", first = "";
+  view.querySelectorAll("[data-spy]").forEach(function(el){
+    if (el.offsetParent === null) return;
+    if (!first) first = el.id;
+    if (el.getBoundingClientRect().top <= line) cur = el.id;
+  });
+  cur = cur || first;
+  document.querySelectorAll("[data-goto]").forEach(function(b){
+    if (b.dataset.goto === cur) b.setAttribute("aria-current","true"); else b.removeAttribute("aria-current");
+  });
+}
+function show(name){
+  if (VIEWS.indexOf(name) < 0) name = VIEWS[0];
+  curView = name;
+  VIEWS.forEach(function(v){ document.getElementById("v-" + v).hidden = (v !== name); });
+  tabsEl.querySelectorAll("a[data-tab]").forEach(function(a){
+    var on = (a.dataset.tab === name);
+    if (on) a.setAttribute("aria-current","page"); else a.removeAttribute("aria-current");
+    a.parentNode.classList.toggle("on", on);
+  });
+  spy();
+}
+function setGroup(g){
+  document.querySelectorAll("[data-wfg]").forEach(function(x){ x.setAttribute("aria-pressed", x.dataset.wfg === g ? "true" : "false"); });
+  document.getElementById("wfg-web").hidden = (g !== "web");
+  document.getElementById("wfg-desk").hidden = (g !== "desk");
+}
+function goTo(id){
+  var el = document.getElementById(id); if (!el) return;
+  var g = el.closest(".wf-group");
+  if (g && g.hidden) setGroup(g.id === "wfg-desk" ? "desk" : "web");
+  el.scrollIntoView({block:"start"});
+  spy();
+}
+show((location.hash || "").slice(1));
+window.addEventListener("hashchange", function(){
+  show((location.hash || "").slice(1));
+  var y = viewsEl.getBoundingClientRect().top + window.scrollY - stickH() - 8;
+  if (window.scrollY > y) window.scrollTo(0, Math.max(0, y));
+  spy();
+});
+document.addEventListener("click", function(ev){
+  var b = ev.target.closest ? ev.target.closest("[data-goto]") : null;
+  if (b) goTo(b.dataset.goto);
+});
+var spyTick = false;
+window.addEventListener("scroll", function(){
+  if (spyTick) return; spyTick = true;
+  requestAnimationFrame(function(){ spyTick = false; spy(); });
+}, {passive:true});
+
+/* ---------- Lọc danh mục ---------- */
+var flv = "all", fgd = "all";
+function applyFilter(){
+  document.querySelectorAll(".feat").forEach(function(li){
+    li.hidden = !((flv === "all" || li.dataset.lv === flv) && (fgd === "all" || li.dataset.gd === fgd));
+  });
+  document.querySelectorAll(".mod").forEach(function(m){
+    var n = m.querySelectorAll(".feat:not([hidden])").length;
+    m.hidden = (n === 0);
+    m.querySelector(".mod-n").textContent = n + " chức năng";
+  });
+}
+document.querySelectorAll("[data-flv]").forEach(function(b){
+  b.addEventListener("click", function(){
+    flv = b.dataset.flv;
+    document.querySelectorAll("[data-flv]").forEach(function(x){ x.setAttribute("aria-pressed", x === b ? "true" : "false"); });
+    applyFilter();
+  });
+});
+document.querySelectorAll("[data-fgd]").forEach(function(b){
+  b.addEventListener("click", function(){
+    fgd = b.dataset.fgd;
+    document.querySelectorAll("[data-fgd]").forEach(function(x){ x.setAttribute("aria-pressed", x === b ? "true" : "false"); });
+    applyFilter();
+  });
+});
+applyFilter();
+
+/* ---------- Hai nhóm wireframe ---------- */
+document.querySelectorAll("[data-wfg]").forEach(function(b){
+  b.addEventListener("click", function(){
+    setGroup(b.dataset.wfg);
+    var first = document.querySelector("#wfg-" + b.dataset.wfg + " [data-spy]");
+    if (first) first.scrollIntoView({block:"start"});
+    spy();
+  });
+});
+
+/* ---------- Lựa chọn: lưu chung qua db, không có thì lưu trên máy ---------- */
+var KEY = "hang-chon-picks";
+var picks = {}, early = {}, chains = {}, mode = "loading", db = null;
+var noteEl = document.getElementById("save-note");
+var NOTE = {
+  loading: "Đang kết nối nơi lưu lựa chọn…",
+  shared: "Lựa chọn được lưu chung: anh và chị cùng thấy, em đọc lại được khi làm bước tiếp theo.",
+  local: "Lựa chọn đang chỉ lưu trên máy này.",
+  readonly: "Anh chị đang ở chế độ chỉ xem. Muốn bấm chọn thì cần được chia sẻ quyền Contributor hoặc Editor.",
+  error: "Lựa chọn vừa rồi chưa lưu được. Anh chị bấm lại sau ít phút."
+};
+function setMode(m){ mode = m; noteEl.textContent = NOTE[m]; }
+
+var SUM = [
+  ["home","Trang chủ"],["style","Phong cách"],["q1","Nhóm hàng khởi đầu"],["q2","Cách giữ hàng"],
+  ["q3","Nền tảng website"],["q4","Kênh mở đầu"],["q5","Mức tự chủ của AI"],["q6","Đăng ký kinh doanh"],["q7","Mức độ lộ diện"]
+];
+function labelOf(id){
+  var box = document.querySelector('[data-pick="' + id + '"]'); if (!box) return "";
+  var b = box.querySelector('[data-v][aria-pressed="true"]'); if (!b) return "";
+  var fig = b.closest("figure");
+  var t = fig ? fig.querySelector("figcaption b") : b.querySelector("b");
+  return t ? t.textContent : b.textContent;
+}
+function render(){
+  document.querySelectorAll("[data-pick]").forEach(function(box){
+    var cur = picks[box.dataset.pick] || "";
+    box.querySelectorAll("[data-v]").forEach(function(b){
+      b.setAttribute("aria-pressed", b.dataset.v === cur ? "true" : "false");
+      b.disabled = (mode === "readonly");
+    });
+    var feat = box.closest(".feat");
+    if (feat) feat.classList.toggle("is-skip", cur === "skip");
+  });
+  var n = {now:0, later:0, skip:0};
+  FEAT_IDS.forEach(function(id){ var v = picks[id]; if (n.hasOwnProperty(v)) n[v]++; });
+  var rest = total - n.now - n.later - n.skip;
+  var line = "Làm ngay " + n.now + " · Để sau " + n.later + " · Bỏ " + n.skip + " · Chưa bấm " + rest;
+  document.getElementById("tally").textContent = line;
+  document.getElementById("sum-feat").textContent = "Chức năng: " + line;
+  var ul = document.getElementById("sum-list");
+  ul.textContent = "";
+  SUM.forEach(function(s){
+    var li = document.createElement("li"), k = document.createElement("span"), v = document.createElement("span");
+    var lab = labelOf(s[0]);
+    k.textContent = s[1];
+    v.textContent = lab || "chưa chọn";
+    if (!lab) v.className = "none";
+    li.appendChild(k); li.appendChild(v); ul.appendChild(li);
+  });
+}
+function saveLocal(){ try { localStorage.setItem(KEY, JSON.stringify(picks)); } catch(e){} }
+function persist(id, v){
+  if (mode === "loading"){ early[id] = v; return; }
+  if (mode === "local"){ saveLocal(); return; }
+  if (mode !== "shared" || !db) return;
+  var ref = db.collection("picks").doc(id);
+  chains[id] = (chains[id] || Promise.resolve()).then(function(){
+    return v ? ref.set({v: v, at: new Date().toISOString()}) : ref.delete();
+  }).then(function(){ if (mode === "shared") noteEl.textContent = NOTE.shared; }, function(err){
+    if (err && err.code === "invalid_argument"){ setMode("readonly"); render(); }
+    else noteEl.textContent = NOTE.error;
+  });
+}
+function flushEarly(){
+  var e = early; early = {};
+  if (mode === "readonly") return;
+  Object.keys(e).forEach(function(id){
+    if (e[id]) picks[id] = e[id]; else delete picks[id];
+    persist(id, e[id]);
+  });
+}
+function goLocal(){
+  try {
+    var s = JSON.parse(localStorage.getItem(KEY) || "{}");
+    if (s && typeof s === "object") Object.keys(s).forEach(function(k){ if (typeof s[k] === "string" && !(k in picks)) picks[k] = s[k]; });
+  } catch(e){}
+  setMode("local"); flushEarly(); render();
+}
+document.addEventListener("click", function(ev){
+  var b = ev.target.closest ? ev.target.closest("[data-v]") : null; if (!b) return;
+  var box = b.closest("[data-pick]"); if (!box || mode === "readonly") return;
+  var id = box.dataset.pick, v = (picks[id] === b.dataset.v) ? "" : b.dataset.v;
+  if (v) picks[id] = v; else delete picks[id];
+  render(); persist(id, v);
+});
+render();
+
+(async function connect(){
+  var c = window.claude;
+  if (!c || typeof c.use !== "function") return goLocal();
+  try { db = await c.use("db"); } catch(e){ db = null; }
+  if (!db) return goLocal();
+  var can = null;
+  try { var u = await c.use("user"); if (u && typeof u.can === "function") can = await u.can("data.write"); } catch(e){}
+  var first = true;
+  var timer = setTimeout(function(){ if (mode === "loading") noteEl.textContent = "Chưa kết nối được nơi lưu lựa chọn. Trang vẫn đang thử lại."; }, 10000);
+  db.collection("picks").onSnapshot(function(snap){
+    clearTimeout(timer);
+    var next = {};
+    snap.docs.forEach(function(d){ var x = d.data(); if (x && typeof x.v === "string") next[d.id] = x.v; });
+    picks = next;
+    if (first){ first = false; setMode(can === false ? "readonly" : "shared"); flushEarly(); }
+    render();
+  }, function(){ clearTimeout(timer); db = null; goLocal(); });
+})();
+
+})();
+</script>
