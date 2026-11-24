@@ -10,18 +10,13 @@
 - Threads API (graph.threads.net): POST /{threads-user-id}/threads (`media_type=TEXT|IMAGE|VIDEO|CAROUSEL`) → POST
   /{threads-user-id}/threads_publish `creation_id`. Hạn mức 250 bài / 24 giờ, chữ tối đa 500 ký tự.
 
-Cấu hình: META_PAGE_ID, META_PAGE_TOKEN, META_IG_USER_ID (trong settings) + THREADS_USER_ID, THREADS_ACCESS_TOKEN,
-META_GRAPH_VERSION (mặc định v23.0) đọc từ biến môi trường. Token không lưu trong CSDL.
-
-Phần bình luận/tin nhắn (fetch_inbound, send_message, reply_comment, parse_webhook) thuộc driver hộp thư; ở đây báo
-chưa cấu hình. Người tích hợp ghép lớp `MetaPublisher` vào driver `meta` chung.
+Cấu hình (settings): META_PAGE_ID, META_PAGE_TOKEN, META_IG_USER_ID, THREADS_USER_ID, THREADS_ACCESS_TOKEN,
+META_GRAPH_VERSION. Token không lưu trong CSDL. Lớp `MetaPublisher` được gộp vào driver `meta` (`meta.py`).
 """
 
 from __future__ import annotations
 
 import asyncio
-import os
-from datetime import datetime
 from typing import Any
 
 import httpx
@@ -30,8 +25,8 @@ from app.core.config import settings
 from app.core.enums import Channel
 from app.core.timeutil import now_utc
 from app.integrations.base import IntegrationError, IntegrationNotConfigured
-from app.integrations.social import InboundEvent, PostMetrics, PublishResult, SentMessage, SocialDriver, SocialPost
-from app.integrations.social._ratelimit_publish import RateLimited, limiter
+from app.integrations.social import PostMetrics, PublishResult, SocialPost
+from app.integrations.social._ratelimit import RateLimited, limiter
 
 GRAPH = "https://graph.facebook.com"
 GRAPH_VIDEO = "https://graph-video.facebook.com"
@@ -42,7 +37,7 @@ DAY = 24 * 3600
 
 
 def _version() -> str:
-    return os.environ.get("META_GRAPH_VERSION", "v23.0")
+    return settings.meta_graph_version
 
 
 class MetaPublisher:
@@ -51,8 +46,7 @@ class MetaPublisher:
     poll_interval = 3.0
     poll_attempts = 40
 
-    def __init__(self, transport: httpx.AsyncBaseTransport | None = None) -> None:
-        self._transport = transport
+    _transport: httpx.AsyncBaseTransport | None = None
 
     # ---- cấu hình ------------------------------------------------------------------------------------------------
 
@@ -74,8 +68,8 @@ class MetaPublisher:
 
     def _threads(self) -> tuple[str, str]:
         return (
-            self._need(os.environ.get("THREADS_USER_ID"), "THREADS_USER_ID"),
-            self._need(os.environ.get("THREADS_ACCESS_TOKEN"), "THREADS_ACCESS_TOKEN"),
+            self._need(settings.threads_user_id, "THREADS_USER_ID"),
+            self._need(settings.threads_access_token, "THREADS_ACCESS_TOKEN"),
         )
 
     # ---- HTTP ----------------------------------------------------------------------------------------------------
@@ -310,21 +304,3 @@ class MetaPublisher:
             if isinstance(v, int | float):
                 out[m["name"]] = int(v)
         return out
-
-
-class Driver(MetaPublisher, SocialDriver):
-    """Driver chỉ-đăng-bài, chọn bằng `SOCIAL_PUBLISH_DRIVERS=facebook=meta_publish,...` (xem module content)."""
-
-    name = "meta_publish"
-
-    async def fetch_inbound(self, since: datetime | None = None) -> list[InboundEvent]:
-        raise IntegrationNotConfigured("Hộp thư Meta nằm ở driver «meta» của module hộp thư.")
-
-    async def send_message(self, channel: Channel, thread_external_id: str, text: str) -> SentMessage:
-        raise IntegrationNotConfigured("Gửi tin Meta nằm ở driver «meta» của module hộp thư.")
-
-    async def reply_comment(self, channel: Channel, comment_external_id: str, text: str) -> SentMessage:
-        raise IntegrationNotConfigured("Trả lời bình luận Meta nằm ở driver «meta» của module hộp thư.")
-
-    async def parse_webhook(self, headers: dict[str, str], body: bytes) -> list[InboundEvent]:
-        raise IntegrationNotConfigured("Webhook Meta nằm ở driver «meta» của module hộp thư.")

@@ -74,11 +74,11 @@ async def test_ghn_quote_create_track(monkeypatch: pytest.MonkeyPatch) -> None:
 async def test_ghtk_quote_and_track(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "ghtk_token", "tok")
     for k, v in {
-        "GHTK_PICK_NAME": "Hàng Chọn",
-        "GHTK_PICK_TEL": "0900000000",
-        "GHTK_PICK_ADDRESS": "1 Kho Mẫu",
+        "ghtk_pick_name": "Hàng Chọn",
+        "ghtk_pick_tel": "0900000000",
+        "ghtk_pick_address": "1 Kho Mẫu",
     }.items():
-        monkeypatch.setenv(k, v)
+        monkeypatch.setattr(settings, k, v)
     base = "https://services.giaohangtietkiem.vn"
     respx.get(f"{base}/services/shipment/fee").mock(
         return_value=httpx.Response(

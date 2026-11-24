@@ -45,13 +45,20 @@ function useNativeDialog(open: boolean, onClose: () => void) {
   }, [open]);
 
   // Khi trang bị ẩn do điều hướng (Activity), đóng hộp để quay lại không thấy hộp mở sẵn.
+  // Hoãn tới microtask và chỉ đóng nếu hiệu ứng không được gắn lại: StrictMode (dev) gỡ rồi gắn lại hiệu ứng ngay
+  // trong cùng một lượt — đóng tức thì thì Sheet mở sẵn lúc mount sẽ tự đóng.
+  const attached = useRef(false);
   useLayoutEffect(() => {
     const d = ref.current;
+    attached.current = true;
     return () => {
-      if (d?.open) {
-        d.close();
-        onCloseRef.current();
-      }
+      attached.current = false;
+      queueMicrotask(() => {
+        if (!attached.current && d?.open) {
+          d.close();
+          onCloseRef.current();
+        }
+      });
     };
   }, []);
 

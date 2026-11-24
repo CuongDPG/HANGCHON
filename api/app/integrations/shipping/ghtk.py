@@ -11,7 +11,6 @@ Webhook: khai `<API_BASE_URL>/api/hooks/shipping/ghtk`. Mình hỏi lại GHTK t
 from __future__ import annotations
 
 import json
-import os
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import parse_qs
@@ -59,7 +58,7 @@ class Driver(ShippingDriver):
     name = "ghtk"
 
     def __init__(self) -> None:
-        self.base = DEV if os.environ.get("GHTK_ENV") == "dev" else PROD
+        self.base = DEV if settings.ghtk_env == "dev" else PROD
 
     def _headers(self) -> dict[str, str]:
         if not settings.ghtk_token:
@@ -69,12 +68,12 @@ class Driver(ShippingDriver):
     @staticmethod
     def _pick() -> dict[str, str]:
         pick = {
-            "pick_name": os.environ.get("GHTK_PICK_NAME", ""),
-            "pick_tel": os.environ.get("GHTK_PICK_TEL", ""),
-            "pick_address": os.environ.get("GHTK_PICK_ADDRESS", ""),
+            "pick_name": settings.ghtk_pick_name or "",
+            "pick_tel": settings.ghtk_pick_tel or "",
+            "pick_address": settings.ghtk_pick_address or "",
             "pick_province": settings.shipping_from_province,
-            "pick_district": os.environ.get("GHTK_PICK_DISTRICT", ""),
-            "pick_ward": os.environ.get("GHTK_PICK_WARD", ""),
+            "pick_district": settings.ghtk_pick_district or "",
+            "pick_ward": settings.ghtk_pick_ward or "",
         }
         if not (pick["pick_name"] and pick["pick_tel"] and pick["pick_address"]):
             raise IntegrationNotConfigured("Chưa khai địa chỉ lấy hàng GHTK (GHTK_PICK_NAME/TEL/ADDRESS).")

@@ -61,7 +61,7 @@ async def test_onebound_requires_keys(monkeypatch):
 @respx.mock
 async def test_onebound_maps_search_and_product(monkeypatch):
     monkeypatch.setattr(settings, "onebound_api_key", "k")
-    monkeypatch.setenv("ONEBOUND_API_SECRET", "s")
+    monkeypatch.setattr(settings, "onebound_api_secret", "s")
     respx.get(f"{BASE_URL}/taobao/item_search/").mock(
         return_value=httpx.Response(
             200,
@@ -128,7 +128,7 @@ async def test_onebound_maps_search_and_product(monkeypatch):
 @respx.mock
 async def test_onebound_error_code(monkeypatch):
     monkeypatch.setattr(settings, "onebound_api_key", "k")
-    monkeypatch.setenv("ONEBOUND_API_SECRET", "s")
+    monkeypatch.setattr(settings, "onebound_api_secret", "s")
     respx.get(f"{BASE_URL}/1688/item_search/").mock(
         return_value=httpx.Response(200, json={"error_code": "4005", "reason": "key không hợp lệ"})
     )

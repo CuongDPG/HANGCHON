@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import os
 import time
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -41,7 +40,7 @@ class Driver(MarketplacesDriver):
 
     def _creds(self) -> tuple[str, str, str, str]:
         pid, key = settings.shopee_partner_id, settings.shopee_partner_key
-        shop, token = os.environ.get("SHOPEE_SHOP_ID", ""), os.environ.get("SHOPEE_ACCESS_TOKEN", "")
+        shop, token = settings.shopee_shop_id or "", settings.shopee_access_token or ""
         if not (pid and key and shop and token):
             raise IntegrationNotConfigured("Chưa đủ khoá Shopee (partner id/key, shop id, access token).")
         return str(pid), key, shop, token

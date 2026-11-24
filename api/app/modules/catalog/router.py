@@ -136,7 +136,7 @@ async def drop_detail(slug: str, db: DbSession) -> Any:
 
 @store.post("/drops/{slug}/remind", response_model=ReminderOut, status_code=status.HTTP_201_CREATED)
 async def drop_remind(slug: str, body: ReminderIn, request: Request, db: DbSession) -> Any:
-    limit(f"remind:{client_ip(request)}", 10, 600)
+    await limit(f"remind:{client_ip(request)}", 10, 600)
     d = await drop_svc.get_by_slug(db, slug)
     return {"added": await drop_svc.add_reminder(db, d, body.contact)}
 
@@ -206,7 +206,7 @@ async def finds(request: Request, db: DbSession) -> Any:
 async def create_find(body: FindRequestIn, request: Request, response: Response, db: DbSession) -> Any:
     if body.website:  # ô bẫy: người thật không điền
         raise BadRequest("Không gửi được yêu cầu này.", code="spam")
-    limit(f"find:{client_ip(request)}", 20, 3600)
+    await limit(f"find:{client_ip(request)}", 20, 3600)
     key = device_key(request, response)
     fr, dup = await find_svc.create(
         db, title=body.title, description=body.description, budget_vnd=body.budget_vnd,
@@ -219,7 +219,7 @@ async def create_find(body: FindRequestIn, request: Request, response: Response,
 
 @store.post("/finds/{slug}/vote", response_model=VoteOut)
 async def vote(slug: str, request: Request, response: Response, db: DbSession, body: VoteIn | None = None) -> Any:
-    limit(f"vote:{client_ip(request)}", 60, 600)
+    await limit(f"vote:{client_ip(request)}", 60, 600)
     fr = await find_svc.get_public(db, slug)
     added = await find_svc.vote(db, fr, device_key(request, response), contact=body.contact if body else None)
     await db.refresh(fr)
@@ -253,7 +253,7 @@ async def submit_review(
     display_name: Annotated[str | None, Form(max_length=60)] = None,
     photos: Annotated[list[UploadFile] | None, File()] = None,
 ) -> Any:
-    limit(f"review:{client_ip(request)}", 10, 600)
+    await limit(f"review:{client_ip(request)}", 10, 600)
     r = await review_svc.get_by_token(db, token)
     blobs = [await f.read() for f in (photos or []) if f.filename]
     await review_svc.submit(db, r, rating=rating, body=body, display_name=display_name, photos=blobs)

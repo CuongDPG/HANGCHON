@@ -10,22 +10,22 @@
 - Số liệu: POST /v2/video/query/?fields=id,view_count,like_count,comment_count,share_count (scope `video.list`).
 - Giới hạn: 6 yêu cầu khởi tạo mỗi phút cho mỗi token người dùng.
 
-Cấu hình: TIKTOK_ACCESS_TOKEN (token người dùng, đọc từ biến môi trường; làm mới bằng TIKTOK_CLIENT_KEY/SECRET ngoài
-phạm vi driver này). Không có video/ảnh thì không đẩy được: kịch bản chữ để chị tự quay.
+Cấu hình (settings): TIKTOK_ACCESS_TOKEN (token người dùng; làm mới bằng TIKTOK_CLIENT_KEY/SECRET ngoài phạm vi
+driver này). Chọn bằng `SOCIAL_CHANNEL_DRIVERS=tiktok=tiktok_draft`. Không có video/ảnh thì không đẩy được: kịch bản chữ để chị tự quay.
 """
 
 from __future__ import annotations
 
-import os
 from datetime import datetime
 from typing import Any
 
 import httpx
 
+from app.core.config import settings
 from app.core.enums import Channel
 from app.integrations.base import IntegrationError, IntegrationNotConfigured
 from app.integrations.social import InboundEvent, PostMetrics, PublishResult, SentMessage, SocialDriver, SocialPost
-from app.integrations.social._ratelimit_publish import RateLimited, limiter
+from app.integrations.social._ratelimit import RateLimited, limiter
 
 API = "https://open.tiktokapis.com/v2"
 
@@ -35,7 +35,7 @@ class TikTokDraftPublisher:
         self._transport = transport
 
     def _token(self) -> str:
-        tok = os.environ.get("TIKTOK_ACCESS_TOKEN")
+        tok = settings.tiktok_access_token
         if not tok:
             raise IntegrationNotConfigured("Thiếu TIKTOK_ACCESS_TOKEN để đẩy bản nháp TikTok.")
         return tok
@@ -115,7 +115,9 @@ class TikTokDraftPublisher:
 
 
 class Driver(TikTokDraftPublisher, SocialDriver):
-    name = "tiktok_draft_publish"
+    name = "tiktok_draft"
+    supports_messaging = False
+    channels = (Channel.TIKTOK,)
 
     async def fetch_inbound(self, since: datetime | None = None) -> list[InboundEvent]:
         return []  # Content Posting API không có bình luận/tin nhắn

@@ -4,9 +4,7 @@ không biết thì chuyển chị qua control.propose (luôn hỏi chị). Giớ
 from __future__ import annotations
 
 import logging
-import time
 import uuid
-from collections import defaultdict, deque
 from datetime import timedelta
 from decimal import Decimal
 from typing import Any
@@ -15,6 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import ai, control
+from app.core import ratelimit
 from app.core.errors import AppError, BadRequest, NotFound
 from app.core.timeutil import now_utc
 from app.modules.assessment.models import Assessment, ReviewDigest
@@ -47,21 +46,14 @@ class RateLimited(AppError):
     message = "Bạn hỏi nhanh quá, đợi một chút rồi hỏi tiếp nhé."
 
 
-_burst: dict[str, deque[float]] = defaultdict(deque)
-
-
-def _check_burst(key: str) -> None:
-    now = time.monotonic()
-    q = _burst[key]
-    while q and q[0] <= now - 60:
-        q.popleft()
-    if len(q) >= PER_MINUTE:
+async def _check_burst(key: str) -> None:
+    """Tối đa PER_MINUTE câu mỗi phút (đếm chung trên Redis, xem app.core.ratelimit)."""
+    if not await ratelimit.hit(f"assistant:{key}", PER_MINUTE, 60):
         raise RateLimited()
-    q.append(now)
 
 
 def reset_limits() -> None:
-    _burst.clear()
+    ratelimit.reset()
 
 
 # ---- hồ sơ làm căn cứ ------------------------------------------------------------------------------------------
@@ -202,9 +194,9 @@ async def ask(
         raise BadRequest("Bạn gõ câu hỏi giúp mình nhé.")
     if len(question) > MAX_QUESTION:
         raise BadRequest(f"Câu hỏi dài quá {MAX_QUESTION} chữ, bạn hỏi gọn lại giúp mình.")
-    _check_burst(f"s:{session_key}")
+    await _check_burst(f"s:{session_key}")
     if ip_hash:
-        _check_burst(f"ip:{ip_hash}")
+        await _check_burst(f"ip:{ip_hash}")
     if await _day_count(db, session_key) >= PER_DAY:
         raise RateLimited("Hôm nay bạn đã hỏi nhiều rồi. Bạn nhắn thẳng cho chị qua Zalo giúp mình nhé.")
 

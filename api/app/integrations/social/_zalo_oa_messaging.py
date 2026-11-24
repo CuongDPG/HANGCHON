@@ -8,8 +8,8 @@
   body `{"recipient": {"user_id"}, "message": {"text"}}` → `{"error": 0, "data": {"message_id"}}`.
 - Hồ sơ người dùng: `GET https://openapi.zalo.me/v3.0/oa/user/detail?data={"user_id": ...}` → `data.display_name`.
 
-Cấu hình (api/.env): ZALO_OA_ID, ZALO_OA_ACCESS_TOKEN, ZALO_OA_SECRET (khoá bí mật OA dùng kiểm chữ ký),
-ZALO_APP_ID (đọc thẳng từ môi trường). Access token OA hết hạn theo giờ — làm mới token là việc của người vận hành.
+Cấu hình (settings): ZALO_OA_ID, ZALO_OA_ACCESS_TOKEN, ZALO_OA_SECRET (khoá bí mật OA dùng kiểm chữ ký), ZALO_APP_ID.
+Lớp `ZaloOAMessaging` được gộp vào driver `zalo_oa` (`zalo_oa.py`). Access token OA hết hạn theo giờ — làm mới token là việc của người vận hành.
 Zalo OA không có bình luận; gửi vào nhóm Zalo không làm qua đây.
 """
 
@@ -18,7 +18,6 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-import os
 from datetime import UTC, datetime
 from typing import Any
 
@@ -28,7 +27,7 @@ from app.core.config import settings
 from app.core.enums import Channel
 from app.core.timeutil import now_utc
 from app.integrations.base import IntegrationError, IntegrationNotConfigured
-from app.integrations.social import InboundEvent, PostMetrics, PublishResult, SentMessage, SocialDriver, SocialPost
+from app.integrations.social import InboundEvent, SentMessage
 
 API = "https://openapi.zalo.me"
 INBOUND_EVENTS = {
@@ -85,7 +84,7 @@ class ZaloOAMessaging:
     # ---- webhook ------------------------------------------------------------------------------------------------
 
     def check_signature(self, headers: dict[str, str], body: bytes, timestamp: str) -> None:
-        secret, app_id = settings.zalo_oa_secret, os.environ.get("ZALO_APP_ID", "")
+        secret, app_id = settings.zalo_oa_secret, settings.zalo_app_id or ""
         if not secret or not app_id:
             raise IntegrationNotConfigured("Chưa cấu hình ZALO_OA_SECRET / ZALO_APP_ID để kiểm chữ ký webhook Zalo.")
         sig = {k.lower(): v for k, v in headers.items()}.get("x-zevent-signature", "").removeprefix("mac=")
@@ -158,15 +157,3 @@ class ZaloOAMessaging:
 
     async def reply_comment(self, channel: Channel, comment_external_id: str, text: str) -> SentMessage:
         raise IntegrationError("Zalo OA không có bình luận để trả lời.", code="not_supported")
-
-
-class Driver(ZaloOAMessaging, SocialDriver):
-    """Driver chỉ có phần nhắn tin (dùng khi `zalo_oa.py` chưa gộp phần này)."""
-
-    name = "zalo_oa_messaging"
-
-    async def publish(self, post: SocialPost) -> PublishResult:
-        raise IntegrationNotConfigured("Đăng bài Zalo OA nằm ở driver «zalo_oa» của module nội dung.")
-
-    async def post_metrics(self, channel: Channel, external_id: str) -> PostMetrics:
-        raise IntegrationNotConfigured("Số liệu bài Zalo OA nằm ở driver «zalo_oa» của module nội dung.")

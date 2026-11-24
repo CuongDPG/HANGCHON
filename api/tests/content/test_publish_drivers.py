@@ -12,10 +12,10 @@ from app.core.config import settings
 from app.core.enums import Channel
 from app.integrations.base import IntegrationError, IntegrationNotConfigured
 from app.integrations.social import SocialPost
-from app.integrations.social import _ratelimit_publish as rl
-from app.integrations.social.meta_publish import Driver as MetaDriver
-from app.integrations.social.tiktok_draft_publish import Driver as TikTokDriver
-from app.integrations.social.zalo_oa_publish import Driver as ZaloDriver
+from app.integrations.social import _ratelimit as rl
+from app.integrations.social.meta import Driver as MetaDriver
+from app.integrations.social.tiktok_draft import Driver as TikTokDriver
+from app.integrations.social.zalo_oa import Driver as ZaloDriver
 from app.modules.content.ai_io import ProductFacts
 from app.modules.content.checks import build_findings, check_claims, check_numbers, money_mentions, status_of
 from app.modules.content.models import CheckStatus
@@ -24,9 +24,9 @@ from app.modules.content.models import CheckStatus
 @pytest.fixture(autouse=True)
 def _fresh_limiter(monkeypatch):
     for mod in (
-        "app.integrations.social.meta_publish",
-        "app.integrations.social.tiktok_draft_publish",
-        "app.integrations.social.zalo_oa_publish",
+        "app.integrations.social._meta_publish",
+        "app.integrations.social.tiktok_draft",
+        "app.integrations.social._zalo_oa_publish",
     ):
         monkeypatch.setattr(f"{mod}.limiter", rl.RateLimiter())
 
@@ -104,8 +104,8 @@ async def test_meta_instagram_needs_media(monkeypatch):
 
 
 async def test_meta_threads_text(monkeypatch):
-    monkeypatch.setenv("THREADS_USER_ID", "U1")
-    monkeypatch.setenv("THREADS_ACCESS_TOKEN", "TT")
+    monkeypatch.setattr(settings, "threads_user_id", "U1")
+    monkeypatch.setattr(settings, "threads_access_token", "TT")
     rec = Recorder(
         {
             ("POST", "/U1/threads_publish"): {"id": "T9"},
@@ -145,7 +145,7 @@ def test_rate_limiter_window():
 
 
 async def test_tiktok_pushes_video_to_inbox(monkeypatch):
-    monkeypatch.setenv("TIKTOK_ACCESS_TOKEN", "ACT.abcdefgh")
+    monkeypatch.setattr(settings, "tiktok_access_token", "ACT.abcdefgh")
     rec = Recorder(
         {("POST", "/post/publish/inbox/video/init/"): {"data": {"publish_id": "v_inbox_1"}, "error": {"code": "ok"}}}
     )

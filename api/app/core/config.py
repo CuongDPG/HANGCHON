@@ -125,6 +125,36 @@ class Settings(BaseSettings):
     tiktok_shop_app_secret: str | None = None
     hooks_mock_secret: str = "mock-webhook-secret"
 
+    # chi tiết driver thật (mọi biến môi trường driver đọc qua đây, không đọc thẳng os.environ)
+    # Mạng xã hội: driver theo từng kênh, dùng chung cho đăng bài (content) và hộp thư (inbox).
+    # "facebook=meta,instagram=meta,threads=meta,zalo_oa=zalo_oa,tiktok=tiktok_draft"; kênh không khai → SOCIAL_DRIVER.
+    social_channel_drivers: str = ""
+    meta_graph_version: str = "v24.0"
+    threads_user_id: str | None = None
+    threads_access_token: str | None = None
+    tiktok_access_token: str | None = None
+    zalo_app_id: str | None = None
+    zalo_oa_author: str = "Hàng Chọn"
+    zalo_oa_broadcast: bool = False  # True: bài viết OA gửi luôn tới người quan tâm (tốn hạn mức tin)
+    onebound_api_secret: str | None = None
+    ghn_env: Literal["dev", "prod"] = "prod"
+    ghtk_env: Literal["dev", "prod"] = "prod"
+    ghtk_pick_name: str | None = None
+    ghtk_pick_tel: str | None = None
+    ghtk_pick_address: str | None = None
+    ghtk_pick_district: str | None = None
+    ghtk_pick_ward: str | None = None
+    shopee_shop_id: str | None = None
+    shopee_access_token: str | None = None
+    tiktok_shop_access_token: str | None = None
+    tiktok_shop_cipher: str | None = None
+    # dựng video (f6)
+    content_ffmpeg: bool = True
+    content_font_path: str | None = None
+    # sao lưu (k4): đường dẫn pg_dump; không có thì thử `docker exec <container> pg_dump`
+    pg_dump_path: str | None = None
+    pg_dump_docker_container: str | None = "hangchon-postgres-1"
+
     @field_validator("*", mode="before")
     @classmethod
     def _blank_is_none(cls, v: Any, info: Any) -> Any:
