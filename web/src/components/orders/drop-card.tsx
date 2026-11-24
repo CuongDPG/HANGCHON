@@ -23,6 +23,7 @@ function CloseEarlyButton({ drop }: { drop: DropOverview }) {
     <Button
       size="sm"
       variant="secondary"
+      aria-label={`Chốt đợt sớm ${drop.code}`}
       loading={close.isPending}
       onClick={async () => {
         const ok = await confirm({

@@ -64,6 +64,8 @@ uv run python -m app.seed --demo >"$RUN/seed.log" 2>&1 || { tail -30 "$RUN/seed.
 grep "Dữ liệu mẫu" "$RUN/seed.log" || true
 
 echo "▶ e2e: API :$API_PORT + worker"
+# hãng giao giả lên nấc mỗi 3 giây (thay vì 1 giờ) để bài vòng đời đi tới «đã giao»
+export MOCK_SHIPPING_STEP_SECONDS=3
 (exec uv run uvicorn app.main:app --host 127.0.0.1 --port "$API_PORT" >"$RUN/api.log" 2>&1) &
 PIDS+=($!)
 (exec uv run arq app.worker.WorkerSettings >"$RUN/worker.log" 2>&1) &

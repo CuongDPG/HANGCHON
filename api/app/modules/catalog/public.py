@@ -95,6 +95,7 @@ def slots_left(item: DropItem) -> int | None:
 
 def _drop_brief(drop: Drop, item: DropItem) -> dict[str, Any]:
     return {
+        "id": drop.id,
         "slug": drop.slug,
         "label": drop_svc.label(drop),
         "title": drop.title,
