@@ -6,6 +6,7 @@ quét `content.compose_pending` mỗi 2 phút bắt mọi bản còn `drafting`.
 from __future__ import annotations
 
 import logging
+import uuid
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -44,3 +45,31 @@ async def on_drop_opened(db: AsyncSession, payload: dict[str, Any]) -> None:
         return
     if await ensure_placeholders(db, drop=drop):
         await _kick()
+
+
+@events.on("review.published")
+async def on_review_published(db: AsyncSession, payload: dict[str, Any]) -> None:
+    """Đánh giá tốt (≥ 4★) được hiển thị → gợi ý một bài Facebook kể lại lời khách (chị gật thì AI mới soạn)."""
+    from datetime import datetime, time, timedelta
+
+    from app import control
+    from app.core.enums import Channel
+    from app.core.timeutil import VN_TZ, local_today
+    from app.modules.catalog.models import Review
+    from app.modules.content.service import ACTION_SUGGEST
+
+    review = await db.get(Review, uuid.UUID(str(payload.get("review_id"))))
+    product = await facts.get_product(db, payload.get("product_id", ""))
+    if review is None or product is None or (review.rating or 0) < 4 or not (review.body or "").strip():
+        return
+    slot = datetime.combine(local_today() + timedelta(days=1), time(20, 0), tzinfo=VN_TZ)
+    quote = review.body.strip()[:200]
+    await control.propose(
+        ACTION_SUGGEST,
+        f"Gợi ý bài từ đánh giá {review.rating}★: {product.name}",
+        {"slot_at": slot.isoformat(), "channel": Channel.FACEBOOK.value, "product_id": str(product.id),
+         "idea": f"Kể lại cảm nhận của khách đã nhận hàng ({review.rating}★): «{quote}». Giữ nguyên lời khách."},
+        {"product": product.name, "rating": review.rating, "quote": quote, "slot_at": slot.isoformat()},
+        db=db, summary="Khách vừa khen món này; một bài kể lại lời khách thường ra đơn tốt.",
+        ref_type="reviews", ref_id=review.id, dedupe_key=f"review-post:{review.id}", ai_generated=False,
+    )  # fmt: skip

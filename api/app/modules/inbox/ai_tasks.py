@@ -137,7 +137,7 @@ _KW: list[tuple[IntentKey, tuple[str, ...]]] = [
     ("ask_stock", ("con hang", "con khong", "con ko", " con k ", "con mau", "con size", "het hang", "con nua", "con ban")),
     ("ask_price", (" gia ", "bao nhieu", "nhieu tien", " bn ", "bao tien", "bnhieu", "xin gia", "gia bao")),
     ("purchase", ("lay", "dat ", "chot", "mua", "cho minh 1", "cho em 1", "gui cho", "len don", "dat hang")),
-    ("ask_product", ("dung", "cach", "rua", "giat", "may rua bat", "lo vi song", "duoc khong", "chat lieu", "giu nhiet")),
+    ("ask_product", ("dung", "cach", "rua", "giat", "may rua bat", "lo vi song", "duoc khong", "chat lieu", "giu nhiet", "giu nong")),
     ("small_talk", ("cam on", "thank", "hi ", "chao", "ok shop", "da nhan duoc", "tuyet voi")),
 ]  # fmt: skip
 

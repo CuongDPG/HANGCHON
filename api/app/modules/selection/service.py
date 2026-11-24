@@ -337,6 +337,8 @@ async def change_stage(
             await control.cancel_pending(
                 db, action="selection.draft_reasons", ref_type="selection_decisions", ref_id=prev.id
             )
+    if target != CandidateStage.CANDIDATE:  # đã chuyển cột → gợi ý mua mẫu không còn cần
+        await control.cancel_pending(db, action="selection.suggest_sample", ref_type="candidates", ref_id=c.id)
     c.stage = target
     c.stage_changed_at = now_utc()
     if position is None:
@@ -375,6 +377,32 @@ async def change_stage(
         if target == CandidateStage.SELECTED:
             await draft_reasons(db, decision)
     return c, decision
+
+
+async def suggest_sample_if_passing(db: AsyncSession, candidate_id: uuid.UUID, assessment_id: str | None) -> bool:
+    """Nghe `candidate.assessed`: điểm ≥ điểm đạt của khung chấm và món còn ở cột Ứng viên → hỏi chị mua mẫu."""
+    from app.modules.assessment.models import Assessment, ScoringProfile  # chỉ đọc
+
+    c = await db.get(Candidate, candidate_id)
+    a = await db.get(Assessment, uuid.UUID(assessment_id)) if assessment_id else None
+    if c is None or a is None or a.score_total is None or c.stage != CandidateStage.CANDIDATE:
+        return False
+    prof = await db.get(ScoringProfile, a.scoring_profile_id) if getattr(a, "scoring_profile_id", None) else None
+    if prof is None:
+        prof = await db.scalar(select(ScoringProfile).where(ScoringProfile.is_default.is_(True)).limit(1))
+    pass_score = (prof.pass_score if prof else None) or 70
+    if float(a.score_total) < pass_score:
+        return False
+    await control.propose(
+        "selection.suggest_sample", f"Mua mẫu «{c.title_vi}»? Đạt {float(a.score_total):.0f}/100",
+        {"candidate_id": str(c.id)},
+        {"title": c.title_vi, "score": float(a.score_total), "pass_score": pass_score,
+         "href": f"/desk/san-hang/ung-vien/{c.id}"},
+        db=db, summary=f"Hồ sơ thẩm định đạt {float(a.score_total):.0f} điểm (điểm đạt {pass_score}).",
+        rationale=a.summary, ref_type="candidates", ref_id=c.id, dedupe_key=f"suggest-sample:{c.id}",
+        ai_generated=False,
+    )  # fmt: skip
+    return True
 
 
 # ---- c2: nhật ký thử hàng -----------------------------------------------------------------------------------------

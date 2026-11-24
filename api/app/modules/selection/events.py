@@ -17,6 +17,12 @@ async def _learn_taste(db: AsyncSession, payload: dict[str, Any]) -> None:
     await service.mark_taste_pending(db, uuid.UUID(payload["candidate_id"]))
 
 
+@events.on("candidate.assessed")
+async def _suggest_sample(db: AsyncSession, payload: dict[str, Any]) -> None:
+    """Hồ sơ thẩm định đạt điểm đạt của khung chấm → việc chờ chị «mua mẫu?» (một việc cho mỗi ứng viên)."""
+    await service.suggest_sample_if_passing(db, uuid.UUID(payload["candidate_id"]), payload.get("assessment_id"))
+
+
 @events.on("tester.feedback_received")
 async def _tester_feedback(db: AsyncSession, payload: dict[str, Any]) -> None:
     """h8: cảm nhận của khách thử hàng → một ghi chú thử (author=tester) cạnh ghi chú của chị. Mỗi lời mời một ghi chú."""

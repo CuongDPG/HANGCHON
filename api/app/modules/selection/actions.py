@@ -37,6 +37,14 @@ control.register_action(
     description="AI tổng hợp điều chị hay chọn, hay loại để xếp hạng ứng viên cho giống mắt chị.",
 )
 
+control.register_action(
+    "selection.suggest_sample",
+    "Gợi ý mua mẫu món đạt ngưỡng điểm",
+    GROUP,
+    default="ask",
+    description="Hồ sơ thẩm định đạt điểm đạt của khung chấm → hỏi chị có mua mẫu không. Duyệt = chuyển sang Mua mẫu.",
+)
+
 control.register_setting(
     service.TRIAL_DAYS_KEY, "Số ngày thử mỗi món", service.DEFAULT_TRIAL_DAYS, group=GROUP,
     description="Thanh tiến độ «ngày thử thứ n/14» trên bàn chọn.",
@@ -122,3 +130,12 @@ async def _stats(db: AsyncSession) -> list[control.Stat]:
             href="/desk/ban-chon?tab=sample", order=21,
         ),
     ]  # fmt: skip
+
+
+@control.handler("selection.suggest_sample")
+async def _suggest_sample(ctx: control.ActionContext) -> control.HandlerResult:
+    c, _ = await service.change_stage(ctx.db, uuid.UUID(ctx.payload["candidate_id"]), "sample", ctx.user)
+    return control.HandlerResult(
+        result={"candidate_id": str(c.id)}, summary=f"Chuyển «{c.title_vi}» sang Mua mẫu",
+        ref_type="candidates", ref_id=c.id,
+    )  # fmt: skip
