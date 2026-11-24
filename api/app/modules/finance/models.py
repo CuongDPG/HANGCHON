@@ -126,6 +126,9 @@ class Expense(UUIDPk, Timestamps, Base):
     payment_method: Mapped[str | None] = mapped_column(String(30))
     is_deductible: Mapped[bool] = flag(True)
     created_by_id: Mapped[uuid.UUID | None] = fk("users", index=False)
+    source_key: Mapped[str | None] = mapped_column(
+        String(120), unique=True, comment="Chi phí sinh từ sự kiện expense.recorded của module khác (chống ghi trùng)"
+    )
 
 
 class Invoice(UUIDPk, Timestamps, Base):

@@ -41,6 +41,4 @@ async def on_order_refunded(db: AsyncSession, payload: dict[str, Any]) -> None:
 
 @events.on("expense.recorded")
 async def on_expense_recorded(db: AsyncSession, payload: dict[str, Any]) -> None:
-    expense_id = _uuid(payload.get("expense_id"))
-    if expense_id is not None:
-        await service.record_expense(db, expense_id)
+    await service.record_expense_event(db, payload)
