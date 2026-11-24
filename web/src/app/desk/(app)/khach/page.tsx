@@ -1,7 +1,7 @@
-import { DeskPlaceholder } from "@/components/desk/desk-placeholder";
+import { InboxScreen } from "@/components/inbox/inbox-screen";
 
-export const metadata = { title: "Khách" };
+export const metadata = { title: "Hộp thư" };
 
 export default function DeskCustomersPage() {
-  return <DeskPlaceholder navKey="customers" />;
+  return <InboxScreen />;
 }
