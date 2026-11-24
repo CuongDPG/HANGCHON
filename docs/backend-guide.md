@@ -10,7 +10,8 @@ docker compose up -d                       # Postgres 5442, Redis 6382 (tên d�
 ./scripts/dev.sh start | stop [all] | logs [api|worker|web|infra|all] | status
 scripts/check.sh api                       # ruff check + ruff format --check + toàn bộ pytest — phải xanh trước khi gộp
 cd api && uv run pytest tests/<file> -k ten
-cd api && uv run python -m app.seed        # tài khoản chị (OWNER_EMAIL/OWNER_PASSWORD) + dữ liệu mẫu tối thiểu
+cd api && uv run python -m app.seed        # tài khoản chị (OWNER_EMAIL/OWNER_PASSWORD) + dữ liệu nền tối thiểu
+cd api && uv run python -m app.seed --demo # + câu chuyện mẫu dùng chung cho mọi module (app/demo.py, chạy một lần)
 cd api && uv run arq app.worker.WorkerSettings
 ```
 
@@ -272,5 +273,5 @@ Tên job `"<module>.<viec>"`. Test đặt `JOBS_EAGER=true` → `enqueue` chạy
 
 - Driver thật: `sources/web`, `sources/onebound`, `social/meta|tiktok_draft|zalo_oa`, `payments/sepay`, `shipping/ghn|ghtk`,
   `notify/zalo_oa|email`, `marketplaces/tiktok_shop|shopee`; `storage/s3` mới viết, chưa kiểm chứng.
-- Service/router/UI của 11 module nghiệp vụ; dữ liệu mẫu đầy đủ (`app/seed.py` mới có phần tối thiểu).
+- Trạng thái từng chức năng: [status.md](status.md).
 - Provider anthropic mới kiểm bằng client giả (chưa gọi API thật vì chưa có khoá); fallbacks `"default"` cho Opus 5.5 theo tài liệu.

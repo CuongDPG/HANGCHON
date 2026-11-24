@@ -42,8 +42,8 @@ Next.js là bản 16: đọc tài liệu đi kèm trong `web/node_modules/next/d
   trống / lỗi. `scripts/check.sh web` xanh và `bun run build` thành công.
 - **Xem bằng mắt**: chạy dev với dữ liệu mẫu, chụp từng màn hình ở 390px (và 1280px cho màn hình chính) bằng
   Playwright, mở ảnh xem, sửa chỗ xấu/lệch/tràn rồi mới kết thúc. Thêm ít nhất một bài Playwright đi hết luồng chính.
-- Dữ liệu mẫu: viết `api/app/modules/<module>/seed.py` có `async def seed_demo(db)` (idempotent), tên món hàng và
-  người đều là ví dụ, không dùng dữ liệu thật.
+- Dữ liệu mẫu: thêm vào câu chuyện chung `api/app/demo.py` (`python -m app.seed --demo`), đi qua API/sự kiện thật;
+  không viết `seed_demo` riêng cho module (tránh sản phẩm/đơn/khách trùng lặp). Tên món hàng và người đều là ví dụ.
 - Mỗi chức năng trong danh sách được giao phải **chạy được thật từ giao diện tới CSDL**. Phần phụ thuộc tài khoản
   bên ngoài thì chạy trọn bằng driver `mock` và viết sẵn driver thật theo tài liệu chính thức (ghi rõ là chưa thử thật).
 

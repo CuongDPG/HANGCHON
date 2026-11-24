@@ -26,20 +26,18 @@ async function login(page: Page) {
   await api(page.request, "post", "/api/desk/auth/login", OWNER);
 }
 
-async function approveInQueue(page: Page, text: RegExp | string) {
-  await page.goto("/desk/duyet");
-  const main = page.getByRole("main");
-  const row = main.getByRole("button", { name: /Duyệt →|Xử lý →/ }).filter({ hasText: text }).first();
-  await expect(row).toBeVisible({ timeout: 20_000 });
-  await row.click();
+/** Chị mở việc chờ ở «Chờ duyệt» (link `?id=` như khi bấm từ «Hôm nay») và bấm Duyệt. */
+async function approveInQueue(page: Page, itemId: string, title: RegExp | string) {
+  await page.goto(`/desk/duyet?id=${itemId}`);
   const sheet = page.getByRole("dialog");
+  await expect(sheet.getByText(title).first()).toBeVisible({ timeout: 20_000 });
   await sheet.getByRole("button", { name: "Duyệt", exact: true }).click();
   await expect(page.getByText("Đã duyệt", { exact: true })).toBeVisible();
 }
 
 test("một món hàng từ đề tìm tới đánh giá của khách", async ({ page }, info) => {
   test.skip(info.project.name !== "mobile", "Một luồng ghi dữ liệu, chạy ở khung điện thoại 390px");
-  test.setTimeout(300_000);
+  test.setTimeout(480_000);
   await login(page);
   const main = page.getByRole("main");
 
@@ -69,8 +67,13 @@ test("một món hàng từ đề tìm tới đánh giá của khách", async ({
   await main.getByRole("button", { name: "Mua mẫu", exact: true }).click();
   await page.getByRole("alertdialog").getByRole("button", { name: "Mua mẫu" }).click();
   await expect.poll(async () => (await api<{ items: unknown[] }>(page.request, "get", `/api/desk/supply/purchase-orders?candidate_id=${candId}`)).items.length).toBe(1);
-  const samplePo = (await api<{ items: { id: string; code: string }[] }>(page.request, "get", `/api/desk/supply/purchase-orders?candidate_id=${candId}`)).items[0];
-  await approveInQueue(page, samplePo.code);
+  const samplePo = (await api<{ items: { id: string; code: string; approval_item_id: string }[] }>(page.request, "get", `/api/desk/supply/purchase-orders?candidate_id=${candId}`)).items[0];
+  // từ việc chờ bấm «Mở chi tiết» tới đúng màn hình đơn đặt mẫu
+  await page.goto(`/desk/duyet?id=${samplePo.approval_item_id}`);
+  await page.getByRole("dialog").getByRole("link", { name: "Mở chi tiết →" }).click();
+  await expect(page).toHaveURL(new RegExp(`/desk/nguon-cung/don/${samplePo.id}`));
+  await expect(main.getByText(samplePo.code).first()).toBeVisible();
+  await approveInQueue(page, samplePo.approval_item_id, samplePo.code);
   expect((await api<{ status: string }>(page.request, "get", `/api/desk/supply/purchase-orders/${samplePo.id}`)).status).toBe("approved");
 
   // ---- c1/c2: đang thử, ghi chú thử hàng ----------------------------------------------------------------------
@@ -102,8 +105,8 @@ test("một món hàng từ đề tìm tới đánh giá của khách", async ({
   await api(page.request, "post", "/api/desk/supply/cost-sheets", { candidate_id: candId, unit_price_amount: "38", currency: "CNY", weight_grams: 300 });
   await page.goto(`/desk/nguon-cung/gia-von/${candId}`);
   await expect(main.getByText(/Giá vốn về tay|về tay/).first()).toBeVisible();
-  await api(page.request, "post", "/api/desk/supply/price-proposals", { candidate_id: candId });
-  await approveInQueue(page, `Giá bán ${title}`);
+  const proposal = await api<{ approval_item_id: string }>(page.request, "post", "/api/desk/supply/price-proposals", { candidate_id: candId });
+  await approveInQueue(page, proposal.approval_item_id, `Giá bán ${title}`);
   await expect.poll(async () => (await api<{ price_vnd: number }>(page.request, "get", `/api/desk/catalog/products/${productId}`)).price_vnd).toBeGreaterThan(0);
 
   // ---- e1: AI viết trang (worker) → chị đăng lên kệ → content soạn bài các kênh (f1) ----------------------------
@@ -185,9 +188,9 @@ test("một món hàng từ đề tìm tới đánh giá của khách", async ({
   await main.getByRole("button", { name: `Chốt đợt sớm ${drop.code}` }).click();
   await page.getByRole("alertdialog").getByRole("button", { name: "Chốt đợt" }).click();
   await expect(page.getByText(/Đã chốt/)).toBeVisible();
-  const pos = await api<{ items: { id: string; code: string; kind: string; drop_id: string }[] }>(page.request, "get", "/api/desk/supply/purchase-orders?size=100");
+  const pos = await api<{ items: { id: string; code: string; kind: string; drop_id: string; approval_item_id: string }[] }>(page.request, "get", "/api/desk/supply/purchase-orders?size=100");
   const batch = pos.items.find((p) => p.drop_id === drop.id && p.kind === "batch")!;
-  await approveInQueue(page, batch.code);
+  await approveInQueue(page, batch.approval_item_id, batch.code);
   expect((await api<{ status: string }>(page.request, "get", `/api/desk/supply/purchase-orders/${batch.id}`)).status).toBe("approved");
 
   // ---- d7: gửi đơn, lô hàng về → đơn chờ giao -----------------------------------------------------------------
@@ -219,12 +222,9 @@ test("một món hàng từ đề tìm tới đánh giá của khách", async ({
   await expect(main.getByText(/Cảm ơn/).first()).toBeVisible();
   await login(page);
   await page.goto("/desk/san-pham/danh-gia");
-  const review = main.locator("li, article, div").filter({ hasText: `vòng ${RUN}` });
-  const show = review.getByRole("button", { name: "Hiện" }).first();
-  if (await show.isVisible().catch(() => false)) {
-    await show.click();
-    await expect(page.getByText("Đã hiện trên trang sản phẩm")).toBeVisible();
-  }
+  const review = main.getByText(`vòng ${RUN}`).first().locator("xpath=ancestor::*[.//button[normalize-space()='Hiện']][1]");
+  await review.getByRole("button", { name: "Hiện" }).first().click();
+  await expect(page.getByText("Đã hiện trên trang sản phẩm")).toBeVisible();
   await page.context().clearCookies();
   await page.goto(`/san-pham/${product.slug}`);
   await expect(page.getByRole("main").getByText(`vòng ${RUN}`)).toBeVisible();

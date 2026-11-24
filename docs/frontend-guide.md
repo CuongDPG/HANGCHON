@@ -241,7 +241,13 @@ bun run typecheck && bun run lint && bun run test   # = scripts/check.sh web
 bun run build                                       # tắt `bun dev` trước
 bun run e2e                                         # Playwright khói: /, /desk/dang-nhap, /desk/kit ở 390px và 1280px
 E2E_SHOTS=1 bun run e2e                             # kèm ảnh chụp ở test-results/shots/
+../scripts/check.sh e2e                             # TOÀN BỘ Playwright trên hệ thống dựng riêng (CSDL e2e + dữ liệu mẫu
+                                                    # + API :8019 + worker + web :3019), xem scripts/e2e.sh
 ```
+
+`scripts/check.sh e2e` không cần bật tay gì: tự tạo CSDL `hangchon_e2e_<thư mục>`, chạy `app.seed --demo`, bật API, worker
+(hàng đợi riêng) và `next dev` trong `.next-e2e`, đặt `E2E_API=1` để các bài cần dữ liệu thật chạy, rồi dọn sạch.
+Bài chính: `e2e/lifecycle.spec.ts` (vòng đời một món hàng) và `e2e/routes.spec.ts` (mọi route, 390px + 1280px).
 
 Bài khói chạy được khi API chưa chạy: lỗi tải `/api/*` được bỏ qua, nhưng trang phải hiện trạng thái trống/lỗi tử tế,
 không lỗi console, không tràn ngang ở 390px. Thêm màn hình quan trọng thì thêm một dòng vào `e2e/smoke.spec.ts`.
