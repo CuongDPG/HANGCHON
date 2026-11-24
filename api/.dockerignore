@@ -1,0 +1,16 @@
+# Chỉ đưa vào image những gì API/worker cần chạy: pyproject.toml, uv.lock, alembic*, app/
+.venv/
+**/__pycache__/
+**/*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+tests/
+storage/
+data/
+.env
+.env.*
+*.log
+Dockerfile
+.dockerignore

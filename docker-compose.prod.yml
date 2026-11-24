@@ -1,0 +1,248 @@
+# Hàng Chọn — bản chạy thật (Dokploy: ứng dụng loại Docker Compose, đường dẫn tệp docker-compose.prod.yml).
+# Hướng dẫn: docs/deployment.md. Mọi giá trị bí mật lấy từ biến môi trường của Dokploy, KHÔNG ghi vào tệp này.
+#
+# Tên container có tiền tố `hangchon-` (đổi bằng CONTAINER_PREFIX) và API nối Postgres/Redis bằng TÊN CONTAINER:
+# trên Dokploy nhiều ứng dụng dùng chung mạng `dokploy-network`, tên dịch vụ trần `postgres`/`redis` có thể trúng
+# container của ứng dụng khác.
+#
+# Không mở cổng ra máy chủ: Traefik của Dokploy chuyển tên miền vào `web` (cổng 3000) và `/api` vào `api` (cổng 8000).
+
+x-api-env: &api-env
+  # ---- ứng dụng ----
+  APP_ENV: prod
+  WEB_BASE_URL: ${SITE_URL:?SITE_URL bắt buộc, vd https://hangchon.vn}
+  API_BASE_URL: ${API_BASE_URL:-${SITE_URL}}
+  CORS_ORIGINS: ${CORS_ORIGINS:-["${SITE_URL}"]}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  UVICORN_WORKERS: ${UVICORN_WORKERS:-1}
+  # ---- dữ liệu: nối bằng tên container ----
+  DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-hangchon}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD bắt buộc}@${CONTAINER_PREFIX:-hangchon}-postgres:5432/${POSTGRES_DB:-hangchon}
+  DATABASE_ECHO: "false"
+  REDIS_URL: redis://${CONTAINER_PREFIX:-hangchon}-redis:6379/0
+  # ---- đăng nhập ----
+  JWT_SECRET: ${JWT_SECRET:?JWT_SECRET bắt buộc (chuỗi ngẫu nhiên >= 32 ký tự)}
+  JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-20160}
+  COOKIE_NAME: ${COOKIE_NAME:-hc_session}
+  COOKIE_SECURE: ${COOKIE_SECURE:-true}
+  COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
+  OWNER_EMAIL: ${OWNER_EMAIL:?OWNER_EMAIL bắt buộc}
+  OWNER_PASSWORD: ${OWNER_PASSWORD:?OWNER_PASSWORD bắt buộc (mật khẩu lần đầu, đổi ngay sau khi đăng nhập)}
+  OWNER_NAME: ${OWNER_NAME:-Chị}
+  CREATE_OWNER_ON_STARTUP: ${CREATE_OWNER_ON_STARTUP:-true}
+  HC_DEMO_ACTIONS: ${HC_DEMO_ACTIONS:-}
+  # ---- AI ----
+  AI_PROVIDER: ${AI_PROVIDER:-fake}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  AI_MODEL_SMART: ${AI_MODEL_SMART:-claude-opus-5-5}
+  AI_MODEL_FAST: ${AI_MODEL_FAST:-claude-haiku-5-5}
+  AI_EFFORT_SMART: ${AI_EFFORT_SMART:-medium}
+  AI_EFFORT_FAST: ${AI_EFFORT_FAST:-low}
+  AI_MAX_TOKENS: ${AI_MAX_TOKENS:-16000}
+  AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-300}
+  AI_MAX_RETRIES: ${AI_MAX_RETRIES:-2}
+  AI_FALLBACKS: ${AI_FALLBACKS:-default}
+  AI_FALLBACK_MODELS: ${AI_FALLBACK_MODELS:-["claude-opus-5-5","claude-opus-5"]}
+  AI_MONTHLY_BUDGET_VND: ${AI_MONTHLY_BUDGET_VND:-1500000}
+  AI_USD_VND_RATE: ${AI_USD_VND_RATE:-26000}
+  AI_WEB_SEARCH_USD_PER_1K: ${AI_WEB_SEARCH_USD_PER_1K:-10}
+  AI_PRICING: ${AI_PRICING:-}
+  # ---- việc nền ----
+  JOBS_EAGER: "false"
+  # ---- lưu trữ tệp (local = volume apidata:/data) ----
+  STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+  STORAGE_LOCAL_DIR: /data/storage
+  STORAGE_PUBLIC_BASE_URL: ${STORAGE_PUBLIC_BASE_URL:-${SITE_URL}/api/files}
+  S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-}
+  S3_BUCKET: ${S3_BUCKET:-}
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+  S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+  S3_REGION: ${S3_REGION:-auto}
+  # ---- video ngắn (f6) ----
+  CONTENT_FFMPEG: ${CONTENT_FFMPEG:-1}
+  CONTENT_FONT_PATH: ${CONTENT_FONT_PATH:-}
+  # ---- tích hợp ngoài: mặc định mock ----
+  SOURCES_DRIVER: ${SOURCES_DRIVER:-mock}
+  SOCIAL_DRIVER: ${SOCIAL_DRIVER:-mock}
+  SOCIAL_PUBLISH_DRIVERS: ${SOCIAL_PUBLISH_DRIVERS:-}
+  PAYMENTS_DRIVER: ${PAYMENTS_DRIVER:-mock}
+  SHIPPING_DRIVER: ${SHIPPING_DRIVER:-mock}
+  NOTIFY_DRIVER: ${NOTIFY_DRIVER:-mock}
+  MARKETPLACES_DRIVER: ${MARKETPLACES_DRIVER:-mock}
+  EINVOICE_DRIVER: ${EINVOICE_DRIVER:-mock}
+  # nguồn hàng
+  ONEBOUND_API_KEY: ${ONEBOUND_API_KEY:-}
+  ONEBOUND_API_SECRET: ${ONEBOUND_API_SECRET:-}
+  # Meta (Facebook Page, Instagram, Threads)
+  META_APP_ID: ${META_APP_ID:-}
+  META_APP_SECRET: ${META_APP_SECRET:-}
+  META_PAGE_ID: ${META_PAGE_ID:-}
+  META_PAGE_TOKEN: ${META_PAGE_TOKEN:-}
+  META_IG_USER_ID: ${META_IG_USER_ID:-}
+  META_WEBHOOK_VERIFY_TOKEN: ${META_WEBHOOK_VERIFY_TOKEN:-}
+  META_GRAPH_VERSION: ${META_GRAPH_VERSION:-v24.0}
+  THREADS_USER_ID: ${THREADS_USER_ID:-}
+  THREADS_ACCESS_TOKEN: ${THREADS_ACCESS_TOKEN:-}
+  # TikTok
+  TIKTOK_CLIENT_KEY: ${TIKTOK_CLIENT_KEY:-}
+  TIKTOK_CLIENT_SECRET: ${TIKTOK_CLIENT_SECRET:-}
+  TIKTOK_ACCESS_TOKEN: ${TIKTOK_ACCESS_TOKEN:-}
+  # Zalo OA
+  ZALO_APP_ID: ${ZALO_APP_ID:-}
+  ZALO_OA_ID: ${ZALO_OA_ID:-}
+  ZALO_OA_ACCESS_TOKEN: ${ZALO_OA_ACCESS_TOKEN:-}
+  ZALO_OA_SECRET: ${ZALO_OA_SECRET:-}
+  ZALO_OA_AUTHOR: ${ZALO_OA_AUTHOR:-Hàng Chọn}
+  ZALO_OA_BROADCAST: ${ZALO_OA_BROADCAST:-}
+  # thanh toán VietQR / SePay
+  SEPAY_API_KEY: ${SEPAY_API_KEY:-}
+  SEPAY_WEBHOOK_SECRET: ${SEPAY_WEBHOOK_SECRET:-}
+  BANK_CODE: ${BANK_CODE:-MOCKBANK}
+  BANK_ACCOUNT_NO: ${BANK_ACCOUNT_NO:-0000000000}
+  BANK_ACCOUNT_NAME: ${BANK_ACCOUNT_NAME:-HANG CHON}
+  PAYMENT_CODE_PREFIX: ${PAYMENT_CODE_PREFIX:-HC}
+  # vận chuyển
+  GHN_TOKEN: ${GHN_TOKEN:-}
+  GHN_SHOP_ID: ${GHN_SHOP_ID:-}
+  GHN_ENV: ${GHN_ENV:-}
+  GHTK_TOKEN: ${GHTK_TOKEN:-}
+  GHTK_ENV: ${GHTK_ENV:-}
+  GHTK_PICK_NAME: ${GHTK_PICK_NAME:-}
+  GHTK_PICK_TEL: ${GHTK_PICK_TEL:-}
+  GHTK_PICK_ADDRESS: ${GHTK_PICK_ADDRESS:-}
+  GHTK_PICK_DISTRICT: ${GHTK_PICK_DISTRICT:-}
+  GHTK_PICK_WARD: ${GHTK_PICK_WARD:-}
+  SHIPPING_FROM_PROVINCE: ${SHIPPING_FROM_PROVINCE:-Hà Nội}
+  MOCK_SHIPPING_STEP_SECONDS: ${MOCK_SHIPPING_STEP_SECONDS:-3600}
+  # email
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_FROM: ${SMTP_FROM:-Hàng Chọn <no-reply@hangchon.local>}
+  # sàn
+  SHOPEE_PARTNER_ID: ${SHOPEE_PARTNER_ID:-}
+  SHOPEE_PARTNER_KEY: ${SHOPEE_PARTNER_KEY:-}
+  SHOPEE_SHOP_ID: ${SHOPEE_SHOP_ID:-}
+  SHOPEE_ACCESS_TOKEN: ${SHOPEE_ACCESS_TOKEN:-}
+  TIKTOK_SHOP_APP_KEY: ${TIKTOK_SHOP_APP_KEY:-}
+  TIKTOK_SHOP_APP_SECRET: ${TIKTOK_SHOP_APP_SECRET:-}
+  TIKTOK_SHOP_ACCESS_TOKEN: ${TIKTOK_SHOP_ACCESS_TOKEN:-}
+  TIKTOK_SHOP_CIPHER: ${TIKTOK_SHOP_CIPHER:-}
+  # Chữ ký webhook của driver mock. Khi PAYMENTS_DRIVER/SHIPPING_DRIVER còn là mock, webhook mock VẪN mở ở prod
+  # → bắt buộc đặt chuỗi ngẫu nhiên riêng (giá trị mặc định nằm công khai trong repo).
+  HOOKS_MOCK_SECRET: ${HOOKS_MOCK_SECRET:?HOOKS_MOCK_SECRET bắt buộc (chuỗi ngẫu nhiên)}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ${CONTAINER_PREFIX:-hangchon}-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-hangchon}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD bắt buộc}
+      POSTGRES_DB: ${POSTGRES_DB:-hangchon}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: ${CONTAINER_PREFIX:-hangchon}-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1000"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: ./api
+      args:
+        PG_MAJOR: "16"
+    image: ${CONTAINER_PREFIX:-hangchon}-api:latest
+    container_name: ${CONTAINER_PREFIX:-hangchon}-api
+    restart: unless-stopped
+    init: true
+    environment: *api-env
+    volumes:
+      - apidata:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=4)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  worker:
+    # cùng image với api (cùng build → dùng lại cache), khác lệnh chạy
+    build:
+      context: ./api
+      args:
+        PG_MAJOR: "16"
+    image: ${CONTAINER_PREFIX:-hangchon}-api:latest
+    container_name: ${CONTAINER_PREFIX:-hangchon}-worker
+    restart: unless-stopped
+    init: true
+    command: ["arq", "app.worker.WorkerSettings"]
+    environment: *api-env
+    volumes:
+      - apidata:/data
+    depends_on:
+      # chờ API lên (đã migrate xong) rồi mới chạy việc nền
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "arq", "--check", "app.worker.WorkerSettings"]
+      interval: 60s
+      timeout: 20s
+      retries: 3
+      start_period: 60s
+
+  web:
+    build:
+      context: ./web
+      args:
+        API_ORIGIN: http://${CONTAINER_PREFIX:-hangchon}-api:8000
+        SITE_URL: ${SITE_URL:?SITE_URL bắt buộc}
+    image: ${CONTAINER_PREFIX:-hangchon}-web:latest
+    container_name: ${CONTAINER_PREFIX:-hangchon}-web
+    restart: unless-stopped
+    init: true
+    environment:
+      API_ORIGIN: http://${CONTAINER_PREFIX:-hangchon}-api:8000
+      SITE_URL: ${SITE_URL}
+      NEXT_PUBLIC_SITE_URL: ${SITE_URL}
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+    depends_on:
+      api:
+        condition: service_healthy
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/robots.txt').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  pgdata:
+  redisdata:
+  apidata:
