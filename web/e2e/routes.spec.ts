@@ -24,7 +24,8 @@ async function first<T = Record<string, unknown>>(req: APIRequestContext, url: s
 async function collectIds(req: APIRequestContext): Promise<Ids> {
   await req.post("/api/desk/auth/login", { data: OWNER });
   const ids: Ids = {};
-  const product = await first<{ id: string; slug: string }>(req, "/api/desk/catalog/products?size=50");
+  // món đã đăng trong dữ liệu mẫu (bài khác có thể đang tạo món nháp cùng lúc)
+  const product = await first<{ id: string; slug: string; status: string }>(req, "/api/desk/catalog/products?size=100", (p) => p.status === "published");
   ids.product = product?.id;
   ids.slug = product?.slug;
   const drop = await first<{ id: string; slug: string; status: string }>(req, "/api/desk/catalog/drops?size=50", (d) => d.status === "open");

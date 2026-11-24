@@ -43,7 +43,7 @@ test("một món hàng từ đề tìm tới đánh giá của khách", async ({
 
   // ---- a1/a4: ra đề bằng lời, AI hiểu, tìm --------------------------------------------------------------------
   await page.goto("/desk/san-hang");
-  await page.getByLabel("Chị muốn tìm gì?").fill(`Tìm bình giữ nhiệt inox 304 cho bé đi học, nắp kín, dưới 250k (lần ${RUN})`);
+  await page.getByLabel("Chị muốn tìm gì?").fill(`Tìm bình giữ nhiệt inox 304 cho bé đi học, nắp kín, giữ nóng lâu (lần ${RUN})`);
   await page.getByRole("button", { name: "AI đọc đề" }).click();
   await expect(page).toHaveURL(/\/desk\/san-hang\/de\//);
   const briefId = page.url().split("/de/")[1].split(/[?#]/)[0];
@@ -52,14 +52,23 @@ test("một món hàng từ đề tìm tới đánh giá của khách", async ({
   await page.reload();
   await main.getByRole("button", { name: "Đúng rồi, tìm đi" }).click();
   const firstCand = main.locator('a[href^="/desk/san-hang/ung-vien/"]').first();
-  await expect(firstCand).toBeVisible({ timeout: 60_000 });
+  await expect(firstCand.or(main.getByText("Chưa có ứng viên")).first()).toBeVisible({ timeout: 60_000 });
+  // nguồn giả trả món ngẫu nhiên theo từ khoá; lỡ cả lượt bị lọc hết (giá, chất liệu) thì đổi từ khoá, tìm lại
+  for (let i = 0; i < 5 && !(await firstCand.isVisible()); i++) {
+    await api(page.request, "patch", `/api/desk/sourcing/briefs/${briefId}`, { keywords_translated: { zh: [`保温杯 ${RUN}-${i}${Math.round(Math.random() * 1e6)}`] } });
+    await api(page.request, "post", `/api/desk/sourcing/briefs/${briefId}/run`);
+    await page.reload();
+    await expect(firstCand.or(main.getByText("Chưa có ứng viên")).first()).toBeVisible({ timeout: 30_000 });
+  }
+  await expect(firstCand).toBeVisible();
   await firstCand.click();
 
   // ---- b1–b7: hồ sơ thẩm định, chấm điểm theo khung --------------------------------------------------------
   await expect(page).toHaveURL(/\/desk\/san-hang\/ung-vien\//);
   const candId = page.url().split("/ung-vien/")[1].split(/[?#]/)[0];
   const start = main.getByRole("button", { name: "Thẩm định món này" });
-  if (await start.isVisible().catch(() => false)) await start.click();
+  await expect(main.getByText("Điểm theo khung của chị").or(start).first()).toBeVisible({ timeout: 30_000 }); // trang đã tải xong
+  if (await start.isVisible()) await start.click();
   await expect(main.getByText("Điểm theo khung của chị")).toBeVisible({ timeout: 60_000 });
   const title = (await main.getByRole("heading", { level: 1 }).textContent())!.trim();
 

@@ -44,7 +44,8 @@ test("ra đề → tìm → hồ sơ thẩm định", async ({ page }) => {
   await expect(page).toHaveURL(/\/desk\/san-hang\/ung-vien\//);
   const profile = page.getByRole("main");
   const startBtn = profile.getByRole("button", { name: "Thẩm định món này" });
-  if (await startBtn.isVisible().catch(() => false)) await startBtn.click();
+  await expect(profile.getByText("Điểm theo khung của chị").or(startBtn).first()).toBeVisible({ timeout: 30_000 }); // trang đã tải xong
+  if (await startBtn.isVisible()) await startBtn.click();
   await expect(profile.getByText("Điểm theo khung của chị")).toBeVisible({ timeout: 60_000 });
   for (const name of ["Chất lượng", "An toàn", "Biên lợi nhuận", "Khác biệt", "Hàng nhái", "Nguồn", "Vận chuyển"]) {
     await expect(profile.getByText(name, { exact: true }).first()).toBeVisible();
