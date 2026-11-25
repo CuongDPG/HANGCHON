@@ -61,6 +61,8 @@ class Usage:
     web_fetch_requests: int = 0
     # chi phí đã tính theo từng lượt (khi fallback chạy model khác); None = tính theo `model`
     per_model: list[tuple[str, int, int, int, int]] | None = None
+    # chi phí nhà cung cấp tự báo (USD, vd OpenRouter `usage.cost`); có thì dùng thay cho bảng giá
+    reported_cost_usd: float | None = None
 
     def add(self, other: Usage) -> None:
         self.input_tokens += other.input_tokens
@@ -71,6 +73,8 @@ class Usage:
         self.web_fetch_requests += other.web_fetch_requests
         if other.per_model:
             self.per_model = (self.per_model or []) + other.per_model
+        if other.reported_cost_usd is not None:
+            self.reported_cost_usd = (self.reported_cost_usd or 0.0) + other.reported_cost_usd
 
 
 @dataclass

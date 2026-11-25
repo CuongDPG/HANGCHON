@@ -6,11 +6,13 @@
   Lưu ý: `user_location.country="VN"` bị API từ chối, chỉ gửi timezone.
 - Từ chối (`stop_reason == "refusal"`): với model trong AI_FALLBACK_MODELS và AI_FALLBACKS="default", bật server-side
   fallbacks (beta `server-side-fallback-2026-07-01`); nếu cả chuỗi vẫn từ chối → AIRefused.
+- Khoá lấy từ cấu hình chị lưu ở Cài đặt (CSDL, đã giải mã) hoặc ANTHROPIC_API_KEY — truyền vào qua `Connection`.
 """
 
 from __future__ import annotations
 
 import base64
+import hashlib
 import logging
 from typing import Any
 
@@ -18,8 +20,10 @@ import anthropic
 from pydantic import ValidationError
 
 from app.ai.errors import AIError, AIOutputInvalid, AIRefused, AIUnavailable
+from app.ai.providers import BaseProvider, Connection, register
 from app.ai.types import AIRequest, ProviderResponse, Usage
 from app.core.config import settings
+from app.core.secrets import redact
 
 log = logging.getLogger("app.ai.anthropic")
 
@@ -95,28 +99,42 @@ def _sources(content: list[Any]) -> list[dict[str, str]]:
     return [s for s in out if not (s["url"] in seen or seen.add(s["url"]))]
 
 
-class AnthropicProvider:
+@register
+class AnthropicProvider(BaseProvider):
     name = "anthropic"
+    label = "Anthropic (Claude)"
+    key_env = "anthropic_api_key"
+    model_suggestions = ("claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5")
+    key_placeholder = "sk-ant-…"
 
     def __init__(self) -> None:
-        self._client: anthropic.AsyncAnthropic | None = None
+        self._client: anthropic.AsyncAnthropic | None = None  # test gắn client giả vào đây
+        self._clients: dict[str, anthropic.AsyncAnthropic] = {}
 
-    @property
-    def client(self) -> anthropic.AsyncAnthropic:
-        if self._client is None:
-            if not settings.anthropic_api_key:
-                raise AIUnavailable("Chưa có khoá ANTHROPIC_API_KEY. Đặt khoá hoặc dùng AI_PROVIDER=fake.")
-            self._client = anthropic.AsyncAnthropic(
-                api_key=settings.anthropic_api_key,
+    def client_for(self, conn: Connection) -> anthropic.AsyncAnthropic:
+        if self._client is not None:
+            return self._client
+        if not conn.api_key:
+            raise AIUnavailable(
+                "Chưa có khoá Anthropic: nhập khoá ở Cài đặt → AI và khoá API (hoặc đặt ANTHROPIC_API_KEY).",
+                code="ai_no_key",
+            )
+        # một client cho mỗi khoá (đổi khoá ở Cài đặt → client mới); khoá băm để không giữ chuỗi rõ làm khoá dict
+        ident = hashlib.sha256(f"{conn.api_key}|{conn.base_url or ''}".encode()).hexdigest()
+        if ident not in self._clients:
+            self._clients[ident] = anthropic.AsyncAnthropic(
+                api_key=conn.api_key,
+                base_url=conn.base_url or None,
                 timeout=settings.ai_timeout_seconds,
                 max_retries=settings.ai_max_retries,
             )
-        return self._client
+        return self._clients[ident]
 
     def _uses_fallbacks(self, model: str) -> bool:
         return settings.ai_fallbacks == "default" and model in settings.ai_fallback_models
 
-    async def complete(self, req: AIRequest) -> ProviderResponse:
+    async def complete(self, req: AIRequest, conn: Connection) -> ProviderResponse:
+        client = self.client_for(conn)
         content: list[dict[str, Any]] = [_image_block(i) for i in req.images]
         content.append({"type": "text", "text": req.input_json})
         messages: list[dict[str, Any]] = [{"role": "user", "content": content}]
@@ -138,11 +156,11 @@ class AnthropicProvider:
         try:
             for _ in range(MAX_PAUSE_TURNS + 1):
                 if fallbacks:
-                    resp = await self.client.beta.messages.parse(
+                    resp = await client.beta.messages.parse(
                         messages=messages, betas=[FALLBACK_BETA], fallbacks="default", **kwargs
                     )
                 else:
-                    resp = await self.client.messages.parse(messages=messages, **kwargs)
+                    resp = await client.messages.parse(messages=messages, **kwargs)
                 usage.add(_usage(resp))
                 all_content += list(resp.content)
                 if resp.stop_reason != "pause_turn":
@@ -154,8 +172,18 @@ class AnthropicProvider:
             raise AIUnavailable("Khoá AI không có quyền dùng model hoặc tính năng này.", code="ai_permission") from e
         except anthropic.RateLimitError as e:
             raise AIUnavailable("AI đang quá tải lượt gọi, chị thử lại sau ít phút.", code="ai_rate_limited") from e
+        except anthropic.NotFoundError as e:
+            raise AIUnavailable(
+                f"Không tìm thấy model «{req.model}» (sai tên, hoặc khoá không có quyền dùng model này).",
+                code="ai_model_not_found",
+            ) from e
         except anthropic.BadRequestError as e:
-            log.error("Anthropic từ chối yêu cầu (%s): %s", req.task, e.message)
+            detail = redact(str(e.message), conn.api_key)
+            if "credit balance" in detail.lower():
+                raise AIUnavailable(
+                    "Tài khoản Anthropic hết hạn mức (credit), nạp thêm rồi thử lại.", code="ai_quota"
+                ) from e
+            log.error("Anthropic từ chối yêu cầu (%s): %s", req.task, detail)
             raise AIError("Yêu cầu gửi AI không hợp lệ (lỗi hệ thống).", code="ai_bad_request") from e
         except anthropic.APIStatusError as e:
             raise AIUnavailable(code="ai_server_error") from e

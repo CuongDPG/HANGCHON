@@ -32,6 +32,9 @@ INSECURE_JWT_SECRETS = {
 # Mật khẩu chị mặc định (config + api/.env.example) nằm công khai trong repo.
 INSECURE_OWNER_PASSWORDS = {"doimatkhau"}
 
+# Khoá mã hoá bí mật dùng khi chưa đặt SECRETS_ENCRYPTION_KEY — công khai trong repo, chỉ dùng ở dev/test.
+DEV_SECRETS_ENCRYPTION_KEY = "aGFuZ2Nob24tZGV2LW9ubHktc2VjcmV0cy1rZXktMzI="
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=API_DIR / ".env", env_file_encoding="utf-8", extra="ignore")
@@ -61,9 +64,13 @@ class Settings(BaseSettings):
     owner_name: str = "Chị"
     create_owner_on_startup: bool = True
 
-    # AI
-    ai_provider: Literal["anthropic", "fake"] = "fake"
+    # AI — chị đổi được ở Cài đặt → «AI và khoá API» (lưu trong CSDL, ghi đè các biến dưới đây)
+    ai_provider: str = "fake"  # tên provider trong app/ai/providers: anthropic | openrouter | fake
     anthropic_api_key: str | None = None
+    openrouter_api_key: str | None = None
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    # Khoá mã hoá (Fernet) cho bí mật lưu trong CSDL; nhiều khoá cách nhau dấu phẩy để xoay khoá (khoá đầu để mã hoá)
+    secrets_encryption_key: str | None = None
     ai_model_smart: str = "claude-opus-5-5"
     ai_model_fast: str = "claude-haiku-5-5"
     ai_effort_smart: str = "medium"
@@ -217,6 +224,14 @@ class Settings(BaseSettings):
             raise ValueError(
                 "OWNER_PASSWORD còn là mật khẩu mẫu hoặc ngắn hơn 12 ký tự: tài khoản chị được tạo bằng mật khẩu này "
                 "lúc khởi động, đặt chuỗi ngẫu nhiên riêng trước khi chạy production."
+            )
+        if self.app_env == "prod" and (
+            not self.secrets_encryption_key or DEV_SECRETS_ENCRYPTION_KEY in self.secrets_encryption_key.split(",")
+        ):
+            raise ValueError(
+                "SECRETS_ENCRYPTION_KEY chưa đặt hoặc còn là khoá dev: khoá API lưu trong CSDL được mã hoá bằng biến này. "
+                'Sinh khoá bằng `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` '
+                "trước khi chạy production."
             )
         return self
 

@@ -27,7 +27,8 @@ Rà soát ngày 25/11/2026 (nhánh `feat/security-hardening`). Test giữ từng
 | Giới hạn tần suất (Redis, cửa sổ trượt): trợ lý AI (6/phút + 120/ngày mỗi IP, 40/ngày mỗi phiên), tra đơn (30/10 phút mỗi IP, 10/giờ mỗi SĐT), đặt hàng (20/10 phút), báo giá, hỏi về đơn, nhờ tìm, bình chọn, đánh giá, nhắc đợt | `app/core/ratelimit.py` + từng router |
 | IP khách lấy từ `request.client` — uvicorn chỉ tin `X-Forwarded-For` khi yêu cầu tới từ mạng nội bộ (`FORWARDED_ALLOW_IPS`); không đọc thẳng header | `api/Dockerfile`, `ratelimit.client_ip` |
 | Webhook: SePay so khoá hằng-thời-gian; Meta HMAC `X-Hub-Signature-256`; Zalo SHA-256 `X-ZEvent-Signature`; GHN/GHTK không ký → hỏi lại hãng; chống phát lại bằng mã giao dịch / mã tin duy nhất; webhook `mock` 404 ở prod | `integrations/payments/sepay.py`, `integrations/social/_meta_messaging.py`, `_zalo_oa_messaging.py`, `orders/payments.py`, `orders/router.py` `_allowed` |
-| Production không khởi động với `JWT_SECRET` hoặc `OWNER_PASSWORD` mẫu / ngắn; trang `/docs` tắt | `app/core/config.py`, `app/main.py` |
+| Production không khởi động với `JWT_SECRET` hoặc `OWNER_PASSWORD` mẫu / ngắn, hay thiếu `SECRETS_ENCRYPTION_KEY`; trang `/docs` tắt | `app/core/config.py`, `app/main.py` |
+| Khoá API nhà cung cấp AI chị nhập ở *Cài đặt → AI và khoá API*: mã hoá Fernet (AES-128-CBC + HMAC-SHA256) bằng `SECRETS_ENCRYPTION_KEY` riêng (không suy ra từ `JWT_SECRET`; xoay khoá bằng danh sách `moi,cu`); API chỉ trả dạng che `sk-ant-…8AAA` + thời điểm/người đổi; chỉ owner đọc/sửa (helper 403); lưu vết `ai.key_changed` / `ai.key_cleared` / `ai.config_changed` không chứa giá trị khoá; khoá không vào log, `ai_runs`, lời báo lỗi (lời lỗi của nhà cung cấp được lọc khoá) | `app/core/secrets.py`, `app/ai/config.py`, `control/ai_settings.py`, `tests/control/test_ai_config.py` |
 | AI: dữ liệu ngoài bọc `<du_lieu>`; mọi hành động khách nhìn thấy mặc định `ask`, đổi trả/hoàn tiền/đặt hàng NCC `locked_ask`; việc `auto` mặc định đều là việc nội bộ | `app/ai`, `modules/*/actions.py` |
 | Web: React chặn URL `javascript:`; JSON-LD thoát `<`; `next` sau đăng nhập chỉ nhận `/desk...`; header `X-Frame-Options: DENY`, CSP `frame-ancestors 'none'`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`, HSTS | `web/src/components/store/json-ld.tsx`, `desk/dang-nhap/login-form.tsx`, `web/src/lib/security-headers.ts` |
 | Container chạy bằng user thường (`app`, `node`); Postgres/Redis không mở cổng ra máy chủ | `api/Dockerfile`, `web/Dockerfile`, `docker-compose.prod.yml` |
@@ -35,6 +36,7 @@ Rà soát ngày 25/11/2026 (nhánh `feat/security-hardening`). Test giữ từng
 ## 3. Phải làm trước khi mở bán thật
 
 - [ ] `JWT_SECRET`, `POSTGRES_PASSWORD`, `HOOKS_MOCK_SECRET`, `OWNER_PASSWORD` là chuỗi ngẫu nhiên riêng; đổi mật khẩu owner ngay sau lần đăng nhập đầu.
+- [ ] `SECRETS_ENCRYPTION_KEY` là khoá Fernet riêng, cất một bản ngoài máy chủ (mất khoá = phải nhập lại khoá API). Khoá API AI nhập ở Cài đặt rồi xoá khỏi env của Dokploy.
 - [ ] `PAYMENTS_DRIVER=sepay` + `SEPAY_WEBHOOK_SECRET`; `META_APP_SECRET`, `ZALO_OA_SECRET` trước khi khai webhook.
 - [ ] Kiểm sau deploy: gửi `X-Forwarded-For` giả tới `/api/store/assistant/ask` vẫn bị 429 sau 6 câu/phút (xác nhận Traefik nằm trong `FORWARDED_ALLOW_IPS`; mạng Dokploy khác dải mặc định thì đặt biến này).
 - [ ] Đặt trần chi phí AI; mức tự chủ giữ «thận trọng»; không chuyển `inbox.reply_faq` / `content.publish_post` sang `auto` khi chưa theo dõi một thời gian.
@@ -49,4 +51,9 @@ Rà soát ngày 25/11/2026 (nhánh `feat/security-hardening`). Test giữ từng
 - Không có CSP cho script trên web (Next cần nonce); XSS hiện dựa vào React tự thoát chuỗi.
 - Webhook GHN/GHTK không ký: ai cũng gọi được, mỗi lần làm API hỏi lại hãng một lần (tốn hạn mức gọi hãng).
 - `ai_runs.output` và hàng chờ duyệt có thể chứa SĐT/địa chỉ khách; helper xem được. Chưa có thời hạn xoá dữ liệu cá nhân.
+- Khoá mã hoá `SECRETS_ENCRYPTION_KEY` nằm trong env của máy chủ: ai đọc được env (quyền vào Dokploy / `docker inspect`) cùng
+  bản sao CSDL thì giải mã được khoá API. Mã hoá bảo vệ trước việc lộ riêng CSDL hay bản sao lưu, không bảo vệ trước người
+  chiếm máy chủ. Khoá đã giải mã nằm trong bộ nhớ tiến trình API/worker (cache ≤ 5 giây cấu hình, client SDK theo khoá).
+- «Kiểm tra kết nối» là chỗ duy nhất gọi AI theo yêu cầu của người dùng với khoá chưa lưu; chỉ owner bấm được, mỗi lần gọi
+  hai lượt rất ngắn và tính vào trần tháng.
 - Lịch sử git có email công việc thật của người commit (metadata commit) — không xoá được nếu không viết lại lịch sử.

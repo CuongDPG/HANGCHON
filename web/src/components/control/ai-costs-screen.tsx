@@ -1,6 +1,7 @@
 "use client";
 
-import { RotateCw, TriangleAlert } from "lucide-react";
+import { ChevronRight, RotateCw, TriangleAlert } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import {
   Button,
@@ -101,6 +102,7 @@ function CostBody({ data, current }: { data: AICosts; current: boolean }) {
       </Card>
 
       {current ? <BudgetForm budget={data.budget_vnd} /> : null}
+      <AIConfigLink />
 
       <section className="flex flex-col gap-2" aria-label="Theo ngày">
         <SectionLabel>Theo ngày</SectionLabel>
@@ -180,6 +182,17 @@ function BudgetForm({ budget }: { budget: number }) {
         </Button>
       </div>
     </form>
+  );
+}
+
+function AIConfigLink() {
+  const { user } = useSession();
+  if (!isOwner(user)) return null;
+  return (
+    <Link href="/desk/cai-dat/ai" className="flex items-center justify-between gap-3 text-[14px] text-accent hover:underline">
+      Đổi nhà cung cấp AI, khoá API, model
+      <ChevronRight className="size-4 shrink-0" aria-hidden />
+    </Link>
   );
 }
 

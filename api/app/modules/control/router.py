@@ -9,6 +9,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Query, Request, Response, status
 from sqlalchemy import select
 
+from app.ai import config as ai_config
 from app.core import ratelimit
 from app.core.config import settings
 from app.core.db import DbSession
@@ -18,7 +19,7 @@ from app.core.pagination import Page, Paginated, paginate
 from app.core.security import create_access_token, hash_password, verify_password
 from app.core.timeutil import VN_TZ, now_utc
 from app.integrations.base import KINDS, driver_name
-from app.modules.control import links, service
+from app.modules.control import ai_settings, links, service
 from app.modules.control.models import (
     ActivityMode,
     AIActivity,
@@ -33,8 +34,11 @@ from app.modules.control.models import (
 from app.modules.control.registry import INTENTS, SETTINGS
 from app.modules.control.schemas import (
     ActivityOut,
+    AIConfigIn,
+    AIConfigOut,
     AICostsOut,
     AIRunOut,
+    AITestOut,
     ApprovalGroupOut,
     ApprovalItemOut,
     ApproveIn,
@@ -312,6 +316,35 @@ async def update_ai_budget(body: BudgetUpdate, user: OwnerUser, db: DbSession) -
     await service.set_budget(db, body.monthly_budget_vnd, user)
     await db.commit()  # ai_costs đọc trần bằng phiên riêng
     return await service.ai_costs(db)
+
+
+# cấu hình AI: provider, khoá (mã hoá), model, effort, trần — chỉ owner
+
+
+@router.get("/ai/config", response_model=AIConfigOut, summary="Cấu hình AI đang dùng (khoá chỉ trả dạng che)")
+async def get_ai_config(_: OwnerUser, db: DbSession) -> dict:
+    return await ai_settings.get_config(db)
+
+
+@router.patch("/ai/config", response_model=AIConfigOut, summary="Lưu cấu hình AI và chuyển sang dùng provider này")
+async def update_ai_config(body: AIConfigIn, user: OwnerUser, db: DbSession) -> dict:
+    await ai_settings.save_config(db, body, user)
+    await db.commit()
+    ai_config.invalidate()  # có hiệu lực ngay ở tiến trình này; worker thấy sau ≤ CACHE_SECONDS
+    return await ai_settings.get_config(db)
+
+
+@router.post("/ai/config/test", response_model=AITestOut, summary="Kiểm tra kết nối bằng cấu hình đang nhập")
+async def test_ai_config(body: AIConfigIn, _: OwnerUser, db: DbSession) -> dict:
+    return await ai_settings.test_connection(db, body)
+
+
+@router.delete("/ai/config/{provider}/key", status_code=status.HTTP_204_NO_CONTENT, summary="Xoá khoá đã lưu")
+async def delete_ai_key(provider: str, user: OwnerUser, db: DbSession) -> Response:
+    await ai_settings.clear_key(db, provider, user)
+    await db.commit()
+    ai_config.invalidate()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/ai/runs", response_model=Paginated[AIRunOut])

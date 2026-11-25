@@ -51,6 +51,7 @@ Con dấu «ĐÃ CHỌN n/m»: `m` = số `candidates` cùng `brief_id`, `n` = s
 | `ai_runs` | Mỗi lần gọi model một dòng, kể cả lỗi. `task`, `provider`, `model`, `tier`, `status` (`ok`/`error`/`refused`/`blocked`), token vào/ra/cache, `web_search_requests`, `cost_usd`, `cost_vnd`, `duration_ms`, `stop_reason`, `refusal_category`, `fallback_model`, `error_code`, `output` (kết quả đã kiểm khuôn). Tổng `cost_vnd` theo tháng (giờ VN) là căn cứ trần k2. |
 | `ai_activity` | Nhật ký AI (i4): mọi việc đã **thực thi**. `mode` `auto` (AI tự làm) / `approved` (sau khi chị duyệt, kèm `approval_item_id`), `payload`, `result`, `rationale`, `sources`, `ref_type/ref_id`, `undo_data` + `undoable`, `undone_at/undone_by_id`. |
 | `app_settings` | Cài đặt khoá → giá trị JSON (vd `ai.monthly_budget_vnd`, `store.name`). Khoá do module khai báo bằng `register_setting`. |
+| `ai_provider_configs` | Cấu hình nhà cung cấp AI chị lưu ở Cài đặt (ghi đè env). Khoá chính `provider`; `is_active` (nhiều nhất một dòng, chỉ mục duy nhất có điều kiện); `api_key_encrypted` (Fernet, không bao giờ trả ra API), `api_key_hint` (dạng che), `key_updated_at`/`key_updated_by_id`; `base_url`, `model_smart`, `model_fast`, `effort_smart`, `effort_fast` (trống = lấy env); `updated_at`/`updated_by_id`. |
 | `audit_log` | Lưu vết (k3): `actor_kind` (`owner`/`helper`/`ai`/`system`/`customer`), `actor_user_id`, `action` (vd `control.approved`, `auth.login`), `entity_type/entity_id`, `summary`, `data`. Chỉ ghi thêm. |
 
 ## sourcing — săn hàng (a1–a7)

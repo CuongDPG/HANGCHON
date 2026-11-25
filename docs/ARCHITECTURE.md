@@ -66,9 +66,13 @@ result = await ai.run(
 ```
 
 - Provider: `anthropic` (SDK chính thức `anthropic`, structured outputs qua `client.messages.parse`, adaptive
-  thinking, không `temperature`, không prefill, không ép `tool_choice`) hoặc `fake` (hàm giả đăng ký theo
-  tên tác vụ, dùng cho test và chạy thử không có khoá). Chọn bằng `AI_PROVIDER`.
-- Model mặc định: `AI_MODEL_SMART=claude-opus-5-5`, `AI_MODEL_FAST=claude-haiku-5-5` (đổi bằng env).
+  thinking, không `temperature`, không prefill, không ép `tool_choice`), `openrouter` (REST tương thích OpenAI qua
+  `httpx`, `response_format` json_schema, plugin `web`) hoặc `fake` (hàm giả đăng ký theo tên tác vụ, dùng cho test và
+  chạy thử không có khoá). Thêm provider = một tệp `app/ai/providers/<ten>.py` với lớp `@register`.
+- Cấu hình (`app/ai/config.py`): chị chọn provider, khoá (mã hoá, `SECRETS_ENCRYPTION_KEY`), model, effort, trần ở
+  *Cài đặt → AI và khoá API* (bảng `ai_provider_configs`). Thứ tự **Cài đặt > biến môi trường > mặc định**; đọc lại mỗi
+  lần gọi (cache 5 giây, xoá khi lưu) nên đổi là có hiệu lực ngay, kể cả worker.
+- Model mặc định: `AI_MODEL_SMART=claude-opus-5-5`, `AI_MODEL_FAST=claude-haiku-5-5` (đổi bằng env hoặc Cài đặt).
 - Mỗi lần gọi ghi một dòng `ai_runs` (tác vụ, model, token vào/ra, chi phí ước tính, thời lượng, lỗi).
   Vượt `AI_MONTHLY_BUDGET_VND` thì dừng tác vụ tự động và tạo việc chờ chị (chức năng k2).
 - Prompt hệ thống ổn định đặt trước, dữ liệu thay đổi đặt sau (để cache). Dữ liệu từ web, từ khách,
@@ -117,7 +121,7 @@ trọn vẹn khi chưa có tài khoản thật. Driver thật viết theo tài l
 
 | Module | Chức năng | Bảng chính |
 |---|---|---|
-| `control` | i1–i4, i6, k2, k3 | `users`, `autonomy_settings`, `approval_items`, `ai_runs`, `ai_activity`, `app_settings`, `audit_log` |
+| `control` | i1–i4, i6, k2, k3 | `users`, `autonomy_settings`, `approval_items`, `ai_runs`, `ai_activity`, `app_settings`, `audit_log`, `ai_provider_configs` |
 | `sourcing` | a1–a7 | `sourcing_briefs`, `sourcing_runs`, `candidates`, `trend_signals`, `demand_signals` |
 | `assessment` | b1–b7 | `assessments`, `scoring_profiles`, `review_digests`, `market_prices`, `comparisons` |
 | `selection` | c1–c6 | `trial_notes`, `selection_decisions`, `selection_principles`, `taste_profiles` (giai đoạn bảng chọn là trường `candidates.stage`) |

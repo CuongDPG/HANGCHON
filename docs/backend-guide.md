@@ -121,6 +121,10 @@ res.cost_vnd, res.model, res.sources  # sources = [{"url","title"}] từ web sea
   model trong `AI_FALLBACK_MODELS` bật `fallbacks="default"` (beta `server-side-fallback-2026-07-01`; Haiku không hỗ trợ nên không gửi).
 - Chi phí = bảng giá `DEFAULT_AI_PRICING` (ghi đè bằng `AI_PRICING`) × `AI_USD_VND_RATE` + web search; mỗi lần gọi ghi `ai_runs`.
 - Trần tháng: `app_settings["ai.monthly_budget_vnd"]` nếu chị đã đặt, không thì `AI_MONTHLY_BUDGET_VND`; `0` = không giới hạn.
+- Provider/khoá/model/effort: `app.ai.config.current_config()` — dòng `ai_provider_configs` đang dùng (chị lưu ở Cài đặt) >
+  biến môi trường > mặc định; cache 5 giây, `invalidate()` khi lưu. Provider mới: tệp `app/ai/providers/<ten>.py`, lớp kế thừa
+  `BaseProvider` gắn `@register`, `complete(req, conn)` (`conn.api_key` đã giải mã). Nhập khoá env vào CSDL:
+  `uv run python -m app.ai.import_env_config`. Bí mật khác cần lưu CSDL: `app.core.secrets.encrypt/decrypt/mask`.
 
 ## 6. Giám sát — `from app import control`
 
@@ -260,7 +264,7 @@ Tên job `"<module>.<viec>"`. Test đặt `JOBS_EAGER=true` → `enqueue` chạy
    ai_activity / bảng nghiệp vụ và `sources` để dẫn nguồn.
 5. Bảng bổ sung ngoài danh sách mục 7: `demand_mentions`, `assessment_scores`, `comparison_items`, `product_variants`,
    `inventory_movements`, `customer_identities`, `order_events`, `marketplace_listings`, `content_insights`, `group_digests`,
-   `referral_uses` (tổng 80 bảng).
+   `referral_uses`, `ai_provider_configs` (tổng 81 bảng).
 6. `users` thuộc module control; xác thực ở `/api/desk/auth/*`, quản lý tài khoản phụ ở `/api/desk/users`.
 7. Docker compose đặt `name: hangchon` để mọi worktree dùng chung một bộ container; `dev.sh stop` chỉ tắt tiến trình của
    worktree, `dev.sh stop all` mới tắt container.
@@ -274,4 +278,5 @@ Tên job `"<module>.<viec>"`. Test đặt `JOBS_EAGER=true` → `enqueue` chạy
 - Driver thật: `sources/web`, `sources/onebound`, `social/meta|tiktok_draft|zalo_oa`, `payments/sepay`, `shipping/ghn|ghtk`,
   `notify/zalo_zns|email` (kiểm bằng máy chủ giả), `marketplaces/tiktok_shop|shopee`; `storage/s3` mới viết, chưa kiểm chứng.
 - Trạng thái từng chức năng: [status.md](status.md).
-- Provider anthropic mới kiểm bằng client giả (chưa gọi API thật vì chưa có khoá); fallbacks `"default"` cho Opus 5.5 theo tài liệu.
+- Provider anthropic đã gọi thật được (`claude-haiku-5-5`, `claude-opus-5-5`); fallbacks `"default"` cho Opus 5.5 theo tài liệu.
+  Provider openrouter viết theo tài liệu OpenRouter, mới kiểm bằng máy chủ giả (chưa gọi thật).
