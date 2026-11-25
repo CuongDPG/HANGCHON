@@ -7,7 +7,7 @@ import { catalogApi } from "@/lib/api/catalog";
 
 export const metadata: Metadata = {
   title: "Hỏi trợ lý",
-  description: "Trợ lý AI trả lời từ hồ sơ thẩm định của người chọn, có dẫn nguồn. Không biết thì chuyển cho chị.",
+  description: "Hỏi về món hàng, cách dùng, đợt bán. Câu nào chưa rõ sẽ được chuyển cho chị.",
   alternates: { canonical: "/hoi" },
 };
 
@@ -39,7 +39,7 @@ async function AskBody({ searchParams }: { searchParams: PageProps<"/hoi">["sear
     <>
       <PageHeader
         title={name ? `Hỏi về ${name}` : "Hỏi trợ lý"}
-        description="Trợ lý trả lời từ hồ sơ của chị: mô tả, thông số, ghi chú thử hàng. Câu nào chưa có dữ liệu sẽ được chuyển cho chị."
+        description="Hỏi về món hàng, cách dùng, đợt bán. Câu nào chưa rõ sẽ được chuyển cho chị trả lời."
         backHref={name && slug ? `/san-pham/${slug}` : undefined}
       />
       <Suspense fallback={<Skeleton className="h-40 w-full" />}>

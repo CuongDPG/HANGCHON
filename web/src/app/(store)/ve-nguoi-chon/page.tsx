@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Bot, UserRound } from "lucide-react";
+import { UserRound } from "lucide-react";
 import { Suspense } from "react";
 import { JsonLd } from "@/components/store/json-ld";
 import { Card } from "@/components/ui/card";
@@ -12,7 +12,7 @@ const DEFAULT_PICKER_NAME = "Người chọn hàng";
 
 export const metadata: Metadata = {
   title: "Về người chọn",
-  description: "Ai chọn từng món ở Hàng Chọn, chọn theo nguyên tắc nào, và AI giúp phần nào.",
+  description: "Ai chọn từng món ở Hàng Chọn và chọn theo nguyên tắc nào.",
   alternates: { canonical: "/ve-nguoi-chon" },
 };
 
@@ -104,12 +104,6 @@ async function AboutBody() {
             ))}
           </ul>
         ) : null}
-      </Card>
-      <Card tone="soft">
-        <h2 className="flex items-center gap-1.5 text-[17px] font-bold">
-          <Bot className="size-4" aria-hidden /> AI giúp mình việc gì
-        </h2>
-        <p className="mt-1.5 text-[15px]">{a.ai_help}</p>
       </Card>
     </div>
   );

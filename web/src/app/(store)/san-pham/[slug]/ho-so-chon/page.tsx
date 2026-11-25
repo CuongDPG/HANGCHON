@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Bot, FlaskConical, HandHeart } from "lucide-react";
 import { Suspense } from "react";
 import { FunnelStrip } from "@/components/catalog/funnel-strip";
 import { getDossier } from "@/components/catalog/product-data";
@@ -10,7 +9,7 @@ import { ImageBox } from "@/components/ui/image-box";
 import { Money } from "@/components/ui/money";
 import { PageHeader } from "@/components/ui/page-header";
 import { Seal } from "@/components/ui/seal";
-import type { Alternative, Dossier } from "@/lib/api/catalog";
+import type { Alternative } from "@/lib/api/catalog";
 
 export async function generateMetadata({ params }: PageProps<"/san-pham/[slug]/ho-so-chon">): Promise<Metadata> {
   const { slug } = await params;
@@ -117,7 +116,6 @@ async function DossierBody({ params }: { params: PageProps<"/san-pham/[slug]/ho-
         </Card>
       ) : null}
 
-      <Roles d={d} />
     </div>
   );
 }
@@ -150,31 +148,3 @@ function AlternativeCard({ a }: { a: Alternative }) {
   );
 }
 
-function Roles({ d }: { d: Dossier }) {
-  const langs = d.review_languages.length ? ` ${d.review_languages.join(" và ")}` : "";
-  return (
-    <section className="flex flex-col gap-2" aria-labelledby="ai-va-chi">
-      <SectionLabel>
-        <span id="ai-va-chi">Phần nào AI làm, phần nào chị làm</span>
-      </SectionLabel>
-      <ul className="flex flex-col gap-2 text-[14px]">
-        <li className="flex gap-2.5">
-          <Bot className="mt-0.5 size-4 shrink-0 text-auto" aria-hidden />
-          <span>
-            AI tìm {d.funnel.viewed ?? "các"} mẫu ở nhiều nơi
-            {d.reviews_read ? `, đọc ${d.reviews_read.toLocaleString("vi-VN")} đánh giá${langs}` : ""} và tóm tắt lời khen chê.
-            Chị kiểm lại phần tóm tắt.
-          </span>
-        </li>
-        <li className="flex gap-2.5">
-          <FlaskConical className="mt-0.5 size-4 shrink-0 text-review" aria-hidden />
-          <span>Chị mua {d.funnel.tried ?? 0} mẫu bằng tiền của mình và dùng thật, ghi lại từng điều chưa ưng.</span>
-        </li>
-        <li className="flex gap-2.5">
-          <HandHeart className="mt-0.5 size-4 shrink-0 text-seal" aria-hidden />
-          <span>Quyết định chọn hay loại là của {d.picker_name ?? "chị"}. Lý do loại lấy từ ghi chú trong lúc thử.</span>
-        </li>
-      </ul>
-    </section>
-  );
-}

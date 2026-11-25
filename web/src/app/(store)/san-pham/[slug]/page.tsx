@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CircleAlert, Hourglass, MessageCircleQuestion, Sparkles } from "lucide-react";
+import { CircleAlert, Hourglass, MessageCircleQuestion } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 import { AskBox } from "@/components/assistant/ask-box";
@@ -152,11 +152,6 @@ async function ProductBody({ params }: { params: PageProps<"/san-pham/[slug]">["
               <span id="mo-ta">Mô tả</span>
             </SectionLabel>
             <PlainText text={p.description} className="text-[15px] leading-relaxed" />
-            {p.ai_generated ? (
-              <p className="flex items-center gap-1.5 text-[12.5px] text-ink-3">
-                <Sparkles className="size-3.5" aria-hidden /> Phần mô tả do AI soạn từ ghi chú thử hàng, chị đã đọc và duyệt.
-              </p>
-            ) : null}
           </section>
         ) : null}
         {p.specs.length ? (
@@ -248,7 +243,7 @@ function Gallery({ p }: { p: ProductDetail }) {
           </li>
         ))}
       </ul>
-      <p className="text-[12.5px] text-ink-3">Ảnh thật, chị chụp · {p.images.length} ảnh · không dùng ảnh AI tạo</p>
+      <p className="text-[12.5px] text-ink-3">Ảnh thật, chị chụp · {p.images.length} ảnh</p>
     </div>
   );
 }

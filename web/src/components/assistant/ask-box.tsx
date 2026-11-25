@@ -204,7 +204,6 @@ export function AskBox({ productSlug, productName, suggestions = [], placeholder
           {error}
         </p>
       ) : null}
-      <p className="text-[12.5px] text-ink-3">Trợ lý là AI, chỉ trả lời dựa trên hồ sơ thẩm định của chị. Không chắc thì chuyển cho chị.</p>
     </section>
   );
 }

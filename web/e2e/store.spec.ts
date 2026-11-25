@@ -18,7 +18,8 @@ test.describe("website: kệ hàng → sản phẩm → hồ sơ chọn", () => 
     await page.getByRole("searchbox", { name: "Tìm trên kệ" }).fill("binh giu nhiet");
     await page.getByRole("searchbox", { name: "Tìm trên kệ" }).press("Enter");
     await expect(page).toHaveURL(/q=binh/);
-    const card = page.getByRole("main").getByRole("link", { name: /Bình giữ nhiệt/ }).first();
+    // món cố định của dữ liệu mẫu (bài vòng đời chạy song song có thể đăng thêm một «Bình giữ nhiệt…» khác)
+    const card = page.getByRole("main").getByRole("link", { name: /Bình giữ nhiệt nắp bật 500 ml/ }).first();
     await expect(card.getByRole("img", { name: /Đã chọn 1 trong/ })).toBeVisible();
     await card.click();
 

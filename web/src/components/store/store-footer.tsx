@@ -17,7 +17,7 @@ export function StoreFooter() {
         <div>
           <Brand />
           <p className="mt-3 max-w-sm text-[15px] text-ink-2">
-            Mỗi món ở đây đã được mua bằng tiền thật và dùng ít nhất hai tuần. Món nào cũng nói rõ cả điều chưa ưng.
+            Chọn bằng cả trái tim
           </p>
         </div>
         <nav aria-label="Liên kết chân trang">
@@ -31,11 +31,6 @@ export function StoreFooter() {
             ))}
           </ul>
         </nav>
-      </div>
-      <div className="border-t border-line">
-        <p className="mx-auto max-w-page px-4 py-4 text-[13px] text-ink-3 md:px-6">
-          Trợ lý trên trang là AI, trả lời dựa trên hồ sơ thẩm định của người chọn. Quyết định chọn hàng là của người.
-        </p>
       </div>
     </footer>
   );
