@@ -18,7 +18,7 @@ from app.core import events
 from app.core.enums import Channel
 from app.core.errors import BadRequest, Conflict, NotFound
 from app.core.timeutil import now_utc
-from app.integrations import get_driver
+from app.integrations import notify as notify_api
 from app.integrations.notify import OutboundNotification
 from app.modules.catalog.models import Drop, DropItem, DropReminder, DropStatus, Product, ProductStatus
 from app.modules.catalog.textutil import hash_key, normalize_contact, unique_slug
@@ -237,10 +237,15 @@ async def send_reminders(db: AsyncSession, drop: Drop) -> int:
             )
         ).scalars()
     )
-    driver = get_driver("notify")
     sent = 0
     for r in rows:
-        res = await driver.send(OutboundNotification(channel=Channel.ZALO_OA, to=r.contact, text=reminder_text(drop)))
+        text = reminder_text(drop)
+        res = await notify_api.send(
+            OutboundNotification(
+                channel=Channel.ZALO_OA, to=r.contact, text=text, kind="drop_reminder",
+                data={"phone": r.contact, "noi_dung": text, "dot": drop.title},
+            )
+        )  # fmt: skip
         if res.status != "failed":
             r.notified_at = now_utc()
             sent += 1

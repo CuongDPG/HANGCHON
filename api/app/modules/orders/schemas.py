@@ -672,11 +672,37 @@ class ReturnRowOut(ReturnOut):
     recipient_name: str
 
 
+class NotifyChannelOut(BaseModel):
+    """Kênh báo tin đang bật (g5): kênh chính / dự phòng, driver gửi, đã đủ cấu hình chưa."""
+
+    channel: Channel
+    label: str
+    role: Literal["primary", "fallback"]
+    driver: str
+    ready: bool
+    note: str | None = None
+
+
+class FailedNotificationOut(BaseModel):
+    id: uuid.UUID
+    order_id: uuid.UUID | None
+    order_code: str | None
+    event_label: str
+    channel: Channel
+    recipient: str
+    error: str | None
+    attempts: int
+    will_retry: bool
+    created_at: datetime
+
+
 class TemplatesOut(BaseModel):
     templates: dict[str, str]
     defaults: dict[str, str]
     labels: dict[str, str]
     placeholders: dict[str, str]
+    channels: list[NotifyChannelOut] = Field(default_factory=list)
+    failed: list[FailedNotificationOut] = Field(default_factory=list)
 
 
 class TemplatesIn(BaseModel):

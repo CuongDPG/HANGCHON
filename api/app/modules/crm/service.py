@@ -29,7 +29,8 @@ from app.core.enums import Actor, Channel
 from app.core.errors import BadRequest, Conflict, NotFound
 from app.core.security import random_token
 from app.core.timeutil import local_today, now_utc, to_local
-from app.integrations import IntegrationError, get_driver
+from app.integrations import IntegrationError
+from app.integrations import notify as notify_api
 from app.integrations.notify import OutboundNotification
 from app.modules.catalog.models import Category, Drop, DropItem, Product, ProductStatus
 from app.modules.content.models import VoiceProfile
@@ -163,16 +164,49 @@ async def recipient(db: AsyncSession, customer: Customer) -> tuple[Channel, str]
     return None
 
 
+async def can_market_to(db: AsyncSession, customer: Customer) -> bool:
+    """Tin quảng cáo / chăm sóc (báo đợt, nhắc mua lại): chỉ khách đã đồng ý nhận (`marketing_opt_in`, ô đánh dấu
+    khi đặt hàng) và chưa từ chối (nhãn `tu-choi-nhan-tin`), không bị chặn. Tin giao dịch (mốc đơn) không cần."""
+    return bool(customer.marketing_opt_in) and not customer.is_blocked and not await is_opted_out(db, customer.id)
+
+
+OPT_OUT_FOOTER = "Không muốn nhận tin như này nữa, bạn nhắn «TỪ CHỐI» cho shop nhé."
+OPT_OUT_REPLIES = {"tu choi", "tu choi nhan tin", "huy nhan tin", "dung nhan tin", "khong nhan tin", "stop"}
+
+
+def is_opt_out_reply(text: str) -> bool:
+    return slugify(text or "", separator=" ") in OPT_OUT_REPLIES
+
+
 async def notify(
-    db: AsyncSession, customer: Customer, text: str, *, link: str | None = None, subject: str | None = None
+    db: AsyncSession,
+    customer: Customer,
+    text: str,
+    *,
+    link: str | None = None,
+    subject: str | None = None,
+    kind: str | None = None,
+    promotional: bool = False,
+    data: dict[str, Any] | None = None,
 ) -> str:
-    """Gửi tin riêng qua tích hợp notify. Trả mã tin; lỗi thì raise IntegrationError (câu tiếng Việt)."""
+    """Gửi tin riêng qua tích hợp notify. Trả mã tin; lỗi thì raise IntegrationError (câu tiếng Việt).
+    `promotional=True`: kiểm sự đồng ý và thêm câu hướng dẫn từ chối nhận tin."""
+    if promotional and not await can_market_to(db, customer):
+        raise BadRequest(
+            f"{customer.name or 'Khách'} chưa đồng ý nhận tin quảng cáo hoặc đã từ chối.", code="no_consent"
+        )
     to = await recipient(db, customer)
     if to is None:
         raise BadRequest(f"{customer.name or 'Khách'} chưa có kênh nhận tin (Zalo, email hay số điện thoại).")
-    res = await get_driver("notify").send(
-        OutboundNotification(channel=to[0], to=to[1], text=text, link_url=link, subject=subject)
-    )
+    if promotional and OPT_OUT_FOOTER not in text:
+        text = f"{text}\n{OPT_OUT_FOOTER}"
+    values = {"ten": customer.name or "bạn", "noi_dung": text, "link": link or "", "phone": customer.phone or ""}
+    res = await notify_api.send(
+        OutboundNotification(
+            channel=to[0], to=to[1], text=text, link_url=link, subject=subject, kind=kind, promotional=promotional,
+            data={**values, **(data or {})},
+        )
+    )  # fmt: skip
     if res.status == "failed":
         raise IntegrationError(f"Gửi cho {customer.name or 'khách'} không được: {res.error or 'lỗi không rõ'}")
     return res.external_id or ""
@@ -447,10 +481,10 @@ async def regulars(db: AsyncSession) -> list[Customer]:
 
 
 async def audience(db: AsyncSession) -> list[Customer]:
-    """Khách quen nhận tin: bỏ người từ chối nhận tin và người bị chặn."""
+    """Khách quen nhận tin (tin quảng cáo): chỉ người đã đồng ý nhận, bỏ người từ chối nhận tin và người bị chặn."""
     out = []
     for c in await regulars(db):
-        if c.is_blocked or await is_opted_out(db, c.id):
+        if not await can_market_to(db, c):
             continue
         out.append(c)
     return out
@@ -568,7 +602,7 @@ async def send_broadcast(db: AsyncSession, broadcast_id: uuid.UUID, body: str | 
     link = store_link(f"/dot/{drop.slug}") if drop else None
     for c in people:
         try:
-            await notify(db, c, b.body, link=link, subject=b.title)
+            await notify(db, c, b.body, link=link, subject=b.title, kind="broadcast", promotional=True)
             delivered += 1
         except (IntegrationError, BadRequest) as e:
             failed.append(f"{c.name}: {e.message}")
@@ -778,6 +812,8 @@ async def run_due(db: AsyncSession, today: date | None = None) -> dict[str, int]
         skip = None
         if await is_opted_out(db, customer.id) or customer.is_blocked:
             skip = "Khách từ chối nhận tin"
+        elif not customer.marketing_opt_in:
+            skip = "Khách chưa đồng ý nhận tin nhắc"
         elif await db.scalar(
             select(ReorderReminder.id).where(
                 ReorderReminder.customer_id == customer.id,
@@ -863,7 +899,10 @@ async def send_reminder(db: AsyncSession, reminder_id: uuid.UUID, body: str | No
         raise BadRequest("Tin nhắc đang trống.")
     product = await db.get(Product, r.product_id)
     link = store_link(f"/san-pham/{product.slug}") if product else None
-    await notify(db, customer, text, link=link)
+    await notify(
+        db, customer, text, link=link, kind="reorder_reminder", promotional=True,
+        data={"mon": product.name if product else ""},
+    )  # fmt: skip
     r.message_body = text
     r.status = ReminderStatus.SENT
     r.sent_at = now_utc()
@@ -1154,7 +1193,7 @@ async def invite_testers(
             out.append(inv)  # để nháp: khách từ chối nhận tin, chị tự gửi link nếu khách đồng ý
             continue
         try:
-            await notify(db, c, f"{text}\n{invite_link(inv.token)}", link=invite_link(inv.token))
+            await notify(db, c, f"{text}\n{invite_link(inv.token)}", link=invite_link(inv.token), kind="tester_invite")
             inv.status = TesterInviteStatus.INVITED
             inv.invited_at = now_utc()
         except (IntegrationError, BadRequest) as e:

@@ -221,9 +221,9 @@ Tên job `"<module>.<viec>"`. Test đặt `JOBS_EAGER=true` → `enqueue` chạy
 | `social` | `publish(SocialPost)` (TikTok → `draft_pushed`), `fetch_inbound(since)`, `send_message`, `reply_comment`, `post_metrics`, `parse_webhook` | `simulate_inbound(text, channel=, kind=, author_name=)`, `published`, `sent` |
 | `payments` | `create_request(order_code, amount_vnd)` → nội dung CK + QR, `parse_webhook`, `list_transactions(since)` | `simulate_transfer(amount_vnd, content)`, `sign(body)` |
 | `shipping` | `quote(req)`, `create(req, service)`, `track(code)`, `cancel(code)`, `parse_webhook` | không giữ trạng thái: lên nấc theo thời gian; `advance(n)` để tua; service `"fail"` đi nhánh hoàn |
-| `notify` | `send(OutboundNotification)` | `outbox`; người nhận chứa «fail» → lỗi |
+| `notify` | `send(OutboundNotification)` → `NotifyResult` (`retryable` khi lỗi); gọi qua `app.integrations.notify.send(msg)` để định tuyến theo kênh (`NOTIFY_CHANNEL_DRIVERS`) và không bị raise. `kind` = loại tin (mẫu ZNS), `promotional` = tin quảng cáo | `outbox`; người nhận chứa «fail» → lỗi |
 | `marketplaces` | `upsert_product`, `update_stock`, `fetch_orders`, `update_order_status` | `simulate_order(marketplace, sku, qty)` |
-| `einvoice` | `issue(InvoiceRequest)` (cùng `reference` không phát hành trùng), `cancel` | — |
+| `einvoice` | `issue(InvoiceRequest)` (cùng `reference` không phát hành trùng), `cancel`, `adjust`/`replace(AdjustmentRequest)`, `get_status`, `download(id, "pdf"\|"xml")` | — |
 | `storage` | `put/get/delete/exists/url` | driver `local` (mặc định), `s3` (chưa kiểm chứng với dịch vụ thật) |
 
 - Chọn driver bằng env `<KIND>_DRIVER` (mặc định `mock`; storage `local`), hoặc `get_driver("shipping", "ghn")`.
@@ -272,6 +272,6 @@ Tên job `"<module>.<viec>"`. Test đặt `JOBS_EAGER=true` → `enqueue` chạy
 ## 12. Còn dở (để module sau làm)
 
 - Driver thật: `sources/web`, `sources/onebound`, `social/meta|tiktok_draft|zalo_oa`, `payments/sepay`, `shipping/ghn|ghtk`,
-  `notify/zalo_oa|email`, `marketplaces/tiktok_shop|shopee`; `storage/s3` mới viết, chưa kiểm chứng.
+  `notify/zalo_zns|email` (kiểm bằng máy chủ giả), `marketplaces/tiktok_shop|shopee`; `storage/s3` mới viết, chưa kiểm chứng.
 - Trạng thái từng chức năng: [status.md](status.md).
 - Provider anthropic mới kiểm bằng client giả (chưa gọi API thật vì chưa có khoá); fallbacks `"default"` cho Opus 5.5 theo tài liệu.

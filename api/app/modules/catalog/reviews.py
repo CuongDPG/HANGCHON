@@ -19,7 +19,7 @@ from app.core.errors import BadRequest, Conflict, NotFound
 from app.core.security import random_token
 from app.core.storage import get_storage
 from app.core.timeutil import now_utc
-from app.integrations import get_driver
+from app.integrations import notify as notify_api
 from app.integrations.notify import OutboundNotification
 from app.modules.catalog import images as img_lib
 from app.modules.catalog.ai_tasks import ModerateIn, ModerateOut, moderate_rules
@@ -100,8 +100,11 @@ async def request_for_order(db: AsyncSession, order_id: uuid.UUID) -> list[Revie
 
 
 async def send_request(payload: dict[str, Any]) -> dict[str, Any]:
-    res = await get_driver("notify").send(
-        OutboundNotification(channel=Channel.ZALO_OA, to=str(payload["to"]), text=str(payload["text"]))
+    to, text = str(payload["to"]), str(payload["text"])
+    res = await notify_api.send(
+        OutboundNotification(
+            channel=Channel.ZALO_OA, to=to, text=text, kind="review_request", data={"phone": to, "noi_dung": text}
+        )
     )
     if res.status == "failed":
         raise BadRequest(f"Chưa gửi được tin xin đánh giá: {res.error or 'lỗi kênh gửi'}")

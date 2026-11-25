@@ -64,7 +64,7 @@ hoặc mở tay trên máy dev với dữ liệu mẫu `uv run python -m app.see
 | g2 | Khớp thanh toán | chạy với mock, cần tài khoản SePay (webhook) | `/desk/don-hang/van-hanh` |
 | g3 | Tổng hợp đợt để đặt nguồn | chạy thật (đóng đợt → đơn đặt lô theo NCC chờ chị duyệt) | hàng chờ duyệt, `/desk/nguon-cung` |
 | g4 | Tạo vận đơn | chạy với mock, cần tài khoản GHN hoặc GHTK | `/desk/don-hang/[id]`, `/desk/don-hang/in-nhan` |
-| g5 | Báo tin cho khách | một phần — mốc đơn, mẫu tin, chống trùng chạy thật với `notify` mock; **chưa có driver thật** (Zalo ZNS / email) | `/desk/don-hang/van-hanh` (mẫu tin) |
+| g5 | Báo tin cho khách | chạy với mock, cần OA Zalo + ZBS (mẫu ZNS đã duyệt) hoặc máy chủ SMTP — mốc đơn, mẫu tin, chống trùng, kênh dự phòng, gửi lại khi lỗi tạm thời chạy thật; driver `zalo_zns` (viết theo tài liệu ZBS Template Message 11/2026) và `email` (SMTP) mới kiểm bằng máy chủ giả | `/desk/don-hang/van-hanh` (mẫu tin, kênh đang bật, tin gửi lỗi) |
 | g6 | Chốt đơn từ tin nhắn | chạy với AI giả (đơn nháp chờ chị) | hàng chờ duyệt, `/desk/don-hang` |
 | g7 | Đổi trả, hoàn tiền | chạy thật (luôn chờ chị); AI kiểm điều kiện bằng AI giả; hoàn tiền thật phải chị chuyển tay | `/don/[code]`, `/desk/don-hang/[id]` |
 | g8 | Tồn kho nhỏ | chạy thật (giữ hàng khi đã trả, trừ khi giao hãng, nhập khi lô bổ sung về, báo sắp hết) | `/desk/don-hang/van-hanh` |
@@ -74,7 +74,7 @@ hoặc mở tay trên máy dev với dữ liệu mẫu `uv run python -m app.see
 | h3 | Chuyển cho chị | chạy thật (luật khiếu nại/sức khoẻ) + AI giả | hội thoại, hàng chờ |
 | h4 | Sổ khách | chạy thật (hồ sơ ngay từ tin nhắn đầu); tóm tắt bằng AI giả | `/desk/khach/so-khach` |
 | h5 | Nhóm khách quen | chạy với AI giả; gửi nhóm Zalo qua mock | `/desk/khach/khach-quen` |
-| h6 | Nhắc mua lại đúng lúc | chạy thật phần lịch; tin nhắc bằng AI giả, gửi qua mock | `/desk/khach/nhac-mua-lai` |
+| h6 | Nhắc mua lại đúng lúc | chạy thật phần lịch và kiểm đồng ý nhận tin (chỉ khách tích «đồng ý» khi đặt hàng, chưa từ chối; nhắn «TỪ CHỐI» là thôi nhận); tin nhắc bằng AI giả, gửi qua mock | `/desk/khach/nhac-mua-lai` |
 | h7 | Giới thiệu bạn | chạy thật (mã `?ref=` giữ qua giỏ tới đơn) | `/desk/khach/gioi-thieu` |
 | h8 | Khách thử hàng cùng chị | chạy thật (link mời, cảm nhận hiện cạnh ghi chú thử ở Bàn chọn) | `/desk/khach/thu-hang`, `/thu-hang/[token]` |
 | i1 | Hôm nay | chạy thật (số liệu của mọi module) | `/desk` |
@@ -102,10 +102,20 @@ hoặc mở tay trên máy dev với dữ liệu mẫu `uv run python -m app.see
 | TikTok (đẩy bản nháp) | Ứng dụng TikTok for Developers có Content Posting API, token người dùng | `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET`, `TIKTOK_ACCESS_TOKEN` |
 | Chuyển khoản VietQR tự khớp | Tài khoản SePay nối tài khoản ngân hàng, webhook `/api/hooks/payments/sepay` | `PAYMENTS_DRIVER=sepay`, `SEPAY_API_KEY`, `SEPAY_WEBHOOK_SECRET`, `BANK_CODE`, `BANK_ACCOUNT_NO`, `BANK_ACCOUNT_NAME` |
 | Giao hàng | Tài khoản GHN (token + shop id) hoặc GHTK (token + địa chỉ lấy hàng) | `SHIPPING_DRIVER=ghn`/`ghtk`, `GHN_TOKEN`, `GHN_SHOP_ID`, `GHTK_TOKEN`, `GHTK_PICK_*` |
-| Báo tin cho khách (g5) | Chọn nhà cung cấp: Zalo ZNS (mẫu tin đã duyệt) hoặc SMTP email — **driver chưa viết** | `NOTIFY_DRIVER`, `SMTP_*` |
+| Báo tin cho khách (g5) | Zalo: OA đã xác thực + ứng dụng Zalo có quyền «Gửi tin qua số điện thoại», tài khoản ZBS có số dư, các mẫu tin đã được duyệt (mỗi mốc đơn một mẫu); email: máy chủ SMTP | `NOTIFY_CHANNEL_DRIVERS=zalo_oa=zalo_zns,email=email`, `ZALO_APP_ID`, `ZALO_APP_SECRET`, `ZALO_OA_ACCESS_TOKEN`, `ZALO_OA_REFRESH_TOKEN`, `ZALO_ZNS_TEMPLATES`, `SMTP_*` (xem [deployment.md](deployment.md) mục 6) |
 | Sàn TikTok Shop / Shopee | Tài khoản Partner, quyền API shop | `MARKETPLACES_DRIVER`, `TIKTOK_SHOP_*`, `SHOPEE_*` |
-| Hoá đơn điện tử (k5) | Chọn nhà cung cấp (VNPT, Viettel, MISA…) — **driver chưa viết** | `EINVOICE_DRIVER` |
+| Hoá đơn điện tử (k5) | Chọn nhà cung cấp (VNPT, Viettel, MISA…) — **driver chưa viết**, xem mục dưới | `EINVOICE_DRIVER` |
 | Lưu ảnh/sao lưu trên S3/R2 | Bucket + khoá | `STORAGE_DRIVER=s3`, `S3_*` |
+
+## Hoá đơn điện tử (k5): cần gì khi chọn nhà cung cấp
+
+Interface `api/app/integrations/einvoice` đã đủ chỗ cắm: `issue` (phát hành, chống trùng theo mã đơn), `get_status` (trạng
+thái + mã của cơ quan thuế), `download` (PDF / XML), `adjust` / `replace` (hoá đơn điều chỉnh / thay thế), `cancel`.
+Khi chọn nhà cung cấp cần hỏi và ghi lại: tài liệu API + môi trường thử (sandbox) và cách cấp khoá; mẫu số / ký hiệu hoá
+đơn đã đăng ký (hoá đơn có mã hay không mã của cơ quan thuế, loại dành cho hộ kinh doanh); cách ký số (chữ ký số của nhà
+cung cấp hay USB token / ký từ xa); quy trình xử lý sai sót họ hỗ trợ (điều chỉnh, thay thế — còn cho huỷ không, theo quy
+định hiện hành); cách tra trạng thái (gọi hỏi hay webhook) và thời gian cơ quan thuế cấp mã; tải được bản PDF/XML gốc
+để lưu trữ không; khoá chống phát hành trùng phía họ; giá theo gói số hoá đơn và hạn mức gọi API.
 
 ## Kiểm chứng
 

@@ -508,7 +508,8 @@ async def return_received(return_id: uuid.UUID, user: OwnerUser, db: DbSession) 
 async def get_templates(_: CurrentUser, db: DbSession) -> TemplatesOut:
     return TemplatesOut(
         templates=await notify.get_templates(db), defaults=notify.DEFAULT_TEMPLATES, labels=notify.TEMPLATE_LABELS,
-        placeholders=notify.PLACEHOLDERS,
+        placeholders=notify.PLACEHOLDERS, channels=await notify.channel_status(db),
+        failed=await notify.recent_failures(db),
     )  # fmt: skip
 
 

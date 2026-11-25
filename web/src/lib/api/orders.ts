@@ -265,7 +265,9 @@ export type DropOverview = {
 export type InventoryRow = { inventory_item_id: string; product_id: string; name: string; on_hand: number; reserved: number; pending_orders_qty: number; available: number; low_stock_threshold: number | null; low: boolean };
 export type Listing = { id: string; marketplace: "tiktok_shop" | "shopee"; product_id: string; product_name: string; external_id: string | null; status: "pending" | "active" | "inactive" | "error"; price_vnd: number | null; synced_stock: number | null; last_synced_at: string | null; error: string | null };
 export type SyncResult = { synced: number; created_orders: number; skipped: number; errors: string[] };
-export type Templates = { templates: Record<string, string>; defaults: Record<string, string>; labels: Record<string, string>; placeholders: Record<string, string> };
+export type NotifyChannel = { channel: string; label: string; role: "primary" | "fallback"; driver: string; ready: boolean; note: string | null };
+export type FailedNotification = { id: string; order_id: string | null; order_code: string | null; event_label: string; channel: string; recipient: string; error: string | null; attempts: number; will_retry: boolean; created_at: string };
+export type Templates = { templates: Record<string, string>; defaults: Record<string, string>; labels: Record<string, string>; placeholders: Record<string, string>; channels: NotifyChannel[]; failed: FailedNotification[] };
 export type LabelData = { order_id: string; code: string; recipient_name: string; recipient_phone: string; address: string; carrier: string; service: string | null; tracking_code: string | null; cod_amount_vnd: number; weight_grams: number | null; items_summary: string; note: string | null; label_url: string | null };
 
 export type ManualOrderInput = AddressFields & {

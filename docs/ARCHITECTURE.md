@@ -108,9 +108,9 @@ trọn vẹn khi chưa có tài khoản thật. Driver thật viết theo tài l
 | `social` | `mock`, `meta` (Facebook Page, Instagram, Threads), `tiktok_draft`, `zalo_oa` | Đăng bài, bình luận, tin nhắn |
 | `payments` | `mock`, `sepay` (webhook chuyển khoản VietQR) | Khớp thanh toán |
 | `shipping` | `mock`, `ghn`, `ghtk` | Vận đơn, trạng thái giao |
-| `notify` | `mock`, `zalo_oa`, `email` | Báo mốc đơn cho khách |
+| `notify` | `mock`, `zalo_zns` (Zalo ZNS / ZBS Template Message), `email` (SMTP) — chọn theo kênh `NOTIFY_CHANNEL_DRIVERS` | Báo mốc đơn cho khách, xin đánh giá, nhắc mua lại |
 | `marketplaces` | `mock`, `tiktok_shop`, `shopee` | Đồng bộ sản phẩm, đơn |
-| `einvoice` | `mock` | Hoá đơn điện tử |
+| `einvoice` | `mock` (interface: phát hành, tra trạng thái, tải PDF/XML, điều chỉnh/thay thế, huỷ) | Hoá đơn điện tử |
 | `storage` | `local`, `s3` | Ảnh, chứng từ, bản sao lưu |
 
 ## 7. Module và bảng chính

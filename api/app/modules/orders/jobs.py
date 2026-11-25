@@ -70,7 +70,7 @@ async def retry_notifications(ctx: dict[str, Any]) -> int:
                 await db.execute(
                     select(Notification).where(
                         Notification.status == NotificationStatus.FAILED,
-                        Notification.attempts < 3,
+                        Notification.attempts < notify.MAX_ATTEMPTS,
                         Notification.recipient != "",
                     )
                 )

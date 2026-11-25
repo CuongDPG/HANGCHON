@@ -12,7 +12,7 @@ from app.core import events
 from app.core.config import settings
 from app.core.jobs import enqueue
 from app.modules.crm import service
-from app.modules.inbox.models import Thread
+from app.modules.inbox.models import Direction, Message, Thread
 from app.modules.orders.models import Order
 
 
@@ -34,6 +34,11 @@ async def _refresh_later(db: AsyncSession, customer_id: uuid.UUID) -> None:
 async def on_message(db: AsyncSession, payload: dict[str, Any]) -> None:
     thread = await db.get(Thread, uuid.UUID(payload["thread_id"]))
     if thread and thread.customer_id:
+        msg = await db.get(Message, uuid.UUID(payload["message_id"])) if payload.get("message_id") else None
+        # khách nhắn «TỪ CHỐI» (câu hướng dẫn cuối tin quảng cáo) → không gửi tin báo đợt / nhắc mua lại nữa
+        if msg and msg.direction == Direction.INBOUND and service.is_opt_out_reply(msg.body):
+            if not await service.is_opted_out(db, thread.customer_id):
+                await service.set_opt_out(db, thread.customer_id, True, None)
         await _refresh_later(db, thread.customer_id)
 
 
