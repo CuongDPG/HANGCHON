@@ -8,12 +8,12 @@ import { errorMessage } from "@/lib/api/client";
 import { serverFetch } from "@/lib/api/server";
 
 export const metadata: Metadata = {
-  title: "Nhờ chị tìm",
-  description: "Bạn cần món gì mà chưa tìm được loại ưng? Gửi nhu cầu, người khác bấm «mình cũng cần». Đủ người, chị mở tìm.",
+  title: "Nhờ tìm",
+  description: "Bạn cần món gì mà chưa tìm được loại ưng? Gửi nhu cầu, người khác bấm «mình cũng cần». Đủ người, mình mở tìm.",
   alternates: { canonical: "/nho-tim" },
 };
 
-/** Nhờ chị tìm (e9). Danh sách đọc kèm cookie thiết bị để biết bạn đã bấm «cùng cần» món nào. */
+/** Nhờ tìm (e9). Danh sách đọc kèm cookie thiết bị để biết bạn đã bấm «cùng cần» món nào. */
 export default function FindPage({ searchParams }: PageProps<"/nho-tim">) {
   return (
     <div className="flex flex-col gap-5">

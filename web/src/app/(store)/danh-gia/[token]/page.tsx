@@ -33,7 +33,7 @@ async function ReviewBody({ params }: { params: PageProps<"/danh-gia/[token]">["
         <EmptyState
           tone={notFound ? "default" : "error"}
           title={notFound ? "Đường link không đúng hoặc đã hết hạn" : "Chưa tải được"}
-          description={notFound ? "Bạn mở lại đúng link trong tin nhắn của chị nhé." : errorMessage(err)}
+          description={notFound ? "Bạn mở lại đúng link trong tin nhắn mình gửi nhé." : errorMessage(err)}
         />
       </>
     );

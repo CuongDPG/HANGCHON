@@ -5,7 +5,7 @@ export type StoreNavItem = { href: string; label: string; icon: LucideIcon };
 
 export const STORE_NAV: StoreNavItem[] = [
   { href: "/", label: "Kệ hàng", icon: LayoutGrid },
-  { href: "/dot", label: "Đợt gom", icon: Hourglass },
+  { href: "/dot", label: "Mua chung", icon: Hourglass },
   { href: "/nho-tim", label: "Nhờ tìm", icon: Search },
   { href: "/don", label: "Đơn", icon: Package },
   { href: "/ve-nguoi-chon", label: "Người chọn", icon: UserRound },

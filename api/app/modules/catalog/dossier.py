@@ -345,7 +345,7 @@ async def collect_facts(db: AsyncSession, snap: Snapshot) -> list[Fact]:
     ).scalars()
     for i, t in enumerate(notes):
         if t:
-            facts.append(Fact(f"trial_notes:{i}", "Ghi chú thử hàng của chị", t[:600]))
+            facts.append(Fact(f"trial_notes:{i}", "Ghi chú thử hàng của người chọn", t[:600]))
     return facts
 
 

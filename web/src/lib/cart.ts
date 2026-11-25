@@ -87,7 +87,7 @@ export function groupByDrop(items: CartItem[]): { dropId: string | null; label: 
   const groups = new Map<string, { dropId: string | null; label: string; items: CartItem[] }>();
   for (const i of items) {
     const id = i.dropId ?? "";
-    if (!groups.has(id)) groups.set(id, { dropId: i.dropId ?? null, label: i.dropId ? (i.dropLabel ?? "Đợt gom") : "Hàng có sẵn", items: [] });
+    if (!groups.has(id)) groups.set(id, { dropId: i.dropId ?? null, label: i.dropId ? (i.dropLabel ?? "Mua chung") : "Hàng có sẵn", items: [] });
     groups.get(id)!.items.push(i);
   }
   return [...groups.values()];

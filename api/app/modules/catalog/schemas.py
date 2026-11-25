@@ -491,6 +491,7 @@ class ProductDetail(ProductCard):
     ai_generated: bool
     reviews: list[PublicReview]
     url: str
+    picker_name: str | None = None
 
 
 class Alternative(BaseModel):

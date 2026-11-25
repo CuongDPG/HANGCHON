@@ -108,7 +108,12 @@ EVENT_OF: dict[str, NotificationEvent] = {
     "owner_reply": NotificationEvent.OTHER,
 }
 
-CARRIER_NAMES = {"ghn": "Giao Hàng Nhanh", "ghtk": "Giao Hàng Tiết Kiệm", "mock": "hãng giao (thử)", "self": "chị"}
+CARRIER_NAMES = {
+    "ghn": "Giao Hàng Nhanh",
+    "ghtk": "Giao Hàng Tiết Kiệm",
+    "mock": "hãng giao (thử)",
+    "self": "Hàng Chọn (tự giao)",
+}
 
 
 def vnd(v: int) -> str:

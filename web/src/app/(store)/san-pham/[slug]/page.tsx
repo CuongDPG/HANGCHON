@@ -21,6 +21,7 @@ import { Seal } from "@/components/ui/seal";
 import type { ProductDetail } from "@/lib/api/catalog";
 import { siteUrl } from "@/lib/api/catalog";
 import { formatDate, formatDayMonth } from "@/lib/format";
+import { ownerReplyLabel } from "@/lib/picker";
 
 export async function generateMetadata({ params }: PageProps<"/san-pham/[slug]">): Promise<Metadata> {
   const { slug } = await params;
@@ -93,7 +94,7 @@ async function ProductBody({ params }: { params: PageProps<"/san-pham/[slug]">["
             </div>
             {p.drop ? (
               <Link href={`/dot/${p.drop.slug}`} className="rounded-md border border-accent px-2.5 py-1 text-[13px] font-medium text-accent">
-                {p.drop.label}
+                Mua chung · {p.drop.label}
               </Link>
             ) : p.stock > 0 ? (
               <Badge tone="success">Có sẵn {p.stock}</Badge>
@@ -141,6 +142,7 @@ async function ProductBody({ params }: { params: PageProps<"/san-pham/[slug]">["
         <AskBox
           productSlug={p.slug}
           productName={p.name}
+          pickerName={p.picker_name}
           suggestions={p.faq.length ? [] : ["Món này có điểm gì chưa tốt?", "Thông số chính là gì?"]}
         />
       </section>
@@ -231,7 +233,7 @@ function DropNote({ p }: { p: ProductDetail }) {
 function Gallery({ p }: { p: ProductDetail }) {
   if (!p.images.length) {
     // chưa có ảnh: ô giữ chỗ thấp hơn trên điện thoại để tên món và giá không bị đẩy khỏi màn hình đầu
-    return <ImageBox alt={p.name} ratio="1/1" placeholder="Ảnh thật, chị chụp" className="aspect-[16/9] md:aspect-square" />;
+    return <ImageBox alt={p.name} ratio="1/1" placeholder="Ảnh thật, mình tự chụp" className="aspect-[16/9] md:aspect-square" />;
   }
   return (
     <div className="flex flex-col gap-2">
@@ -243,7 +245,7 @@ function Gallery({ p }: { p: ProductDetail }) {
           </li>
         ))}
       </ul>
-      <p className="text-[12.5px] text-ink-3">Ảnh thật, chị chụp · {p.images.length} ảnh</p>
+      <p className="text-[12.5px] text-ink-3">Ảnh thật, mình tự chụp · {p.images.length} ảnh</p>
     </div>
   );
 }
@@ -280,7 +282,7 @@ function Reviews({ p }: { p: ProductDetail }) {
               {r.body ? <p className="mt-1 text-[15px]">{r.body}</p> : null}
               {r.owner_reply ? (
                 <p className="mt-2 border-l-2 border-accent pl-3 text-[14px] text-ink-2">
-                  <span className="font-semibold text-ink">Chị trả lời:</span> {r.owner_reply}
+                  <span className="font-semibold text-ink">{ownerReplyLabel(p.picker_name)}:</span> {r.owner_reply}
                 </p>
               ) : null}
             </li>

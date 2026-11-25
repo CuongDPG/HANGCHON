@@ -32,12 +32,12 @@ export function CartScreen() {
         <EmptyState
           icon={<ShoppingBag />}
           title="Giỏ đang trống"
-          description="Chọn món trên kệ hoặc trong đợt đang mở. Không cần tạo tài khoản để đặt."
+          description="Chọn món trên kệ hoặc trong đợt mua chung đang mở. Không cần tạo tài khoản để đặt."
           action={
             <>
               <ButtonLink href="/">Xem kệ hàng</ButtonLink>
               <ButtonLink href="/dot" variant="secondary">
-                Đợt đang mở
+                Mua chung đang mở
               </ButtonLink>
             </>
           }

@@ -140,7 +140,8 @@ ai.task(
     description="Soạn «Vì sao mình chọn» (3 ý) và «Điều mình chưa ưng» từ ghi chú thử",
     system=(
         "Bạn viết hộ chị hai đoạn ngắn cho trang sản phẩm: «Vì sao mình chọn» (tối đa 3 ý) và «Điều mình chưa ưng».\n"
-        "Viết bằng giọng của chị: xưng «mình», câu ngắn, thật thà, kể như đang dùng thật. Mỗi ý một câu.\n"
+        "Viết bằng giọng của chị: xưng «mình», câu ngắn, thật thà, kể như đang dùng thật. Mỗi ý một câu. Đây là lời "
+        "khách đọc trên website: không bao giờ gọi người bán là «chị» (đó là cách gọi nội bộ).\n"
         "CHỈ dùng điều có trong ghi chú thử hàng được cung cấp. KHÔNG thêm công dụng, số liệu, so sánh hay lời khen "
         "nào không có trong ghi chú. KHÔNG dùng từ «tốt nhất», «số 1», «thần thánh», «cam kết».\n"
         "Ghi chú không đủ 3 ý tốt thì viết ít ý hơn và nói rõ thiếu gì ở `missing_info`. "

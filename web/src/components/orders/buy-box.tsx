@@ -50,7 +50,7 @@ export function BuyBox({ productId, slug, name, priceVnd, listPriceVnd, showSumm
         </span>
         {dropId ? (
           <Badge tone="accent" icon={<Hourglass />}>
-            {dropLabel ?? "Đặt trong đợt"}
+            {dropLabel ? `Mua chung · ${dropLabel}` : "Mua chung"}
           </Badge>
         ) : soldOut ? (
           <Badge tone="outline">Chờ đợt sau</Badge>
@@ -90,7 +90,7 @@ export function BuyBox({ productId, slug, name, priceVnd, listPriceVnd, showSumm
                 router.push(dropId ? `/dat-hang?dot=${encodeURIComponent(dropId)}` : "/dat-hang");
               }}
             >
-              {dropId ? "Đặt trong đợt" : "Đặt ngay"}
+              {dropId ? "Đặt mua chung" : "Đặt ngay"}
             </Button>
           </div>
           {dropId ? <p className="text-[13px] text-ink-2">Không cần tạo tài khoản. Chuyển khoản bằng mã QR hoặc trả khi nhận.</p> : null}

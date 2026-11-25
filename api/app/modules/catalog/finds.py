@@ -240,12 +240,12 @@ def public_status(fr: FindRequest, trying: int = 0) -> dict[str, str]:
         return {"key": "none", "label": "Chưa có món ưng"}
     if s == FindRequestStatus.SEARCHING:
         if trying:
-            return {"key": "trying", "label": f"Chị đang thử {trying} mẫu"}
+            return {"key": "trying", "label": f"Mình đang thử {trying} mẫu"}
         return {"key": "searching", "label": "AI đang tìm ứng viên"}
     if s == FindRequestStatus.THRESHOLD_REACHED:
-        return {"key": "threshold", "label": "Đủ người cần, chị sắp mở tìm"}
+        return {"key": "threshold", "label": "Đủ người cần, mình sắp mở tìm"}
     if s == FindRequestStatus.PENDING_REVIEW:
-        return {"key": "pending", "label": "Chờ chị xem"}
+        return {"key": "pending", "label": "Chờ xem qua"}
     if s == FindRequestStatus.REJECTED:
         return {"key": "rejected", "label": "Không hiện"}
     return {"key": "new", "label": "Mới"}

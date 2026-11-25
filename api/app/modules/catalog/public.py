@@ -242,6 +242,8 @@ async def product_detail(db: AsyncSession, p: Product) -> dict[str, Any]:
         "ai_generated": p.ai_generated,
         "reviews": await published_reviews(db, p.id),
         "url": f"{settings.web_base_url.rstrip('/')}/san-pham/{p.slug}",
+        # tên người chọn cho nhãn «… trả lời» (chưa đặt thì là tên trung tính mặc định)
+        "picker_name": await setting(db, "store.picker_name"),
     }
 
 

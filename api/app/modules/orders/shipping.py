@@ -337,7 +337,7 @@ async def _set_shipment_status(
     if status in (ShippingStatus.FAILED_DELIVERY, ShippingStatus.RETURNING, ShippingStatus.RETURNED):
         title = SHIPPING_LABELS[status]
         if status == ShippingStatus.RETURNED and order.status in (OrderStatus.SHIPPING, OrderStatus.READY_TO_SHIP):
-            service.set_status(db, order, OrderStatus.RETURNED, "Hàng đã hoàn về chị", visible=True)
+            service.set_status(db, order, OrderStatus.RETURNED, "Hàng đã hoàn về kho", visible=True)
         else:
             exists = await db.scalar(
                 select(func.count()).where(
@@ -373,7 +373,7 @@ async def cancel_shipment(db: AsyncSession, sh: Shipment) -> Shipment:
     sh.status = ShippingStatus.CANCELLED
     db.add(
         ShipmentEvent(
-            shipment_id=sh.id, status=ShippingStatus.CANCELLED, description="Chị huỷ vận đơn", occurred_at=now_utc()
+            shipment_id=sh.id, status=ShippingStatus.CANCELLED, description="Đã huỷ vận đơn", occurred_at=now_utc()
         )
     )
     if sh.order_id:

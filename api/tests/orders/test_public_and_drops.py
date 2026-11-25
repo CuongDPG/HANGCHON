@@ -91,7 +91,7 @@ async def test_inbound_arrived_moves_orders_when_all_lots_in(client: httpx.Async
         await events.emit("inbound.arrived", {"inbound_shipment_id": str(lot_b)}, db=s)
         await s.commit()
     view = (await client.get(f"/api/store/orders/{o['code']}", params={"t": o["token"]})).json()
-    assert view["status"] == "ready_to_ship" and view["headline"] == "Chị đang chuẩn bị gói hàng"
+    assert view["status"] == "ready_to_ship" and view["headline"] == "Mình đang chuẩn bị gói hàng"
 
 
 async def test_arrival_is_one_milestone_in_timeline(client: httpx.AsyncClient) -> None:
@@ -150,7 +150,7 @@ async def test_ask_question_and_owner_replies(client: httpx.AsyncClient, owner_c
     r = await client.post(
         f"/api/store/orders/{o['code']}/questions", json={"t": o["token"], "message": "Bao giờ hàng về ạ?"}
     )
-    assert r.status_code == 201 and any(e["title"] == "Bạn đã hỏi chị về đơn này" for e in r.json()["events"])
+    assert r.status_code == 201 and any(e["title"] == "Bạn đã hỏi về đơn này" for e in r.json()["events"])
     async with SessionLocal() as s:
         item = (await s.execute(select(ApprovalItem))).scalar_one()
         assert item.action == "orders.customer_question" and item.preview["question"] == "Bao giờ hàng về ạ?"

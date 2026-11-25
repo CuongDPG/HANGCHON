@@ -3,8 +3,8 @@ import { Brand } from "@/components/layout/brand";
 
 const LINKS = [
   { href: "/ve-nguoi-chon", label: "Về người chọn" },
-  { href: "/dot", label: "Đợt gom đơn" },
-  { href: "/nho-tim", label: "Nhờ chị tìm" },
+  { href: "/dot", label: "Mua chung" },
+  { href: "/nho-tim", label: "Nhờ tìm" },
   { href: "/don", label: "Tra cứu đơn" },
   { href: "/hoi", label: "Hỏi trợ lý" },
 ];

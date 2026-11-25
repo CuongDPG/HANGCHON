@@ -21,9 +21,9 @@ INBOUND_LABELS: dict[str, str] = {
     InboundStatus.AT_AGENT_WAREHOUSE: "Hàng đã về kho bên mua hộ",
     InboundStatus.INTERNATIONAL_TRANSIT: "Hàng đang trên đường về Việt Nam",
     InboundStatus.CUSTOMS: "Hàng đang thông quan",
-    InboundStatus.DOMESTIC_TRANSIT: "Hàng đang chuyển về kho của chị",
-    InboundStatus.DELIVERED: "Hàng đã về tới kho, chị kiểm từng món",
-    InboundStatus.PROBLEM: "Lô hàng gặp trục trặc, chị đang xử lý",
+    InboundStatus.DOMESTIC_TRANSIT: "Hàng đang chuyển về kho",
+    InboundStatus.DELIVERED: "Hàng đã về tới kho, đang kiểm từng món",
+    InboundStatus.PROBLEM: "Lô hàng gặp trục trặc, đang xử lý",
 }
 INBOUND_ORDER = [
     InboundStatus.ORDERED,

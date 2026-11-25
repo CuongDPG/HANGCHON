@@ -126,7 +126,7 @@ function OrderView({ order, token }: { order: PublicOrder; token: string }) {
                     Viết đánh giá
                   </Link>
                 ) : (
-                  <Badge tone={r.status === "published" ? "success" : "neutral"}>{r.status === "published" ? "Đã hiện trên web" : "Đã gửi, chị đang xem"}</Badge>
+                  <Badge tone={r.status === "published" ? "success" : "neutral"}>{r.status === "published" ? "Đã hiện trên web" : "Đã gửi, mình đang xem"}</Badge>
                 )}
               </div>
             ))}
@@ -140,7 +140,7 @@ function OrderView({ order, token }: { order: PublicOrder; token: string }) {
                 <span>
                   {r.code} · {RETURN_KIND_LABELS[r.kind]}
                 </span>
-                <Badge tone={r.status === "rejected" ? "danger" : r.status === "refunded" || r.status === "exchanged" ? "success" : "warning"}>{RETURN_STATUS_LABELS[r.status]}</Badge>
+                <Badge tone={r.status === "rejected" ? "danger" : r.status === "refunded" || r.status === "exchanged" ? "success" : "warning"}>{r.status === "pending_decision" ? "Mình đang xem" : RETURN_STATUS_LABELS[r.status]}</Badge>
               </div>
             ))}
           </Card>
@@ -214,7 +214,7 @@ function AskSheet({ open, onClose, code, token }: { open: boolean; onClose: () =
     setPending(true);
     try {
       setOrder(await storeOrdersApi.ask(code, { t: token, message: text.trim() }));
-      notifySuccess("Đã gửi câu hỏi, chị sẽ trả lời bạn sớm");
+      notifySuccess("Đã gửi câu hỏi, mình sẽ trả lời bạn sớm");
       setText("");
       onClose();
     } catch (e) {
@@ -224,7 +224,7 @@ function AskSheet({ open, onClose, code, token }: { open: boolean; onClose: () =
     }
   }
   return (
-    <Sheet open={open} onClose={onClose} title="Hỏi về đơn này" description="Câu hỏi tới thẳng chị, chị trả lời qua tin nhắn." footer={<Button onClick={send} loading={pending}>Gửi câu hỏi</Button>}>
+    <Sheet open={open} onClose={onClose} title="Hỏi về đơn này" description="Câu hỏi tới thẳng mình, mình trả lời bạn qua tin nhắn." footer={<Button onClick={send} loading={pending}>Gửi câu hỏi</Button>}>
       <Textarea label="Câu hỏi" rows={4} value={text} onChange={(e) => setText(e.target.value)} error={error} placeholder="Vd: Bao giờ hàng về tới mình?" />
     </Sheet>
   );
@@ -277,7 +277,7 @@ function ReturnSheet({ open, onClose, order, token }: { open: boolean; onClose: 
     setError(null);
     try {
       setOrder(await storeOrdersApi.requestReturn(order.code, { t: token, kind, reason, description: desc || undefined, order_item_index: Number(item) }));
-      notifySuccess("Đã gửi yêu cầu, chị sẽ xem và báo bạn");
+      notifySuccess("Đã gửi yêu cầu, mình sẽ xem và báo bạn");
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Chưa gửi được.");
@@ -286,7 +286,7 @@ function ReturnSheet({ open, onClose, order, token }: { open: boolean; onClose: 
     }
   }
   return (
-    <Sheet open={open} onClose={onClose} title="Yêu cầu đổi trả" description="Chị xem từng yêu cầu và trả lời bạn." footer={<Button onClick={send} loading={pending}>Gửi yêu cầu</Button>}>
+    <Sheet open={open} onClose={onClose} title="Yêu cầu đổi trả" description="Mình xem từng yêu cầu và trả lời bạn." footer={<Button onClick={send} loading={pending}>Gửi yêu cầu</Button>}>
       <div className="flex flex-col gap-3">
         {error ? <p role="alert" className="text-[14px] text-seal">{error}</p> : null}
         <InlineSelect label="Món" value={item} onChange={setItem} options={order.items.map((i, idx) => ({ value: String(idx), label: i.name }))} />

@@ -76,14 +76,14 @@ export async function ShelfResults({ q, nhom }: { q: string | null; nhom: string
       <EmptyState
         icon={<Stamp />}
         title="Kệ hàng đang được xếp"
-        description="Những món đầu tiên còn đang trong thời gian dùng thử. Bạn đang cần món gì, cứ nhờ chị tìm giúp."
+        description="Những món đầu tiên còn đang trong thời gian dùng thử. Bạn đang cần món gì, cứ nhờ mình tìm giúp."
         action={
           <>
             <ButtonLink href="/nho-tim" icon={<HandHelping className="size-4" />}>
-              Nhờ chị tìm
+              Nhờ tìm
             </ButtonLink>
             <ButtonLink href="/dot" variant="secondary" icon={<Hourglass className="size-4" />}>
-              Xem đợt gom
+              Xem mua chung
             </ButtonLink>
           </>
         }
@@ -114,10 +114,10 @@ export async function ShelfResults({ q, nhom }: { q: string | null; nhom: string
         <EmptyState
           icon={<SearchX />}
           title={q ? `Kệ chưa có món nào khớp «${q}»` : "Nhóm này chưa có món nào"}
-          description="Chị chỉ bày món đã tự mua và dùng thử. Bạn cần món này thì nhờ chị tìm — đủ người cùng cần, chị sẽ đi tìm và thử."
+          description="Mình chỉ bày món đã tự mua và dùng thử. Bạn cần món này thì nhờ mình tìm — đủ người cùng cần, mình sẽ đi tìm và thử."
           action={
             <ButtonLink href={q ? `/nho-tim?tim=${encodeURIComponent(q)}` : "/nho-tim"} icon={<HandHelping className="size-4" />}>
-              Nhờ chị tìm
+              Nhờ tìm
             </ButtonLink>
           }
         />

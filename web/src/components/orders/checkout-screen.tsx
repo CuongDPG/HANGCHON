@@ -89,7 +89,7 @@ export function CheckoutScreen() {
     return (
       <div className="flex flex-col gap-6">
         <PageHeader title="Đặt hàng" backHref="/gio-hang" />
-        <EmptyState icon={<ShoppingBag />} title="Chưa có món nào để đặt" description="Bạn chọn món trên kệ hoặc trong đợt đang mở nhé." action={<ButtonLink href="/">Xem kệ hàng</ButtonLink>} />
+        <EmptyState icon={<ShoppingBag />} title="Chưa có món nào để đặt" description="Bạn chọn món trên kệ hoặc trong đợt mua chung đang mở nhé." action={<ButtonLink href="/">Xem kệ hàng</ButtonLink>} />
       </div>
     );
   }
@@ -135,7 +135,7 @@ export function CheckoutScreen() {
             onChange={(e) => setValue("province", e.target.value, { shouldValidate: !!errors.province })}
             onPick={(v) => setValue("province", v, { shouldValidate: true })}
           />
-          <Textarea label="Ghi chú cho chị" rows={2} placeholder="Giờ nhận hàng, gửi kèm thiệp…" error={errors.note?.message} {...register("note")} />
+          <Textarea label="Ghi chú cho người bán" rows={2} placeholder="Giờ nhận hàng, gửi kèm thiệp…" error={errors.note?.message} {...register("note")} />
         </section>
 
         <Card>

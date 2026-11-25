@@ -56,7 +56,7 @@ async def test_unknown_hands_off_and_owner_reply_reaches_customer(db, client, ow
     r = await owner_client.post(f"/api/desk/control/approvals/{item.id}/approve", json={})
     assert r.json()["status"] == "failed"
     r = await owner_client.post(f"/api/desk/control/approvals/{item.id}/approve",
-                                json={"payload": {"reply": "Có bán lẻ nắp, bạn nhắn chị nhé."}})  # fmt: skip
+                                json={"payload": {"reply": "Có bán lẻ nắp, bạn nhắn mình nhé."}})  # fmt: skip
     assert r.json()["status"] == "approved", r.text
     conv = (await client.get(f"/api/store/assistant/conversations/{conv_id}")).json()
     assert conv["messages"][-1]["role"] == "owner" and conv["status"] == "open"

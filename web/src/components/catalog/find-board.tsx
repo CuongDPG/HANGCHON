@@ -20,7 +20,7 @@ const STATUS_TONE: Record<string, string> = {
   none: "border-line text-ink-3",
 };
 
-/** Bảng Nhờ chị tìm (e9): gửi nhu cầu, bấm «mình cũng cần» (mỗi thiết bị một lượt), xem trạng thái công khai. */
+/** Bảng Nhờ tìm (e9): gửi nhu cầu, bấm «mình cũng cần» (mỗi thiết bị một lượt), xem trạng thái công khai. */
 export function FindBoard({ initial, threshold, prefill }: { initial: FindRequestPublic[]; threshold: number; prefill?: string }) {
   const [items, setItems] = useState(initial);
   const [title, setTitle] = useState(prefill ?? "");
@@ -111,7 +111,7 @@ export function FindBoard({ initial, threshold, prefill }: { initial: FindReques
           <div className="flex flex-col gap-3">
             <Textarea label="Mô tả thêm (không bắt buộc)" value={description} onChange={(e) => setDescription(e.target.value)} maxLength={1000} rows={2} />
             <Input
-              label="Số điện thoại / Zalo để chị báo khi tìm được (không bắt buộc)"
+              label="Số điện thoại / Zalo để mình báo khi tìm được (không bắt buộc)"
               value={contact}
               onChange={(e) => setContact(e.target.value)}
               inputMode="tel"
@@ -127,7 +127,7 @@ export function FindBoard({ initial, threshold, prefill }: { initial: FindReques
       {sent ? (
         <Card tone="soft" role="status">
           <p className="text-[15px]">
-            Đã nhận «{sent}». Chị xem qua rồi mới hiện lên bảng để mọi người cùng bấm.
+            Đã nhận «{sent}». Mình xem qua rồi mới hiện lên bảng để mọi người cùng bấm.
           </p>
         </Card>
       ) : null}
@@ -177,7 +177,7 @@ export function FindBoard({ initial, threshold, prefill }: { initial: FindReques
       ) : (
         <EmptyState title="Chưa có lời nhờ tìm nào" description="Bạn là người đầu tiên. Gửi món bạn cần ở ô phía trên nhé." />
       )}
-      <p className="text-[14px] text-ink-2">Món nào đủ {threshold} người cùng cần, chị sẽ mở tìm. Không tìm được món ưng thì chị nói thẳng.</p>
+      <p className="text-[14px] text-ink-2">Món nào đủ {threshold} người cùng cần, mình sẽ mở tìm. Không tìm được món ưng thì mình nói thẳng.</p>
     </div>
   );
 }
