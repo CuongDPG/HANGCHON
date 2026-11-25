@@ -227,5 +227,5 @@ Thử khôi phục định kỳ trên máy khác (hoặc bằng `KEEP=1 scripts/
   (chỉ khi cần dữ liệu khởi đầu) · `docker exec -it hangchon-postgres psql -U hangchon hangchon`.
 - **Healthcheck:** api `GET /api/health`, web `GET /robots.txt`, worker `arq --check`, postgres `pg_isready`, redis `ping`.
   Mọi dịch vụ `restart: unless-stopped`.
-- **CI:** [`ci/github-actions-ci.yml`](../ci/github-actions-ci.yml) (**chưa bật**: quyền đẩy code hiện tại không được phép tạo workflow; để bật, chép file này vào `.github/workflows/ci.yml` bằng tài khoản có quyền `workflow`, ví dụ sau khi chạy `gh auth refresh -s workflow`) chạy ruff + pytest (Postgres + Redis thật) và
+- **CI:** [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) (bật từ 25/11/2026, chạy mỗi lần đẩy lên `main` và mỗi PR) chạy ruff + pytest (Postgres + Redis thật) và
   typecheck + lint + test + build của web khi push/PR vào `main`. Dokploy không chờ CI: kiểm xanh trước khi gộp.
