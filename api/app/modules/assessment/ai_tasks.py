@@ -73,7 +73,9 @@ ai.task(
         "- `status`: ok (không thấy vấn đề), warning (cần lưu ý hoặc thiếu thông tin), blocked (không nên bán khi "
         "chưa có giấy tờ, hoặc rủi ro an toàn rõ).\n"
         "- `findings`: từng ý một câu, kèm mức info/warning/danger. Không chắc quy định thì nói «nên kiểm lại với "
-        "cơ quan quản lý», không khẳng định.\n" + _NO_INVENT
+        "cơ quan quản lý», không khẳng định.\n"
+        "- Viết như ghi chú trung tính về món hàng: không xưng hô, không gọi «chị», không «em» (dữ kiện an toàn có thể "
+        "hiện trên trang sản phẩm).\n" + _NO_INVENT
     ),
 )
 
@@ -89,6 +91,8 @@ ai.task(
         "để chị kiểm khi thử hàng.\n"
         "- `scores`: chấm từng tiêu chí trong `criteria` (giữ đúng `key`) theo thang 0–10, `reason` nêu căn cứ cụ thể. "
         "Thiếu dữ liệu thì chấm thận trọng quanh 5 và nói rõ thiếu gì. Tiêu chí «Hàng nhái»: điểm cao = ít rủi ro.\n"
+        "Viết `summary`, `strengths`, `weaknesses` như mô tả trung tính về món hàng: không xưng hô, không gọi «chị», "
+        "không «em» (các câu này có thể được dùng lại làm dữ kiện cho trang sản phẩm khách đọc).\n"
         "Đây là điểm NHÁP, chị sẽ sửa. " + _NO_INVENT
     ),
 )

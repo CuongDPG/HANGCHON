@@ -22,7 +22,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from app import ai, control
 from app.core import events
 from app.core.enums import Language, SourcePlatform
-from app.core.errors import BadRequest, NotFound
+from app.core.errors import BadRequest, Conflict, NotFound
 from app.core.money import margin_pct, round_vnd
 from app.core.timeutil import now_utc
 from app.integrations import IntegrationError, IntegrationNotConfigured, get_driver
@@ -478,10 +478,11 @@ async def _step_market(db: AsyncSession, a: Assessment, c: Candidate) -> None:
     )
 
 
-def save_market_rows(db: AsyncSession, p: dict[str, Any], ai_run_id: uuid.UUID | None) -> int:
+def save_market_rows(db: AsyncSession, p: dict[str, Any], ai_run_id: uuid.UUID | None) -> list[MarketPrice]:
     now = now_utc()
+    rows: list[MarketPrice] = []
     for li in p["listings"]:
-        db.add(
+        rows.append(
             MarketPrice(
                 candidate_id=uuid.UUID(p["candidate_id"]),
                 platform=SourcePlatform(li["platform"]),
@@ -499,7 +500,8 @@ def save_market_rows(db: AsyncSession, p: dict[str, Any], ai_run_id: uuid.UUID |
                 ai_run_id=ai_run_id,
             )
         )
-    return len(p["listings"])
+    db.add_all(rows)
+    return rows
 
 
 async def _category_name(db: AsyncSession, category_id: uuid.UUID | None) -> str | None:
@@ -572,27 +574,16 @@ async def risk_signals(
                     "text": f"Giá cùng mẫu chênh nhiều giữa {len(offers)} shop ({min(prices) // 1000}k–{max(prices) // 1000}k).",
                 }
             )
-    if c.main_image_url:
-        same_img = (
-            (
-                await db.execute(
-                    select(Candidate.seller_name)
-                    .where(Candidate.main_image_url == c.main_image_url, Candidate.id != c.id)
-                    .limit(5)
-                )
-            )
-            .scalars()
-            .all()
+    sellers, by_look = await _same_image_sellers(db, c)
+    if sellers:
+        how = " (so theo hình: giống hệt dù ảnh đã nén hay đổi cỡ)" if by_look else ""
+        notes.append(
+            {
+                "kind": "counterfeit",
+                "level": "warning",
+                "text": f"Ảnh chính trùng với {len(sellers)} shop khác{how}: có thể ảnh lấy lại, cần ảnh thật.",
+            }
         )
-        sellers = {s for s in same_img if s and s != c.seller_name}
-        if sellers:
-            notes.append(
-                {
-                    "kind": "counterfeit",
-                    "level": "warning",
-                    "text": f"Ảnh chính trùng với {len(sellers)} shop khác: có thể ảnh lấy lại, cần ảnh thật.",
-                }
-            )
     if c.review_count and c.sales_count is not None and c.review_count > max(c.sales_count, 1) * 1.2:
         notes.append(
             {
@@ -626,6 +617,42 @@ async def risk_signals(
         day, n = days.most_common(1)[0]
         notes.append({"kind": "fake_review", "level": "warning", "text": f"{n} đánh giá dồn vào cùng ngày {day}."})
     return notes  # fmt: skip
+
+
+SAME_IMAGE_SCAN = 2000  # số ứng viên có băm ảnh gần nhất đem so (cửa hàng nhỏ, so trong Python là đủ)
+
+
+async def _same_image_sellers(db: AsyncSession, c: Candidate) -> tuple[set[str], bool]:
+    """b7 — shop khác dùng cùng ảnh chính: trùng URL, hoặc trùng theo hình (băm dhash, `sourcing.imagehash`) với
+    ứng viên khác hay với ảnh của các shop cùng mẫu. → (tên shop, có phát hiện nhờ so theo hình)."""
+    from app.modules.sourcing.imagehash import same_image
+
+    def other(name: str | None) -> bool:
+        return bool(name) and name != c.seller_name
+
+    sellers: set[str] = set()
+    if c.main_image_url:
+        rows = await db.execute(
+            select(Candidate.seller_name)
+            .where(Candidate.main_image_url == c.main_image_url, Candidate.id != c.id)
+            .limit(5)
+        )
+        sellers |= {s for s in rows.scalars() if other(s)}
+    if not c.image_hash:
+        return sellers, False
+    look: set[str] = set()
+    for o in (c.raw or {}).get("offers", []):
+        if o.get("external_id") != c.source_external_id and same_image(c.image_hash, o.get("image_hash")):
+            if other(o.get("seller_name")):
+                look.add(o["seller_name"])
+    rows = await db.execute(
+        select(Candidate.seller_name, Candidate.image_hash)
+        .where(Candidate.image_hash.is_not(None), Candidate.id != c.id)
+        .order_by(Candidate.created_at.desc())
+        .limit(SAME_IMAGE_SCAN)
+    )
+    look |= {name for name, h in rows.all() if other(name) and same_image(c.image_hash, h)}
+    return sellers | look, bool(look - sellers)
 
 
 def risk_levels(notes: list[dict[str, str]]) -> tuple[RiskLevel, RiskLevel]:
@@ -1045,3 +1072,130 @@ async def ensure_seeded_profile(db: AsyncSession) -> ScoringProfile:
         prof.criteria = list(DEFAULT_CRITERIA)
         prof.pass_score = DEFAULT_PASS_SCORE
     return prof
+
+
+# ---- hoàn tác việc AI tự làm -------------------------------------------------------------------------------------
+# Mỗi hàm `*_snapshot` chụp phần hồ sơ mà action sắp ghi; `restore_*` trả lại đúng phần đó. Không hoàn tác khi
+# hồ sơ đã có bản AI mới hơn hoặc chị đã duyệt sau đó (tránh xoá công của chị).
+
+
+def _iso(v: Any) -> Any:
+    return v.isoformat() if v is not None and hasattr(v, "isoformat") else v
+
+
+def _dt(v: str | None) -> Any:
+    from datetime import datetime
+
+    return datetime.fromisoformat(v) if v else None
+
+
+def _uuid(v: str | None) -> uuid.UUID | None:
+    return uuid.UUID(v) if v else None
+
+
+def _dec(v: str | None) -> Decimal | None:
+    return Decimal(v) if v is not None else None
+
+
+def profile_snapshot(a: Assessment) -> dict[str, Any]:
+    return {
+        "summary": a.summary,
+        "strengths": list(a.strengths or []),
+        "weaknesses": list(a.weaknesses or []),
+        "uncertain": [n for n in a.risk_notes or [] if n.get("kind") == "uncertain"],
+        "market": (a.price_overview or {}).get("market"),
+        "score_status": a.score_status.value,
+        "score_total": str(a.score_total) if a.score_total is not None else None,
+        "score_confirmed_at": _iso(a.score_confirmed_at),
+        "score_confirmed_by_id": str(a.score_confirmed_by_id) if a.score_confirmed_by_id else None,
+        "generated_at": _iso(a.generated_at),
+        "ai_run_id": str(a.ai_run_id) if a.ai_run_id else None,
+        "ai_generated": a.ai_generated,
+        "scores": [
+            {
+                "key": x.criterion_key, "label": x.criterion_label, "weight": str(x.weight), "position": x.position,
+                "ai_score": str(x.ai_score) if x.ai_score is not None else None, "ai_reason": x.ai_reason,
+                "owner_score": str(x.owner_score) if x.owner_score is not None else None, "owner_note": x.owner_note,
+            }
+            for x in a.scores
+        ],
+    }  # fmt: skip
+
+
+def restore_profile(a: Assessment, before: dict[str, Any], applied_run_id: str | None) -> None:
+    if a.score_status == ScoreStatus.CONFIRMED:
+        raise Conflict("Chị đã duyệt điểm sau khi AI chấm, nên không hoàn tác bản chấm này nữa.", code="confirmed")
+    if applied_run_id and str(a.ai_run_id) != applied_run_id:
+        raise Conflict("Hồ sơ đã có bản AI viết mới hơn, hoàn tác bản mới nhất trước.", code="superseded")
+    a.summary = before["summary"]
+    a.strengths = before["strengths"]
+    a.weaknesses = before["weaknesses"]
+    a.risk_notes = [n for n in a.risk_notes or [] if n.get("kind") != "uncertain"] + before["uncertain"]
+    po = dict(a.price_overview or {})
+    po.pop("market", None)
+    if before.get("market"):
+        po["market"] = before["market"]
+    a.price_overview = po
+    a.score_status = ScoreStatus(before["score_status"])
+    a.score_total = _dec(before["score_total"])
+    a.score_confirmed_at = _dt(before["score_confirmed_at"])
+    a.score_confirmed_by_id = _uuid(before["score_confirmed_by_id"])
+    a.generated_at = _dt(before["generated_at"])
+    a.ai_run_id = _uuid(before["ai_run_id"])
+    a.ai_generated = before["ai_generated"]
+    # sửa tại chỗ theo khoá tiêu chí (xoá rồi thêm lại cùng khoá sẽ vướng ràng buộc duy nhất khi flush)
+    existing = {x.criterion_key: x for x in a.scores}
+    keep = {x["key"] for x in before["scores"]}
+    for key, row in existing.items():
+        if key not in keep:
+            a.scores.remove(row)
+    for x in before["scores"]:
+        row = existing.get(x["key"])
+        if row is None:
+            row = AssessmentScore(criterion_key=x["key"])
+            a.scores.append(row)
+        row.criterion_label = x["label"]
+        row.weight = Decimal(x["weight"])
+        row.position = x["position"]
+        row.ai_score = _dec(x["ai_score"])
+        row.ai_reason = x["ai_reason"]
+        row.owner_score = _dec(x["owner_score"])
+        row.owner_note = x["owner_note"]
+
+
+def safety_snapshot(a: Assessment) -> dict[str, Any]:
+    return {
+        "safety": dict(a.safety or {}),
+        "status": a.safety_status.value,
+        "confirmed_at": _iso(a.safety_confirmed_at),
+        "confirmed_by_id": str(a.safety_confirmed_by_id) if a.safety_confirmed_by_id else None,
+    }
+
+
+def restore_safety(a: Assessment, before: dict[str, Any], applied: dict[str, Any]) -> None:
+    if a.safety_confirmed_at is not None:
+        raise Conflict(
+            "Chị đã xác nhận an toàn sau khi AI soát, nên không hoàn tác bản nháp này nữa.", code="confirmed"
+        )
+    if (a.safety or {}) != applied:
+        raise Conflict("Hồ sơ đã có bản soát an toàn mới hơn, hoàn tác bản mới nhất trước.", code="superseded")
+    a.safety = before["safety"]
+    a.safety_status = SafetyStatus(before["status"])
+    a.safety_confirmed_at = _dt(before["confirmed_at"])
+    a.safety_confirmed_by_id = _uuid(before["confirmed_by_id"])
+
+
+def risk_snapshot(a: Assessment) -> dict[str, Any]:
+    return {
+        "notes": [n for n in a.risk_notes or [] if n.get("kind") != "uncertain"],
+        "counterfeit": a.counterfeit_risk.value,
+        "fake_review": a.fake_review_risk.value,
+    }
+
+
+def restore_risk(a: Assessment, before: dict[str, Any], applied_notes: list[dict[str, Any]]) -> None:
+    if [n for n in a.risk_notes or [] if n.get("kind") != "uncertain"] != applied_notes:
+        raise Conflict("Hồ sơ đã có cảnh báo mới hơn, hoàn tác bản mới nhất trước.", code="superseded")
+    a.risk_notes = before["notes"] + [n for n in a.risk_notes or [] if n.get("kind") == "uncertain"]
+    a.counterfeit_risk = RiskLevel(before["counterfeit"])
+    a.fake_review_risk = RiskLevel(before["fake_review"])

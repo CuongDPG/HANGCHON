@@ -23,6 +23,7 @@ import { useProfile, useRunAssessment } from "@/lib/api/assessment";
 import { platformLabel } from "@/lib/api/sourcing";
 import { formatNumber } from "@/lib/format";
 import { STAGE_LABEL } from "@/components/sourcing/candidate-row";
+import { GuidanceNotes } from "@/components/sourcing/guidance-notes";
 import { CostCard } from "./cost-card";
 import { DecisionBar } from "./decision-bar";
 import { ReviewsCard } from "./reviews-card";
@@ -133,6 +134,13 @@ export function ProfileScreen({ id }: { id: string }) {
           ) : null}
         </div>
       </div>
+
+      {c.guidance ? (
+        <Card className="flex flex-col gap-2">
+          <CardHeader title="Nguyên tắc và gu của chị" />
+          <GuidanceNotes g={c.guidance} />
+        </Card>
+      ) : null}
 
       {assessing ? (
         <Card tone="soft" className="flex items-center gap-3" role="status">

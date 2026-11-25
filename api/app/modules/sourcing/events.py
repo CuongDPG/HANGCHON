@@ -39,4 +39,10 @@ async def _on_assessed(db: AsyncSession, payload: dict[str, Any]) -> None:
     a = await db.get(Assessment, uuid.UUID(payload["assessment_id"])) if payload.get("assessment_id") else None
     if cand is None or a is None or a.score_total is None:
         return
-    cand.ai_score = int(Decimal(a.score_total).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    score = int(Decimal(a.score_total).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    gd = (cand.raw or {}).get("guidance")
+    if isinstance(gd, dict) and gd.get("delta"):
+        # c5 + c6: nguyên tắc/gu vẫn chỉnh điểm sau thẩm định (chạy lặp lại cho cùng kết quả)
+        cand.raw = {**cand.raw, "guidance": {**gd, "base_score": score}}
+        score = max(0, min(100, score + int(gd["delta"])))
+    cand.ai_score = score

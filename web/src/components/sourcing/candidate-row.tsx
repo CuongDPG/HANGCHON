@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ImageBox } from "@/components/ui";
 import { platformLabel, type CandidateCard } from "@/lib/api/sourcing";
 import { cn } from "@/lib/cn";
+import { GuidanceNotes } from "./guidance-notes";
 import { formatNumber, formatVndCompact } from "@/lib/format";
 
 export const STAGE_LABEL: Record<string, string> = {
@@ -59,6 +60,7 @@ export function CandidateRow({
         </div>
       </div>
       {c.rank_reason ? <p className="mt-2 text-[13px] text-ink-2 [text-wrap:pretty]">{c.rank_reason}</p> : null}
+      {c.guidance ? <GuidanceNotes g={c.guidance} className="mt-1.5" /> : null}
     </>
   );
   const cls = cn(

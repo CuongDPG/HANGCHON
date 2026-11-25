@@ -112,3 +112,53 @@ async def test_store_validation_error_in_customer_voice(client):
     assert r.status_code == 422
     no_chi(r.json()["detail"])
     assert "bạn" in r.json()["detail"]
+
+
+# ---- ghi chú thử hàng / thẩm định chảy ra trang công khai ----------------------------------------------------------
+# Ý đã sắp của ghi chú thử (kể cả số đo) → «Vì sao mình chọn» / «Điều mình chưa ưng»; tóm tắt, điểm mạnh/yếu, an toàn
+# của hồ sơ thẩm định → dữ kiện viết trang sản phẩm.
+
+TRIAL_TEXT = "Chị đo giữ nóng được 8 giờ. Chị thấy nắp đóng kín, không rò. Hơi nặng tay khi chị cầm lâu."
+
+
+def test_trial_and_assessment_prompts_keep_customer_voice():
+    organize = ai.TASKS["selection.organize_note"].system
+    assert "con số chị đo" not in organize and "«mình»" in organize and "«chị đo»" in organize
+    for name in ("assessment.evaluate", "assessment.safety_check"):
+        assert "không gọi «chị»" in ai.TASKS[name].system, name
+
+
+def test_trial_points_and_reasons_never_say_chi():
+    from app.modules.selection.ai_tasks import DraftNote, DraftReasonsIn, OrganizeNoteIn, to_mine
+
+    assert to_mine("Chị đo: 7h sáng → 5h chiều còn ấm, chị thích") == "Mình đo: 7h sáng → 5h chiều còn ấm, mình thích"
+    assert to_mine("Chịu nhiệt tốt") == "Chịu nhiệt tốt"
+    org = FAKES["selection.organize_note"](OrganizeNoteIn(text=TRIAL_TEXT))
+    assert {p.kind for p in org.points} >= {"measure", "good"}
+    no_chi(*(p.text for p in org.points))
+    out = FAKES["selection.draft_reasons"](
+        DraftReasonsIn(candidate_title="Bình giữ nhiệt", notes=[DraftNote(text=TRIAL_TEXT)])
+    )
+    no_chi(*out.reasons_selected, *out.not_satisfied)
+
+
+async def test_saved_reasons_are_scrubbed_even_if_model_slips(db, fake_ai):
+    """Model thật lỡ viết «chị đo» → bản nháp lưu (sẽ lên trang khách) vẫn là «mình đo»."""
+    from app.modules.selection import service as sel
+    from app.modules.selection.ai_tasks import DraftReasonsOut
+    from app.modules.selection.models import Decision, SelectionDecision, TrialNote, TrialNoteKind
+    from app.modules.sourcing.models import Candidate
+
+    fake_ai["selection.draft_reasons"] = lambda inp: DraftReasonsOut(
+        reasons_selected=["Chị đo: giữ nóng 8 giờ.", "Nắp kín."], not_satisfied=["Chị thấy hơi nặng."]
+    )
+    c = Candidate(source_platform="taobao", source_external_id="voice1", title_vi="Bình giữ nhiệt")
+    db.add(c)
+    await db.flush()
+    db.add(TrialNote(candidate_id=c.id, kind=TrialNoteKind.TEXT, text=TRIAL_TEXT, recorded_at=datetime.now(UTC)))
+    d = SelectionDecision(candidate_id=c.id, decision=Decision.SELECTED, decided_at=datetime.now(UTC))
+    db.add(d)
+    await db.flush()
+    await sel.draft_reasons(db, d)
+    no_chi(d.draft_reason_selected or "", d.draft_not_satisfied or "")
+    assert "Mình đo: giữ nóng 8 giờ." in (d.draft_reason_selected or "")

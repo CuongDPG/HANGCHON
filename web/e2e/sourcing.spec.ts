@@ -73,3 +73,31 @@ test("dán link → hồ sơ đã dịch và tự thẩm định", async ({ page
   await expect(page.getByRole("main").getByText("Điểm theo khung của chị")).toBeVisible({ timeout: 60_000 });
   await expect(page.getByRole("main").getByText(/AI đã đọc \d+ đánh giá/)).toBeVisible();
 });
+
+test("nguyên tắc của chị hạ hạng ứng viên khi săn hàng, có ghi lý do (c5)", async ({ page }) => {
+  test.setTimeout(120_000);
+  await login(page);
+  const nonce = `${Date.now()}${Math.round(Math.random() * 1e6)}`;
+  const pr = await page.request.post("/api/desk/selection/principles", { data: { kind: "avoid", text: "Nên tránh giá phơi" } });
+  expect(pr.ok()).toBeTruthy();
+  const principleId = (await pr.json()).id as string;
+  try {
+    const b = await (await page.request.post("/api/desk/sourcing/briefs", { data: { text: "Tìm giá phơi gấp gọn inox cho ban công nhỏ" } })).json();
+    // từ khoá riêng để nguồn giả trả món mới cho lần chạy này
+    await page.request.patch(`/api/desk/sourcing/briefs/${b.id}`, { data: { keywords_translated: { zh: [`折叠晾衣架 ${nonce}`] } } });
+    const run = await page.request.post(`/api/desk/sourcing/briefs/${b.id}/run`);
+    expect(run.ok()).toBeTruthy();
+
+    await page.goto(`/desk/san-hang/de/${b.id}`);
+    const main = page.getByRole("main");
+    const card = main.locator('a[href^="/desk/san-hang/ung-vien/"]').filter({ hasText: "Trái nguyên tắc: Nên tránh giá phơi" }).first();
+    await expect(card).toBeVisible({ timeout: 60_000 });
+    await expect(card).toContainText("sau khi tính nguyên tắc và gu");
+    await card.click();
+    await expect(page.getByRole("main").getByText("Nguyên tắc và gu của chị")).toBeVisible({ timeout: 30_000 });
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+  } finally {
+    await page.request.delete(`/api/desk/selection/principles/${principleId}`);
+  }
+});
