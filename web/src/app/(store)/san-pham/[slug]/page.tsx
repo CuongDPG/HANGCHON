@@ -85,7 +85,8 @@ async function ProductBody({ params }: { params: PageProps<"/san-pham/[slug]">["
             <PageHeader title={p.name} description={p.subtitle ?? undefined} backHref="/" className="flex-1" />
             {p.seal.total ? <Seal chosen={p.seal.chosen} total={p.seal.total} size={64} className="mt-1" /> : null}
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-2">
+          {/* giá hiện một chỗ: máy tính ở đây (khung đặt ngay bên dưới), điện thoại ở khung đặt dính đáy màn hình */}
+          <div className="hidden flex-wrap items-center justify-between gap-2 md:flex">
             <div className="flex items-baseline gap-2">
               <Money value={p.price_vnd} className="font-display text-[26px] font-bold" />
               {p.drop && p.price_vnd !== p.list_price_vnd ? <Money value={p.list_price_vnd} strike className="text-[15px]" /> : null}
@@ -93,12 +94,11 @@ async function ProductBody({ params }: { params: PageProps<"/san-pham/[slug]">["
             {p.drop ? (
               <Link href={`/dot/${p.drop.slug}`} className="rounded-md border border-accent px-2.5 py-1 text-[13px] font-medium text-accent">
                 {p.drop.label}
-                {p.drop.slots_left !== null ? ` · còn ${p.drop.slots_left} suất` : ""}
               </Link>
             ) : p.stock > 0 ? (
               <Badge tone="success">Có sẵn {p.stock}</Badge>
             ) : (
-              <Badge tone="outline">Chưa mở đợt</Badge>
+              <Badge tone="outline">Chờ đợt sau</Badge>
             )}
           </div>
           {p.drop ? <DropNote p={p} /> : null}
@@ -127,7 +127,7 @@ async function ProductBody({ params }: { params: PageProps<"/san-pham/[slug]">["
           ) : null}
 
           <div className="hidden md:block">
-            <BuyBoxFor p={p} />
+            <BuyBoxFor p={p} showSummary={false} />
           </div>
         </div>
       </div>
@@ -195,20 +195,22 @@ async function ProductBody({ params }: { params: PageProps<"/san-pham/[slug]">["
       <Reviews p={p} />
 
       {/* Nút đặt luôn trong tầm tay trên điện thoại (ngay trên thanh điều hướng dưới) */}
-      <div className="sticky bottom-[calc(var(--spacing-tabbar)+env(safe-area-inset-bottom,0px)+8px)] z-10 -mx-1 rounded-md border border-line bg-surface/95 p-3 shadow-[0_6px_24px_-12px_rgb(0_0_0/0.25)] backdrop-blur md:hidden">
+      <div className="sticky bottom-[calc(var(--spacing-tabbar)+env(safe-area-inset-bottom,0px)+8px)] z-10 rounded-md shadow-[0_6px_24px_-12px_rgb(0_0_0/0.25)] md:hidden">
         <BuyBoxFor p={p} />
       </div>
     </article>
   );
 }
 
-function BuyBoxFor({ p }: { p: ProductDetail }) {
+function BuyBoxFor({ p, showSummary }: { p: ProductDetail; showSummary?: boolean }) {
   return (
     <BuyBox
       productId={p.id}
       slug={p.slug}
       name={p.name}
       priceVnd={p.drop?.price_vnd || p.price_vnd}
+      listPriceVnd={p.drop ? p.list_price_vnd : undefined}
+      showSummary={showSummary}
       imageUrl={p.image?.src_small ?? undefined}
       dropId={p.drop?.id}
       dropLabel={p.drop?.label}
@@ -233,7 +235,8 @@ function DropNote({ p }: { p: ProductDetail }) {
 
 function Gallery({ p }: { p: ProductDetail }) {
   if (!p.images.length) {
-    return <ImageBox alt={p.name} ratio="1/1" placeholder="Ảnh thật, chị chụp" />;
+    // chưa có ảnh: ô giữ chỗ thấp hơn trên điện thoại để tên món và giá không bị đẩy khỏi màn hình đầu
+    return <ImageBox alt={p.name} ratio="1/1" placeholder="Ảnh thật, chị chụp" className="aspect-[16/9] md:aspect-square" />;
   }
   return (
     <div className="flex flex-col gap-2">

@@ -32,6 +32,23 @@ _PRAISE = ["Chắc tay, dùng thích", "Đóng gói cẩn thận", "Đúng như 
 _COMPLAIN = ["Nắp hơi lỏng", "Có mùi nhựa lúc đầu", "Màu nhạt hơn ảnh", "Giao chậm", "Hơi nhỏ"]
 
 
+# Giá bán lẻ thường gặp ở Việt Nam theo loại hàng (giả lập, VND): giá VN cùng thang với giá vốn về tay của hàng
+# nhập, để biên dự kiến hợp lý. Khớp cụm cụ thể trước cụm chung; không khớp thì lấy giá ngẫu nhiên theo từ khoá.
+_VN_RETAIL: list[tuple[str, int]] = [
+    ("nhật", 800_000), ("lan can", 1_200_000), ("thuỷ tinh", 230_000), ("in hình", 95_000), ("nhựa", 150_000),
+    ("mini", 170_000), ("trẻ em", 190_000), ("ống hút", 150_000), ("văn phòng", 150_000), ("cốc", 150_000),
+    ("bình giữ nhiệt", 300_000), ("hộp cơm tròn", 220_000), ("hộp cơm", 320_000), ("kẹp phơi", 110_000),
+    ("móc phơi", 160_000), ("cây phơi", 480_000), ("dây phơi", 120_000), ("giày", 130_000), ("giá phơi", 330_000),
+    ("áo choàng", 290_000), ("khăn tắm", 250_000), ("khăn mặt", 170_000), ("pin sạc", 240_000), ("đèn", 230_000),
+    ("móc dán", 110_000), ("kệ", 210_000), ("thảm", 160_000),
+]  # fmt: skip
+
+
+def _market_base(query: str) -> int | None:
+    q = query.lower().replace("thủy", "thuỷ")
+    return next((price for key, price in _VN_RETAIL if key in q), None)
+
+
 def _platform_of(url: str) -> SourcePlatform:
     host = urlparse(url).netloc.lower()
     for key, p in (
@@ -151,11 +168,11 @@ class Driver(SourcesDriver):
 
     async def market_prices(self, query: str, *, limit: int = 10) -> list[MarketListing]:
         r = rng("market", query)
-        base = r.randint(8, 40) * 10_000
+        base = _market_base(query) or r.randint(8, 40) * 10_000
         out = []
         for i in range(min(limit, 6)):
             p = SourcePlatform.SHOPEE_VN if i % 2 == 0 else SourcePlatform.TIKTOK_SHOP_VN
-            price = base + r.randint(-5, 12) * 5_000
+            price = (round(base * r.uniform(0.85, 1.35) / 10_000) * 10_000 - 1_000) if base >= 50_000 else base
             out.append(
                 MarketListing(
                     platform=p,

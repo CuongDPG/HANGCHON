@@ -338,7 +338,8 @@ async def _step_details(db: AsyncSession, a: Assessment, c: Candidate) -> list[S
             ),
             TranslateOut,
         )
-        a.specs = {s.name: s.value for s in tr.output.specs_vi} or dict(c.specs or {})
+        # ứng viên đã có thông số tiếng Việt (dán link / chị đo khi thử) thì giữ; chỉ dùng bản dịch khi còn trống
+        a.specs = dict(c.specs or {}) or {s.name: s.value for s in tr.output.specs_vi}
         po = dict(a.price_overview or {})
         po.update(
             {"weight_grams": product.weight_grams, "moq": product.moq, "description_vi": tr.output.description_vi}

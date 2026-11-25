@@ -316,9 +316,8 @@ async def make_referral(customer_id: uuid.UUID, _: CurrentUser, db: DbSession) -
 @router.get("/regulars", response_model=RegularsOut)
 async def list_regulars(_: CurrentUser, db: DbSession) -> RegularsOut:
     people = await service.regulars(db)
-    reachable = [c for c in await service.audience(db) if await service.recipient(db, c)]
     return RegularsOut(
-        min_orders=await service.regular_min_orders(db), total=len(people), reachable=len(reachable),
+        min_orders=await service.regular_min_orders(db), total=len(people), reachable=await service.reachable_count(db),
         items=await _items(db, people),
     )  # fmt: skip
 
@@ -332,9 +331,13 @@ async def update_settings(body: CrmSettingsIn, user: OwnerUser, db: DbSession) -
 async def _broadcast_views(db: AsyncSession, rows: list[Broadcast]) -> list[BroadcastView]:
     dids = {b.drop_id for b in rows if b.drop_id}
     titles = dict((await db.execute(select(Drop.id, Drop.title).where(Drop.id.in_(dids)))).all()) if dids else {}
+    # tin chưa gửi: số người nhận tính lại tại thời điểm xem (khách quen có thể thêm sau khi tin được soạn)
+    live = await service.reachable_count(db) if any(b.status in service.UNSENT for b in rows) else 0
     return [
         BroadcastView(
-            **BroadcastView.model_validate(b).model_dump(exclude={"drop_title"}), drop_title=titles.get(b.drop_id)
+            **BroadcastView.model_validate(b).model_dump(exclude={"drop_title", "recipient_count"}),
+            drop_title=titles.get(b.drop_id),
+            recipient_count=live if b.status in service.UNSENT else b.recipient_count,
         )
         for b in rows
     ]

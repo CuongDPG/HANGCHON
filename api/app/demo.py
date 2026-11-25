@@ -122,7 +122,7 @@ PRICE = {"p_binh": 289000, "p_hop": 329000, "p_gia": 279000, "p_kep": 119000, "p
 SPECS = {
     "p_binh": ("500 ml · inox 304 · 260 g", [("Dung tích", "500 ml"), ("Chất liệu", "Inox 304, nắp nhựa PP"),
                                              ("Giữ nóng", "Khoảng 8 giờ (chị đo: 7h sáng → 5h chiều còn ấm)"), ("Khối lượng", "260 g")]),
-    "p_hop": ("3 ngăn · inox 304 · 640 g", [("Số ngăn", "3, có nắp kín"), ("Chất liệu", "Inox 304"),
+    "p_hop": ("3 ngăn · inox 304 · 640 g", [("Số ngăn", "3 ngăn, có nắp kín"), ("Chất liệu", "Inox 304"),
                                             ("Dung tích", "Khoảng 1,2 lít"), ("Khối lượng", "640 g")]),
     "p_gia": ("Gấp gọn · inox · 2,1 kg", [("Kích thước mở", "150 × 60 × 95 cm"), ("Khi gấp", "Dày 6 cm"),
                                           ("Chất liệu", "Inox 201, chân nhựa"), ("Khối lượng", "2,1 kg")]),
@@ -495,6 +495,24 @@ class Story:
         for key in ("c_ly", "c_xoay", "c_tham"):
             await self.move(key, "sample")  # đơn đặt mẫu nằm trong hàng chờ chị
         await self.books()
+        await self.shop_profile()
+
+    async def shop_profile(self) -> None:
+        """Cài đặt cửa hàng (thông tin ví dụ), một người phụ giúp, và cho AI học gu từ các quyết định đã có."""
+        await self.call("PATCH", f"{OWNER}/control/settings", json={"values": {
+            "store.picker_name": "Thu (tên ví dụ)",
+            "store.picker_intro": "Mình là mẹ của hai bé, ở chung cư nhỏ nên món nào cũng phải gọn và bền. Mình mua mẫu "
+                                  "bằng tiền của mình, dùng ít nhất hai tuần rồi mới đưa lên kệ. (Lời giới thiệu ví dụ.)",
+            "store.bank_code": "VCB", "store.bank_account_no": "0123456789",
+            "store.bank_account_name": "NGUYEN THI VI DU",
+        }})  # fmt: skip
+        await self.call("POST", "/api/desk/users", ok=(200, 201, 409), json={
+            "email": "phugiup@hangchon.local", "name": "Lan (người phụ giúp, ví dụ)",
+            "password": uuid.uuid4().hex, "role": "helper",
+        })  # fmt: skip
+        await self.call("POST", f"{OWNER}/selection/taste-profiles/retrain", json={"all": True})
+        for item in await self.pending("selection.update_taste"):  # chị xem gu AI hiểu rồi đồng ý
+            await self.approve(item["id"])
 
     async def receive_drop_batch_start(self, drop_key: str) -> None:
         """Duyệt đơn đặt lô của đợt, gửi bên mua hộ, trả tiền (lô đang trên đường về)."""

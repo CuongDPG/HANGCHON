@@ -202,20 +202,20 @@ function DayBody({ day, onOpen, draggable }: { day: CalendarDay; onOpen: (p: Pos
           onDragStart={(e) => e.dataTransfer.setData("application/json", JSON.stringify({ id: p.id, scheduled_at: p.scheduled_at }))}
           onClick={() => onOpen(p)}
           className={cn(
-            "flex w-full min-w-0 items-start gap-2 rounded-md border px-2 py-1.5 text-left text-[13px]",
+            "flex w-full min-w-0 flex-col gap-1 rounded-md border px-2 py-1.5 text-left text-[13px]",
             tone[p.display_status] ?? tone.pending,
             draggable && MOVABLE.has(p.status) && "cursor-grab active:cursor-grabbing",
           )}
         >
-          <ChannelMark channel={p.channel} className="mt-0.5 size-5 text-[10px]" />
-          <span className="min-w-0 flex-1">
-            <span className="block truncate">
-              {p.display_status === "draft_pushed" ? null : <span className="font-semibold tabular-nums">{formatTime(p.scheduled_at)} </span>}
-              {p.channel_label}
-            </span>
-            <span className="line-clamp-2 text-ink-2">
-              {p.display_status === "draft_pushed" ? "Bản nháp chờ chị bấm đăng" : (p.name ?? p.title)}
-            </span>
+          {/* giờ + kênh một dòng riêng, tên bài chiếm cả bề ngang thẻ (cột ngày hẹp không cắt giờ) */}
+          <span className="flex min-w-0 items-center gap-1.5" title={p.channel_label}>
+            <ChannelMark channel={p.channel} className="size-5 shrink-0 text-[10px]" />
+            {p.display_status === "draft_pushed" ? null : <span className="shrink-0 font-semibold tabular-nums">{formatTime(p.scheduled_at)}</span>}
+            {/* cột ngày trên máy tính hẹp: dấu kênh đã đủ nhận ra, tên kênh chỉ hiện khi màn rất rộng */}
+            <span className={cn("min-w-0 truncate", draggable && p.display_status !== "draft_pushed" && "sr-only 2xl:not-sr-only")}>{p.channel_label}</span>
+          </span>
+          <span className="line-clamp-2 min-w-0 text-ink-2">
+            {p.display_status === "draft_pushed" ? "Bản nháp chờ chị bấm đăng" : (p.name ?? p.title)}
           </span>
         </button>
       ))}

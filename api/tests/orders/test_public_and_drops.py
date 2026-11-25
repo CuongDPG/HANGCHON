@@ -94,6 +94,32 @@ async def test_inbound_arrived_moves_orders_when_all_lots_in(client: httpx.Async
     assert view["status"] == "ready_to_ship" and view["headline"] == "Chị đang chuẩn bị gói hàng"
 
 
+async def test_arrival_is_one_milestone_in_timeline(client: httpx.AsyncClient) -> None:
+    """Lô về kho chỉ hiện một mốc «Về tới kho» (trước đây chặng đường về cũng ghi lại đúng mốc đó)."""
+    p = await make_product()
+    d = await make_drop([(p, 100_000, 5)])
+    o = await place(client, cart((p, 1, d)), payment_method="cod")
+    async with SessionLocal() as s:
+        po = PurchaseOrder(code=f"PO-{uuid.uuid4().hex[:6]}", kind=POKind.BATCH, drop_id=d.id)
+        s.add(po)
+        await s.flush()
+        t0 = now_utc() - timedelta(days=3)
+        lot = InboundShipment(purchase_order_id=po.id, code="Lô 1", status=InboundStatus.DELIVERED, milestones=[
+            {"status": "international_transit", "at": t0.isoformat(), "note": None},
+            {"status": "delivered", "at": (t0 + timedelta(days=2)).isoformat(), "note": None},
+        ])  # fmt: skip
+        s.add(lot)
+        await s.flush()
+        await events.emit("inbound.arrived", {"inbound_shipment_id": str(lot.id)}, db=s)
+        await s.commit()
+    view = (await client.get(f"/api/store/orders/{o['code']}", params={"t": o["token"]})).json()
+    titles = [st["title"] for st in view["timeline"]]
+    assert sum("về tới kho" in t.lower() for t in titles) == 1, titles
+    steps = {st["key"]: st for st in view["timeline"]}
+    assert steps["inbound"]["title"] == "Hàng đã về Việt Nam" and steps["inbound"]["status"] == "done"
+    assert steps["arrived"]["status"] == "done" and steps["arrived"]["at"]
+
+
 async def test_drop_closed_event_and_overview(client: httpx.AsyncClient, owner_client: httpx.AsyncClient) -> None:
     a, b = await make_product(), await make_product(name="Hộp gia vị")
     d = await make_drop([(a, 100_000, 10), (b, 50_000, None)])

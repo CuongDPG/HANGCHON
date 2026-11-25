@@ -144,6 +144,26 @@ async def test_drop_opened_drafts_announcement_for_regulars(owner_client, helper
     assert (await owner_client.post(f"/api/desk/crm/broadcasts/{bs[0]['id']}/send", json={})).status_code == 409
 
 
+async def test_unsent_broadcast_counts_recipients_at_view_time(owner_client, db):
+    """Tin soạn lúc chưa có khách quen (0 người) phải hiện đúng số người nhận khi khách quen có thêm sau đó."""
+    p = await f.product(db, "Hộp cơm inox 3 ngăn", 245_000)
+    d = await f.open_drop(db, p)
+    await db.commit()
+    await service.draft_drop_announcement(db, d.id)
+    await db.commit()
+    assert (await owner_client.get("/api/desk/crm/broadcasts")).json()[0]["recipient_count"] == 0
+    await f.customer(db, "Thu Hà", orders=3, identity=(Channel.ZALO_OA, "zalo-ha"))
+    await f.customer(db, "Ngọc", orders=2, email="ngoc@example.com")
+    await db.commit()
+    regs = (await owner_client.get("/api/desk/crm/regulars")).json()
+    b = (await owner_client.get("/api/desk/crm/broadcasts")).json()[0]
+    assert regs["reachable"] == 2 and b["recipient_count"] == 2
+    item = (await db.execute(select(ApprovalItem))).scalars().one()
+    assert "0" not in item.summary  # hàng chờ không ghi cứng số người nhận lúc soạn
+    r = await owner_client.post(f"/api/desk/crm/broadcasts/{b['id']}/send", json={})
+    assert r.json()["status"] == "sent" and r.json()["delivered_count"] == 2 and r.json()["recipient_count"] == 2
+
+
 async def test_broadcast_auto_level_sends_and_threshold_setting(owner_client, db):
     d, *_ = await _drop_with_regulars(db)
     await control.set_level(db, "crm.send_broadcast", AutonomyLevel.AUTO, None)

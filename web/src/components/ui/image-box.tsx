@@ -46,10 +46,11 @@ export function ImageBox({ src, alt, ratio = "1/1", placeholder, priority = fals
           className={cn("absolute inset-0 size-full object-cover", imgClassName)}
         />
       ) : (
-        <div className="absolute inset-0 grid place-items-center bg-[repeating-linear-gradient(135deg,transparent_0_10px,var(--color-soft)_10px_11px)] text-ink-3">
-          <span className="flex flex-col items-center gap-1.5 px-3 text-center text-[12.5px]">
-            <ImageIcon className="size-5" aria-hidden />
-            {placeholder}
+        // ô giữ chỗ (không dùng ảnh giả): ô nhỏ chỉ có biểu tượng, ô lớn thêm lời ghi chú
+        <div className="@container absolute inset-0 grid place-items-center bg-[repeating-linear-gradient(135deg,transparent_0_10px,var(--color-soft)_10px_11px)] text-ink-3">
+          <span className="flex flex-col items-center gap-1.5 px-3 text-center text-[12.5px] @[16rem]:gap-2 @[16rem]:text-[14px]">
+            <ImageIcon className="size-5 @[16rem]:size-7" strokeWidth={1.6} aria-hidden />
+            {placeholder ? <span className="hidden @[7rem]:block">{placeholder}</span> : null}
           </span>
         </div>
       )}
