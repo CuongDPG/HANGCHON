@@ -64,3 +64,21 @@ async def test_demo_story_covers_every_module_and_is_idempotent(owner, monkeypat
         assert await s.scalar(select(func.count(AIActivity.id))) > 20
         assert await s.scalar(select(func.count(LedgerEntry.id)).where(LedgerEntry.kind == "revenue")) >= 8
         assert await s.scalar(select(func.count(WeeklyReport.id))) >= 3
+
+
+async def test_demo_refuses_prod_without_explicit_flag(monkeypatch, caplog) -> None:
+    import pytest
+    from sqlalchemy import func, select
+
+    from app.demo import DemoRefused, seed_demo
+    from app.modules.orders.models import Order
+    from app.seed import main
+
+    monkeypatch.setattr(settings, "app_env", "prod")
+    with pytest.raises(DemoRefused, match="--allow-prod"):
+        await seed_demo()
+    assert await main(demo=True) == 2
+    assert "APP_ENV=prod" in caplog.text and "--allow-prod" in caplog.text
+    assert settings.app_env == "prod"  # không tự đổi sang dev
+    async with SessionLocal() as s:
+        assert await s.scalar(select(func.count()).select_from(Order)) == 0

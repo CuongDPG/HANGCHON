@@ -147,6 +147,13 @@ control.register_setting(
     description="zalo_oa (Zalo theo số điện thoại) · sms · email",
 )
 control.register_setting(
+    "orders.notify_fallback_channels",
+    "Kênh dự phòng khi báo tin không được",
+    [],
+    group=GROUP,
+    description='Thử lần lượt khi kênh chính gửi lỗi, vd ["email"] (chỉ khi khách có email).',
+)
+control.register_setting(
     "orders.notify_templates",
     "Mẫu tin báo khách",
     {},

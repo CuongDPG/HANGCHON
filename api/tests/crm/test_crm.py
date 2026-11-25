@@ -140,7 +140,7 @@ async def test_drop_opened_drafts_announcement_for_regulars(owner_client, helper
     r = await owner_client.post(f"/api/desk/crm/broadcasts/{bs[0]['id']}/send", json={"body": "Mở đợt rồi nè"})
     assert r.status_code == 200 and r.json()["status"] == "sent" and r.json()["delivered_count"] == 2
     assert sorted(m.to for m in _outbox()) == ["ngoc@example.com", "zalo-ha"]
-    assert all(m.text == "Mở đợt rồi nè" for m in _outbox())
+    assert all(m.text == f"Mở đợt rồi nè\n{service.OPT_OUT_FOOTER}" and m.promotional for m in _outbox())
     assert (await owner_client.post(f"/api/desk/crm/broadcasts/{bs[0]['id']}/send", json={})).status_code == 409
 
 
@@ -374,3 +374,41 @@ async def test_stat_provider_due(owner_client, db):
     stats = (await owner_client.get("/api/desk/control/today")).json()["stats"]
     assert any(s["key"] == "crm.reorder_due" and s["value"] == 1 for s in stats)
     _ = NoteAuthor
+
+
+# ---- tin quảng cáo: đồng ý / từ chối nhận tin --------------------------------------------------------------------
+
+
+async def test_promotional_needs_consent_and_reply_opts_out(owner_client, db):
+    await f.accounts(db)
+    p = await f.product(db, "Viên tẩy bồn cầu", 120_000, consumable=True, reorder_days=40)
+    yes = await f.customer(db, "Đồng ý", email="yes@example.com", orders=3)
+    no = await f.customer(db, "Chưa đồng ý", "0912000222", email="no@example.com", orders=3, marketing_opt_in=False)
+    assert [c.id for c in await service.audience(db)] == [yes.id]
+    for cust in (yes, no):
+        o = await f.order(db, cust, p, delivered=True)
+        await service.schedule_reminders(db, o.id)
+    for r in (await db.execute(select(ReorderReminder))).scalars():
+        r.due_on = local_today()
+    await db.flush()
+    assert await service.run_due(db) == {"drafted": 1, "skipped": 1}
+    skipped = (await db.execute(select(ReorderReminder).where(ReorderReminder.customer_id == no.id))).scalar_one()
+    assert "chưa đồng ý" in (skipped.reason or "")
+    with pytest.raises(service.BadRequest):
+        await service.notify(db, no, "Mua lại nhé", promotional=True)
+    await service.notify(db, no, "Đơn của bạn đã giao")  # tin giao dịch: không cần đồng ý
+    assert _outbox()[-1].text == "Đơn của bạn đã giao" and not _outbox()[-1].promotional
+    # khách nhắn «Từ chối» → gắn nhãn từ chối, không nhận tin quảng cáo nữa
+    yes_identity = (Channel.FACEBOOK, "psid-yes")
+    from app.modules.orders.models import CustomerIdentity
+
+    db.add(CustomerIdentity(customer_id=yes.id, channel=yes_identity[0], external_id=yes_identity[1]))
+    await db.commit()
+    r = await owner_client.post(
+        "/api/desk/inbox/dev/simulate",
+        json={"text": "Từ chối", "author_name": "Đồng ý", "author_external_id": "psid-yes"},
+    )
+    yes_id = yes.id
+    assert r.json()["customer_id"] == str(yes_id)
+    db.expire_all()
+    assert await service.is_opted_out(db, yes_id) and await service.audience(db) == []

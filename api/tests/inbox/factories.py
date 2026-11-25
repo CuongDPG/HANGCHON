@@ -79,11 +79,13 @@ async def customer(
     orders: int = 0,
     email: str | None = None,
     identity: tuple[Channel, str] | None = None,
+    marketing_opt_in: bool = True,
 ) -> Customer:
     n = next(_n)
     c = Customer(
-        name=name, phone=phone or f"09{n:08d}", email=email, order_count=orders, total_spent_vnd=orders * 300_000
-    )
+        name=name, phone=phone or f"09{n:08d}", email=email, order_count=orders, total_spent_vnd=orders * 300_000,
+        marketing_opt_in=marketing_opt_in,
+    )  # fmt: skip
     db.add(c)
     await db.flush()
     if identity:

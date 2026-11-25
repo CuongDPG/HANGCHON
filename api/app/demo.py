@@ -674,8 +674,21 @@ class Story:
             self.bump("weekly_reports")
 
 
-async def seed_demo() -> dict[str, int]:
-    """Dựng câu chuyện mẫu (một lần). Trả số đối tượng đã tạo; đã dựng rồi thì trả {}."""
+PROD_REFUSAL = (
+    "Đang ở APP_ENV=prod: không dựng dữ liệu mẫu lên CSDL thật (đơn, khách, tiền về giả sẽ lẫn vào sổ sách). "
+    "Chỉ khi chắc chắn đây là bản thử, chạy lại với cờ --allow-prod."
+)
+
+
+class DemoRefused(RuntimeError):
+    """Từ chối dựng dữ liệu mẫu ở production khi không có cờ tường minh."""
+
+
+async def seed_demo(*, allow_prod: bool = False) -> dict[str, int]:
+    """Dựng câu chuyện mẫu (một lần). Trả số đối tượng đã tạo; đã dựng rồi thì trả {}.
+    Ở `APP_ENV=prod` từ chối (raise `DemoRefused`) trừ khi `allow_prod=True` (cờ `--allow-prod`)."""
+    if settings.app_env == "prod" and not allow_prod:
+        raise DemoRefused(PROD_REFUSAL)
     from app.main import app
     from app.modules.control.models import AppSetting
 
@@ -688,7 +701,7 @@ async def seed_demo() -> dict[str, int]:
     settings.ai_provider, settings.jobs_eager = "fake", True
     for k in ("sources_driver", "social_driver", "payments_driver", "shipping_driver", "notify_driver"):
         setattr(settings, k, "mock")
-    if settings.app_env == "prod":
+    if settings.app_env == "prod":  # chỉ tới đây khi có --allow-prod
         settings.app_env = "dev"  # giả lập tiền về / tin đến chỉ mở ở dev
     from app.core import ratelimit
 

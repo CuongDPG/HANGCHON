@@ -40,6 +40,8 @@ import {
   useSimulateTransfer,
   useSyncProducts,
   useTemplates,
+  type FailedNotification,
+  type NotifyChannel,
   type PaymentRow,
 } from "@/lib/api/orders";
 
@@ -300,6 +302,7 @@ function TemplatesTab() {
   const values = draft ?? q.data.templates;
   return (
     <div className="flex flex-col gap-3">
+      <DeliveryStatus channels={q.data.channels} failed={q.data.failed} />
       <p className="text-[14px] text-ink-2">
         Mỗi mốc gửi khách một tin, không gửi trùng. Chèn thông tin bằng ngoặc nhọn, vd <code>{"{ma_don}"}</code>.
       </p>
@@ -327,5 +330,54 @@ function TemplatesTab() {
         Lưu mẫu tin
       </Button>
     </div>
+  );
+}
+
+/** g5: kênh báo tin đang bật (chính / dự phòng, đủ cấu hình chưa) và các tin gửi lỗi gần đây. */
+function DeliveryStatus({ channels, failed }: { channels: NotifyChannel[]; failed: FailedNotification[] }) {
+  return (
+    <Card className="flex flex-col gap-3">
+      <CardHeader title="Kênh báo tin" />
+      <ul className="flex flex-col gap-2">
+        {channels.map((c) => (
+          <li key={c.channel} className="flex flex-col gap-0.5">
+            <div className="flex flex-wrap items-center gap-2 text-[14px]">
+              <b>{c.label}</b>
+              <Badge tone="outline">{c.role === "primary" ? "kênh chính" : "dự phòng"}</Badge>
+              <Badge tone={c.ready ? "success" : "warning"}>{c.ready ? `đang gửi qua ${c.driver}` : c.driver}</Badge>
+            </div>
+            {c.note ? <p className="text-[13px] text-ink-2">{c.note}</p> : null}
+          </li>
+        ))}
+      </ul>
+      <p className="text-[12.5px] text-ink-2">Đổi kênh chính / dự phòng trong Cài đặt (nhóm Đơn hàng); nhà cung cấp gửi tin do người vận hành cấu hình.</p>
+      {failed.length ? (
+        <div className="flex flex-col gap-2">
+          <h3 className="font-sans text-[14px] font-semibold">Tin gửi lỗi gần đây</h3>
+          <ul className="flex flex-col gap-2">
+            {failed.map((f) => (
+              <li key={f.id} className="rounded-md bg-seal-wash p-2 text-[13px]">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <span>
+                    <b>{f.event_label}</b>
+                    {f.order_code && f.order_id ? (
+                      <>
+                        {" · "}
+                        <Link href={`/desk/don-hang/${f.order_id}`} className="text-accent">{f.order_code}</Link>
+                      </>
+                    ) : null}
+                  </span>
+                  <DateTime value={f.created_at} format="dateTime" className="text-ink-2" />
+                </div>
+                <p className="text-ink-2">{f.error || "Lỗi không rõ"}</p>
+                <p className="text-ink-2">{f.will_retry ? `Sẽ tự gửi lại (đã thử ${f.attempts} lần)` : "Không gửi lại tự động"}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p className="text-[13px] text-ink-2">Chưa có tin nào gửi lỗi.</p>
+      )}
+    </Card>
   );
 }

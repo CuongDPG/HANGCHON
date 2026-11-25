@@ -6,7 +6,7 @@ import pytest
 
 from app.core.enums import Channel, ShippingStatus, SourcePlatform
 from app.integrations import KINDS, IntegrationError, IntegrationNotConfigured, get_driver
-from app.integrations.einvoice import InvoiceLine, InvoiceRequest
+from app.integrations.einvoice import AdjustmentRequest, InvoiceLine, InvoiceRequest
 from app.integrations.marketplaces import MarketplaceProduct
 from app.integrations.notify import OutboundNotification
 from app.integrations.payments import transfer_content_for
@@ -118,3 +118,27 @@ async def test_notify_marketplaces_einvoice_mocks() -> None:
     assert (await inv.issue(req)).number == a.number  # không phát hành trùng
     with pytest.raises(IntegrationError):
         await inv.issue(req.model_copy(update={"reference": "HC2", "total_vnd": 1}))
+
+
+async def test_einvoice_interface_status_adjust_replace_download() -> None:
+    inv = get_driver("einvoice")
+    line = InvoiceLine(name="Bình", quantity=1, unit_price_vnd=100_000)
+    a = await inv.issue(InvoiceRequest(reference="HC9", buyer_name="Khách", lines=[line], total_vnd=100_000))
+    assert (await inv.get_status(a.external_id)).status == "issued"
+    fix = AdjustmentRequest(
+        original_external_id=a.external_id, reference="HC9-dc1", reason="Giảm giá sau bán",
+        lines=[InvoiceLine(name="Giảm giá", quantity=1, unit_price_vnd=-10_000)], total_vnd=-10_000,
+    )  # fmt: skip
+    adj = await inv.adjust(fix)
+    assert adj.original_external_id == a.external_id and (await inv.adjust(fix)).number == adj.number
+    assert (await inv.get_status(a.external_id)).status == "adjusted"
+    rep = await inv.replace(
+        AdjustmentRequest(
+            original_external_id=adj.external_id, reference="HC9-tt", reason="Sai tên", lines=[line], total_vnd=100_000
+        )
+    )
+    assert (await inv.get_status(adj.external_id)).status == "replaced" and rep.original_external_id == adj.external_id
+    assert (await inv.download(a.external_id)).startswith(b"%PDF")
+    assert b"<HDon>" in await inv.download(a.external_id, "xml")
+    with pytest.raises(IntegrationError):
+        await inv.get_status("khong-co")

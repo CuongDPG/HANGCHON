@@ -63,10 +63,13 @@ x-api-env: &api-env
   # ---- tích hợp ngoài: mặc định mock ----
   SOURCES_DRIVER: ${SOURCES_DRIVER:-mock}
   SOCIAL_DRIVER: ${SOCIAL_DRIVER:-mock}
-  SOCIAL_PUBLISH_DRIVERS: ${SOCIAL_PUBLISH_DRIVERS:-}
+  # driver theo kênh cho đăng bài + hộp thư, vd facebook=meta,instagram=meta,threads=meta,zalo_oa=zalo_oa,tiktok=tiktok_draft
+  SOCIAL_CHANNEL_DRIVERS: ${SOCIAL_CHANNEL_DRIVERS:-}
   PAYMENTS_DRIVER: ${PAYMENTS_DRIVER:-mock}
   SHIPPING_DRIVER: ${SHIPPING_DRIVER:-mock}
   NOTIFY_DRIVER: ${NOTIFY_DRIVER:-mock}
+  # driver báo tin theo kênh, vd zalo_oa=zalo_zns,email=email
+  NOTIFY_CHANNEL_DRIVERS: ${NOTIFY_CHANNEL_DRIVERS:-}
   MARKETPLACES_DRIVER: ${MARKETPLACES_DRIVER:-mock}
   EINVOICE_DRIVER: ${EINVOICE_DRIVER:-mock}
   # nguồn hàng
@@ -93,6 +96,12 @@ x-api-env: &api-env
   ZALO_OA_SECRET: ${ZALO_OA_SECRET:-}
   ZALO_OA_AUTHOR: ${ZALO_OA_AUTHOR:-Hàng Chọn}
   ZALO_OA_BROADCAST: ${ZALO_OA_BROADCAST:-}
+  # Zalo ZNS (báo tin khách): làm mới token bằng refresh token + khoá bí mật ứng dụng; token mới lưu trên volume chung
+  ZALO_APP_SECRET: ${ZALO_APP_SECRET:-}
+  ZALO_OA_REFRESH_TOKEN: ${ZALO_OA_REFRESH_TOKEN:-}
+  ZALO_TOKEN_FILE: /data/secrets/zalo_oa_token.json
+  ZALO_ZNS_TEMPLATES: ${ZALO_ZNS_TEMPLATES:-}
+  ZALO_ZNS_DEVELOPMENT: ${ZALO_ZNS_DEVELOPMENT:-}
   # thanh toán VietQR / SePay
   SEPAY_API_KEY: ${SEPAY_API_KEY:-}
   SEPAY_WEBHOOK_SECRET: ${SEPAY_WEBHOOK_SECRET:-}
@@ -119,6 +128,8 @@ x-api-env: &api-env
   SMTP_USER: ${SMTP_USER:-}
   SMTP_PASSWORD: ${SMTP_PASSWORD:-}
   SMTP_FROM: ${SMTP_FROM:-Hàng Chọn <no-reply@hangchon.local>}
+  SMTP_TLS: ${SMTP_TLS:-starttls}
+  SMTP_TIMEOUT_SECONDS: ${SMTP_TIMEOUT_SECONDS:-20}
   # sàn
   SHOPEE_PARTNER_ID: ${SHOPEE_PARTNER_ID:-}
   SHOPEE_PARTNER_KEY: ${SHOPEE_PARTNER_KEY:-}
@@ -128,9 +139,9 @@ x-api-env: &api-env
   TIKTOK_SHOP_APP_SECRET: ${TIKTOK_SHOP_APP_SECRET:-}
   TIKTOK_SHOP_ACCESS_TOKEN: ${TIKTOK_SHOP_ACCESS_TOKEN:-}
   TIKTOK_SHOP_CIPHER: ${TIKTOK_SHOP_CIPHER:-}
-  # Chữ ký webhook của driver mock. Khi PAYMENTS_DRIVER/SHIPPING_DRIVER còn là mock, webhook mock VẪN mở ở prod
-  # → bắt buộc đặt chuỗi ngẫu nhiên riêng (giá trị mặc định nằm công khai trong repo).
-  HOOKS_MOCK_SECRET: ${HOOKS_MOCK_SECRET:?HOOKS_MOCK_SECRET bắt buộc (chuỗi ngẫu nhiên)}
+  # Chữ ký webhook của driver mock. Ở prod (APP_ENV=prod) webhook mock luôn 404 nên biến này không còn tác dụng;
+  # đặt chuỗi ngẫu nhiên nếu muốn, để trống cũng được.
+  HOOKS_MOCK_SECRET: ${HOOKS_MOCK_SECRET:-}
 
 services:
   postgres:

@@ -158,6 +158,18 @@ class Settings(BaseSettings):
     shopee_access_token: str | None = None
     tiktok_shop_access_token: str | None = None
     tiktok_shop_cipher: str | None = None
+    # báo tin cho khách (g5): driver theo kênh, vd "zalo_oa=zalo_zns,email=email"; kênh không khai → NOTIFY_DRIVER
+    notify_channel_drivers: str = ""
+    smtp_tls: Literal["starttls", "ssl", "none"] = "starttls"
+    smtp_timeout_seconds: float = 20.0
+    # Zalo ZNS / ZBS Template Message: access token OA (dùng chung ZALO_OA_ACCESS_TOKEN) hết hạn sau 25 giờ, làm mới
+    # bằng refresh token (dùng một lần, mỗi lần đổi) + khoá bí mật ỨNG DỤNG; token mới lưu ở ZALO_TOKEN_FILE.
+    zalo_app_secret: str | None = None
+    zalo_oa_refresh_token: str | None = None
+    zalo_token_file: str | None = None
+    # {"order_received": {"template_id": "123456", "params": {"customer_name": "ten", "order_code": "ma_don"}}}
+    zalo_zns_templates: Annotated[dict[str, dict[str, Any]], NoDecode] = Field(default_factory=dict)
+    zalo_zns_development: bool = False  # True: gửi `mode=development` (chỉ tới quản trị viên OA/ứng dụng)
     # dựng video (f6)
     content_ffmpeg: bool = True
     content_font_path: str | None = None
@@ -178,7 +190,7 @@ class Settings(BaseSettings):
                 return field.get_default(call_default_factory=True)
         return v
 
-    @field_validator("ai_pricing", mode="before")
+    @field_validator("ai_pricing", "zalo_zns_templates", mode="before")
     @classmethod
     def _parse_pricing(cls, v: Any) -> Any:
         if isinstance(v, str):

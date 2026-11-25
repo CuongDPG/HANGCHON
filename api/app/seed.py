@@ -1,5 +1,5 @@
 """Dữ liệu khởi đầu: `uv run python -m app.seed` (chạy lại nhiều lần không sinh trùng); thêm `--demo` để dựng câu
-chuyện mẫu dùng chung cho mọi module (`app/demo.py`).
+chuyện mẫu dùng chung cho mọi module (`app/demo.py`). Ở `APP_ENV=prod`, `--demo` bị từ chối trừ khi thêm `--allow-prod`.
 
 Tạo tài khoản chị (OWNER_EMAIL / OWNER_PASSWORD) và dữ liệu mẫu tối thiểu: nhóm hàng, khung chấm điểm 7 tiêu chí,
 giọng viết mặc định, vài nguyên tắc chọn, tài khoản kênh giả. Dữ liệu mẫu đầy đủ do các module bổ sung sau."""
@@ -95,8 +95,14 @@ async def seed(db: AsyncSession) -> dict[str, int]:
     return counts
 
 
-async def main(demo: bool = False) -> None:
+async def main(demo: bool = False, *, allow_prod: bool = False) -> int:
+    """Trả mã thoát: 0 = xong, 2 = từ chối dựng dữ liệu mẫu ở production (thiếu `--allow-prod`)."""
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+    if demo and settings.app_env == "prod" and not allow_prod:
+        from app.demo import PROD_REFUSAL
+
+        log.error(PROD_REFUSAL)
+        return 2
     discover_modules()
     async with SessionLocal() as db:
         counts = await seed(db)
@@ -105,13 +111,15 @@ async def main(demo: bool = False) -> None:
     if demo:
         from app.demo import seed_demo
 
-        made = await seed_demo()
+        made = await seed_demo(allow_prod=allow_prod)
         log.info("Dữ liệu mẫu: %s", ", ".join(f"{k}={v}" for k, v in made.items()) if made else "đã có sẵn, bỏ qua")
     if settings.owner_email:
         log.info("Đăng nhập bàn làm việc bằng %s", settings.owner_email)
+    return 0
 
 
 if __name__ == "__main__":
     import sys
 
-    asyncio.run(main(demo="--demo" in sys.argv[1:]))
+    args = sys.argv[1:]
+    sys.exit(asyncio.run(main(demo="--demo" in args, allow_prod="--allow-prod" in args)))

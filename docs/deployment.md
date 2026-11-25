@@ -15,7 +15,7 @@ Internet ── Traefik (Dokploy, HTTPS) ─┬─ https://<tên miền>/      �
 | Thành phần | Image | Ghi chú |
 |---|---|---|
 | `api`, `worker` | [`api/Dockerfile`](../api/Dockerfile) — cùng một image, khác lệnh chạy | Python 3.13 + uv, user `app` (không phải root), có `pg_dump` 16 (sao lưu) và `ffmpeg` (dựng video ngắn) |
-| `web` | [`web/Dockerfile`](../web/Dockerfile) | bun cài gói + build, Node chạy `server.js` bản standalone, user `node` |
+| `web` | [`web/Dockerfile`](../web/Dockerfile) | bun cài gói + build, Node chạy `server.js` bản standalone, user `node`. Dòng `ENV NEXT_PRIVATE_STANDALONE=1` và chú thích «next.config.ts chưa đặt `output`» trong Dockerfile đã lỗi thời: `next.config.ts` đã đặt `output: "standalone"`, nên dòng đó **thừa nhưng vô hại** (để nguyên) |
 | `postgres`, `redis` | `postgres:16-alpine`, `redis:7-alpine` | không mở cổng ra máy chủ |
 
 **Vì sao nối bằng tên container:** trên Dokploy nhiều ứng dụng dùng chung mạng `dokploy-network`. Tên dịch vụ trần
@@ -60,7 +60,6 @@ Sinh chuỗi ngẫu nhiên: `openssl rand -hex 32`. Không ghi giá trị thật
 | `POSTGRES_PASSWORD` | Mật khẩu Postgres. **Chỉ dùng chữ và số** (nó nằm trong `DATABASE_URL`, ký tự `@ : / ?` sẽ làm hỏng URL). `openssl rand -hex 24`. |
 | `JWT_SECRET` | Khoá ký phiên đăng nhập (đóng vai `SECRET_KEY`), ≥ 32 ký tự ngẫu nhiên. Đổi khoá = mọi phiên đang mở bị đăng xuất. |
 | `OWNER_EMAIL`, `OWNER_PASSWORD` | Tài khoản chị, tạo **một lần** khi API khởi động lần đầu. Sau đó đổi mật khẩu trong bàn làm việc; đổi biến này không đổi mật khẩu tài khoản đã có (nên thay bằng chuỗi ngẫu nhiên để khỏi lộ mật khẩu đầu). |
-| `HOOKS_MOCK_SECRET` | Chữ ký webhook của driver mock. Khi `PAYMENTS_DRIVER`/`SHIPPING_DRIVER` còn là `mock`, webhook mock **vẫn mở** ở prod; giá trị mặc định nằm công khai trong repo nên phải đặt chuỗi riêng. |
 
 ### Nên đặt
 
@@ -79,10 +78,13 @@ Sinh chuỗi ngẫu nhiên: `openssl rand -hex 32`. Không ghi giá trị thật
 | `JWT_EXPIRE_MINUTES` | `20160` | Thời hạn phiên (14 ngày). |
 | `POSTGRES_USER`, `POSTGRES_DB` | `hangchon` | Chỉ đặt trước lần deploy đầu; đổi sau đó phải tự đổi trong CSDL. |
 | `CONTAINER_PREFIX` | `hangchon` | Tiền tố tên container. |
+| `HOOKS_MOCK_SECRET` | trống | Chữ ký webhook của driver mock. Ở prod webhook mock **luôn 404** (kể cả khi driver còn là `mock`), nên biến này không còn bắt buộc; chỉ có tác dụng ở dev/test. |
 
 Các biến của từng tích hợp ở mục 6. Danh sách đầy đủ (kèm mặc định) nằm ở khối `x-api-env` đầu tệp
 [`docker-compose.prod.yml`](../docker-compose.prod.yml); biến nào không đặt thì dùng mặc định ở đó.
-`DATABASE_URL`, `REDIS_URL`, `STORAGE_LOCAL_DIR`, `API_ORIGIN` do tệp compose tự dựng, không cần đặt.
+`DATABASE_URL`, `REDIS_URL`, `STORAGE_LOCAL_DIR`, `ZALO_TOKEN_FILE`, `API_ORIGIN` do tệp compose tự dựng, không cần đặt.
+Ngoài khối đó, `api/app/core/config.py` còn vài biến để mặc định là đủ (`APP_NAME`, `TIMEZONE`, `JOBS_QUEUE_NAME`,
+`PG_DUMP_PATH`, `PG_DUMP_DOCKER_CONTAINER` — image có sẵn `pg_dump` trong PATH) nên compose không chuyển vào.
 
 ## 4. Tên miền và HTTPS
 
@@ -115,7 +117,8 @@ Tất cả nằm dưới `https://<tên miền>/api/hooks/...` (thay `<tên mi�
 | GHTK | `/api/hooks/shipping/ghtk` | GHTK không ký; API hỏi lại GHTK trạng thái vận đơn |
 
 Meta gọi `GET` (hub.challenge) để xác nhận khi đăng ký; webhook chỉ trả lời khi driver tương ứng đã cấu hình.
-Webhook `mock` bị tắt ở prod, trừ khi driver đang chọn vẫn là `mock` (xem `HOOKS_MOCK_SECRET`).
+Webhook `mock` (và mọi endpoint giả lập: tiền về giả, tin đến giả, đơn sàn giả) **luôn 404 ở prod**, kể cả khi driver đang
+chọn vẫn là `mock` — muốn thử luồng giả thì chạy trên máy dev.
 
 ## 6. Bật driver thật thay cho `mock`
 
@@ -128,13 +131,24 @@ Các driver thật đều **viết theo tài liệu công khai, chưa thử vớ
 | Nguồn hàng | `SOURCES_DRIVER=web` (Claude + web search, cần AI thật) hoặc `onebound` (1688/Taobao) | `ONEBOUND_API_KEY`, `ONEBOUND_API_SECRET` |
 | Thanh toán | `PAYMENTS_DRIVER=sepay` | `SEPAY_WEBHOOK_SECRET`, `SEPAY_API_KEY`, `BANK_CODE` (mã BIN hoặc VCB/MB…), `BANK_ACCOUNT_NO`, `BANK_ACCOUNT_NAME`, `PAYMENT_CODE_PREFIX` (khớp «Cấu hình mã thanh toán» trên SePay) |
 | Vận chuyển | `SHIPPING_DRIVER=ghn` hoặc `ghtk` (hoặc bật hãng trong cài đặt «Hãng giao đang bật») | GHN: `GHN_TOKEN`, `GHN_SHOP_ID`. GHTK: `GHTK_TOKEN`, `GHTK_PICK_NAME`, `GHTK_PICK_TEL`, `GHTK_PICK_ADDRESS`, `GHTK_PICK_DISTRICT`, `GHTK_PICK_WARD`. Chung: `SHIPPING_FROM_PROVINCE`. Môi trường thử của hãng: `GHN_ENV=dev` / `GHTK_ENV=dev` |
-| Đăng bài | `SOCIAL_PUBLISH_DRIVERS=facebook=meta_publish,instagram=meta_publish,threads=meta_publish,tiktok=tiktok_draft_publish,zalo_oa=zalo_oa_publish` (kênh không khai dùng `SOCIAL_DRIVER`, mặc định `mock`) | Meta: `META_APP_ID`, `META_APP_SECRET`, `META_PAGE_ID`, `META_PAGE_TOKEN`, `META_IG_USER_ID`, `THREADS_USER_ID`, `THREADS_ACCESS_TOKEN`, `META_GRAPH_VERSION`. TikTok: `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET`, `TIKTOK_ACCESS_TOKEN`. Zalo: `ZALO_OA_ID`, `ZALO_OA_ACCESS_TOKEN`, `ZALO_OA_AUTHOR`, `ZALO_OA_BROADCAST=1` (gửi bài luôn) |
-| Hộp thư (bình luận, tin nhắn) | không có biến bật: đặt khoá rồi khai webhook (mục 5); tài khoản kênh tự tạo với driver `meta`/`zalo_oa` khi tin đầu tiên tới | `META_APP_SECRET`, `META_PAGE_ID`, `META_PAGE_TOKEN`, `META_IG_USER_ID`, `META_WEBHOOK_VERIFY_TOKEN`; Zalo: `ZALO_APP_ID`, `ZALO_OA_ID`, `ZALO_OA_ACCESS_TOKEN`, `ZALO_OA_SECRET` |
+| Đăng bài + hộp thư | `SOCIAL_CHANNEL_DRIVERS=facebook=meta,instagram=meta,threads=meta,zalo_oa=zalo_oa,tiktok=tiktok_draft` (một cấu hình chung cho đăng bài và hộp thư; kênh không khai dùng `SOCIAL_DRIVER`, mặc định `mock`; tên cũ `meta_publish`, `zalo_oa_publish`, `tiktok_draft_publish` vẫn được nhận) | Meta: `META_APP_ID`, `META_APP_SECRET`, `META_PAGE_ID`, `META_PAGE_TOKEN`, `META_IG_USER_ID`, `THREADS_USER_ID`, `THREADS_ACCESS_TOKEN`, `META_GRAPH_VERSION`. TikTok: `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET`, `TIKTOK_ACCESS_TOKEN`. Zalo: `ZALO_OA_ID`, `ZALO_OA_ACCESS_TOKEN`, `ZALO_OA_AUTHOR`, `ZALO_OA_BROADCAST=1` (gửi bài luôn) |
+| Hộp thư (bình luận, tin nhắn) | dùng chung `SOCIAL_CHANNEL_DRIVERS` ở trên; đặt khoá rồi khai webhook (mục 5); tài khoản kênh tự tạo với driver `meta`/`zalo_oa` khi tin đầu tiên tới | `META_APP_SECRET`, `META_PAGE_ID`, `META_PAGE_TOKEN`, `META_IG_USER_ID`, `META_WEBHOOK_VERIFY_TOKEN`; Zalo: `ZALO_APP_ID`, `ZALO_OA_ID`, `ZALO_OA_ACCESS_TOKEN`, `ZALO_OA_SECRET` |
 | Sàn | `MARKETPLACES_DRIVER=shopee` hoặc `tiktok_shop` (khung driver: kéo đơn, cập nhật tồn) | Shopee: `SHOPEE_PARTNER_ID`, `SHOPEE_PARTNER_KEY`, `SHOPEE_SHOP_ID`, `SHOPEE_ACCESS_TOKEN`. TikTok Shop: `TIKTOK_SHOP_APP_KEY`, `TIKTOK_SHOP_APP_SECRET`, `TIKTOK_SHOP_ACCESS_TOKEN`, `TIKTOK_SHOP_CIPHER` |
 | Lưu tệp | `STORAGE_DRIVER=s3` (S3, R2, MinIO; chưa kiểm chứng) | `S3_ENDPOINT_URL`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_REGION` |
-| Báo khách (`NOTIFY_DRIVER`), hoá đơn điện tử (`EINVOICE_DRIVER`) | — | Hiện chỉ có `mock`; email (`SMTP_*`) và Zalo OA cho báo khách chưa có driver. |
+| Báo tin cho khách (g5) | `NOTIFY_CHANNEL_DRIVERS=zalo_oa=zalo_zns,email=email` (kênh không khai dùng `NOTIFY_DRIVER`, mặc định `mock`). Kênh chính / dự phòng chị chọn trong *Cài đặt* (`orders.notify_channel`, `orders.notify_fallback_channels`, vd `["email"]`); màn *Đơn hàng → Vận hành → Mẫu tin* hiện kênh nào đang bật và tin nào gửi lỗi | Zalo ZNS (ZBS Template Message): `ZALO_APP_ID`, `ZALO_APP_SECRET` (khoá bí mật **ứng dụng**), `ZALO_OA_ACCESS_TOKEN`, `ZALO_OA_REFRESH_TOKEN`, `ZALO_ZNS_TEMPLATES` (JSON loại tin → `template_id` + `params`, xem `api/.env.example`), `ZALO_ZNS_DEVELOPMENT=true` để gửi thử tới quản trị viên. Email: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_TLS` (`starttls`/`ssl`/`none`), `SMTP_TIMEOUT_SECONDS` |
+| Hoá đơn điện tử (`EINVOICE_DRIVER`) | — | Hiện chỉ có `mock` (chưa chọn nhà cung cấp, xem [status.md](status.md)). |
 
-Token Zalo OA, Meta, sàn hết hạn theo thời gian; làm mới token là việc của người vận hành (đổi biến rồi Redeploy).
+Token Meta, sàn hết hạn theo thời gian; làm mới token là việc của người vận hành (đổi biến rồi Redeploy).
+Riêng access token Zalo OA (25 giờ): driver báo tin `zalo_zns` tự làm mới bằng `ZALO_OA_REFRESH_TOKEN` và lưu token mới ở
+`/data/secrets/zalo_oa_token.json` (volume `apidata`, không phục vụ qua `/api/files`). Refresh token chỉ dùng một lần và
+hết hạn sau 3 tháng: khi màn Mẫu tin báo «không làm mới được access token», cấp refresh token mới vào
+`ZALO_OA_REFRESH_TOKEN` rồi Redeploy (giá trị mới trong env thắng tệp đã lưu). Driver `social/zalo_oa` (đăng bài, hộp
+thư) **chưa** dùng kho token này mà vẫn đọc `ZALO_OA_ACCESS_TOKEN`: nếu cùng một ứng dụng Zalo thì sau lần làm mới đầu
+tiên token trong env của nó hết hiệu lực.
+
+Tin quảng cáo (nhắc mua lại, báo đợt cho khách quen) chỉ gửi cho khách đã tích «đồng ý nhận tin» khi đặt hàng và chưa
+từ chối; cuối tin có câu hướng dẫn nhắn «TỪ CHỐI», khách nhắn vậy qua hộp thư thì hệ thống tự gắn nhãn từ chối.
+Mẫu ZNS cho tin quảng cáo phải đăng ký đúng loại (tag hậu mãi) với Zalo.
 
 ## 7. Sao lưu và khôi phục
 
@@ -170,12 +184,13 @@ Thử khôi phục định kỳ trên máy khác (hoặc bằng `KEEP=1 scripts/
 
 - [ ] `SITE_URL` đúng tên miền HTTPS; mở được `https://<tên miền>/` và `https://<tên miền>/api/health` → `{"status":"ok"}`.
 - [ ] Đăng nhập bằng `OWNER_EMAIL` rồi **đổi mật khẩu owner** trong bàn làm việc; thay `OWNER_PASSWORD` trong Dokploy bằng chuỗi ngẫu nhiên.
-- [ ] `JWT_SECRET`, `POSTGRES_PASSWORD`, `HOOKS_MOCK_SECRET` là chuỗi ngẫu nhiên riêng, không lấy từ ví dụ hay `.env.example`.
+- [ ] `JWT_SECRET`, `POSTGRES_PASSWORD` là chuỗi ngẫu nhiên riêng, không lấy từ ví dụ hay `.env.example`.
 - [ ] `COOKIE_SECURE=true` (mặc định), `COOKIE_DOMAIN` trống.
-- [ ] **Tắt cờ demo:** `HC_DEMO_ACTIONS` trống; không chạy `python -m app.seed` hay dữ liệu mẫu trên prod (nếu đã chạy thử thì xoá dữ liệu mẫu trước khi mở bán).
+- [ ] **Tắt cờ demo:** `HC_DEMO_ACTIONS` trống; không dựng dữ liệu mẫu trên prod — `python -m app.seed --demo` ở `APP_ENV=prod` tự từ chối (chỉ chạy khi thêm `--allow-prod`, dành cho bản thử; nếu đã chạy thì xoá dữ liệu mẫu trước khi mở bán).
 - [ ] `AI_PROVIDER=anthropic` + `ANTHROPIC_API_KEY`; đặt **trần chi phí AI** (`AI_MONTHLY_BUDGET_VND` hoặc trên *Tự chủ → Chi phí AI*) và kiểm một tác vụ AI chạy được.
 - [ ] Mức tự chủ AI vẫn «thận trọng»: mọi thứ khách nhìn thấy đều chờ chị duyệt (*Tự chủ*).
-- [ ] **Không mở bán khi `PAYMENTS_DRIVER=mock`**: webhook mock vẫn ghi nhận «đã trả tiền». Bật `sepay`, chuyển khoản thử một đơn nhỏ, thấy đơn tự chuyển «đã trả».
+- [ ] **Không mở bán khi `PAYMENTS_DRIVER=mock`**: ở prod webhook mock 404 nên chuyển khoản không bao giờ tự khớp. Bật `sepay`, chuyển khoản thử một đơn nhỏ, thấy đơn tự chuyển «đã trả».
+- [ ] Báo tin cho khách: màn *Vận hành → Mẫu tin* không còn kênh nào ghi «driver giả» / «chưa cấu hình»; gửi thử một mốc (ZNS: `ZALO_ZNS_DEVELOPMENT=true` tới số quản trị viên) rồi tắt cờ đó.
 - [ ] Thông tin ngân hàng thật: `BANK_CODE`, `BANK_ACCOUNT_NO`, `BANK_ACCOUNT_NAME` (mã QR trên trang đặt hàng hiện đúng).
 - [ ] Vận chuyển thật (`ghn`/`ghtk`) đã tạo thử một vận đơn và nhận được webhook trạng thái.
 - [ ] Webhook đã khai ở SePay, Meta, Zalo OA, hãng giao (mục 5).
