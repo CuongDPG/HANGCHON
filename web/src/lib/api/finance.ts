@@ -122,9 +122,30 @@ export type Backup = {
   started_at: string;
   finished_at: string | null;
   error: string | null;
+  offsite_driver: string | null;
+  offsite_key: string | null;
+  offsite_at: string | null;
+  offsite_error: string | null;
+  verified_at: string | null;
+  verify_ok: boolean | null;
+  verify_note: string | null;
 };
 
-export type BackupConfig = { pg_dump: string | null; keep: number; schedule: string; last_success_at: string | null };
+export type BackupConfig = {
+  pg_dump: string | null;
+  keep: number;
+  schedule: string;
+  last_success_at: string | null;
+  last_success_id: string | null;
+  /** lỗi của lần hỏng gần nhất (chỉ khi xảy ra sau lần thành công cuối) */
+  last_error: string | null;
+  last_error_at: string | null;
+  storage_driver: string;
+  /** kho ngoài máy chủ; null = chưa cấu hình */
+  offsite_driver: string | null;
+  last_offsite_at: string | null;
+  offsite_error: string | null;
+};
 
 export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
   goods: "Mua hàng",
@@ -305,6 +326,14 @@ export function useRunBackup() {
       void qc.invalidateQueries({ queryKey: financeKeys.backups() });
       void qc.invalidateQueries({ queryKey: financeKeys.backupConfig() });
     },
+  });
+}
+
+export function useVerifyBackup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.post<Backup>(`${BASE}/backups/${id}/verify`),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: financeKeys.backups() }),
   });
 }
 

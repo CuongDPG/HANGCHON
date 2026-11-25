@@ -82,12 +82,12 @@ hoặc mở tay trên máy dev với dữ liệu mẫu `uv run python -m app.see
 | i3 | Mức tự chủ theo từng việc | chạy thật | `/desk/tu-chu` |
 | i4 | Nhật ký AI | chạy thật (hoàn tác, căn cứ, bấm tới đối tượng) | `/desk/nhat-ky-ai` |
 | i5 | Báo cáo tuần | chạy thật phần số liệu; nhận xét bằng AI giả | `/desk/bao-cao` |
-| i6 | Ra lệnh bằng lời | chạy với AI giả | nút «Nói với AI» mọi màn |
+| i6 | Ra lệnh bằng lời | chạy với AI giả — lệnh do từng module đăng ký (`control.intent`): đề săn hàng, soạn bài cho món, tóm tắt đơn (hôm nay / chờ giao / chờ chuyển khoản), tìm khách, mở/đóng đợt (qua hàng chờ theo mức tự chủ), việc đang chờ, chi phí AI tháng, kiểm bản sao lưu, đổi mức tự chủ | nút «Nói với AI» mọi màn |
 | k1 | Sổ doanh thu, chi phí | chạy thật (doanh thu khi đơn đã trả, chi phí NCC + tiền AI hằng tháng, bảng kê CSV) | `/desk/so-sach` |
 | k2 | Trần chi phí AI | chạy thật phần đếm/chặn; đổi nhà cung cấp/khoá/model/trần ngay ở Cài đặt (Anthropic, OpenRouter, AI giả). Anthropic đã gọi thật được với `claude-haiku-5-5`, `claude-opus-5-5`; OpenRouter mới kiểm bằng máy chủ giả, chưa gọi thật. Model ngoài bảng giá: OpenRouter lấy chi phí nó tự báo (`usage.cost`), provider khác tính theo giá model «việc khó» (có cảnh báo trong log) | `/desk/tu-chu/chi-phi-ai`, `/desk/cai-dat/ai` |
 | k3 | Nhãn AI và lưu vết | chạy thật; lưu vết cả việc đổi khoá API / cấu hình AI (ai đổi, lúc nào, đổi trường nào — không ghi giá trị khoá) | nhật ký AI, bài đăng |
-| k4 | Sao lưu và phân quyền | chạy thật phần tài khoản phụ; sao lưu chạy được khi máy có `pg_dump` hoặc container Postgres (`docker exec`) — bản chạy thật cần `postgresql-client` trong image | `/desk/cai-dat/sao-luu`, `/desk/cai-dat/nguoi-phu-giup` |
-| k5 | Hoá đơn điện tử | một phần — luồng soạn/duyệt/chống trùng chạy với mock; **chưa có driver nhà cung cấp hoá đơn thật** | `/desk/so-sach` |
+| k4 | Sao lưu và phân quyền | chạy thật phần tài khoản phụ; sao lưu chạy được khi máy có `pg_dump` hoặc container Postgres (`docker exec`), image prod có `postgresql-client-16`; chép ra S3/R2 khi điền `S3_*` (driver `s3` chưa thử thật); kiểm khôi phục (checksum + giải nén + cấu trúc, không ghi đè) | `/desk/cai-dat/sao-luu`, `/desk/cai-dat/nguoi-phu-giup` |
+| k5 | Hoá đơn điện tử | một phần — luồng soạn/duyệt/chống trùng chạy với mock (prod từ chối phát hành bằng mock); **chưa có driver nhà cung cấp hoá đơn thật** | `/desk/so-sach` |
 
 ## Cần chị/anh cung cấp để bật driver thật
 

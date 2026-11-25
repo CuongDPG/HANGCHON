@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Any, Literal
@@ -34,6 +35,31 @@ INSECURE_OWNER_PASSWORDS = {"doimatkhau"}
 
 # Khoá mã hoá bí mật dùng khi chưa đặt SECRETS_ENCRYPTION_KEY — công khai trong repo, chỉ dùng ở dev/test.
 DEV_SECRETS_ENCRYPTION_KEY = "aGFuZ2Nob24tZGV2LW9ubHktc2VjcmV0cy1rZXktMzI="
+
+# Tích hợp có driver `mock`. Ở production vẫn cho chạy (chủ cửa hàng bật dần từng tài khoản) nhưng phải báo rõ.
+MOCKABLE_INTEGRATIONS = ("sources", "social", "payments", "shipping", "notify", "marketplaces", "einvoice")
+MOCK_EFFECTS = {
+    "sources": "Săn hàng trả ứng viên mẫu, chưa lấy hàng thật từ các sàn.",
+    "social": "Bài «đăng» và tin trả lời không lên Facebook, Instagram, Zalo thật.",
+    "payments": "Không tự khớp chuyển khoản thật; tiền khách chuyển phải đối soát tay.",
+    "shipping": "Vận đơn là giả, hãng giao không tới lấy hàng.",
+    "notify": "Tin báo khách ghi là đã gửi nhưng không tới khách.",
+    "marketplaces": "Không đồng bộ sản phẩm, đơn với sàn TMĐT.",
+    "einvoice": "Số hoá đơn là giả; bản chạy thật từ chối phát hành cho tới khi nối nhà cung cấp hoá đơn.",
+}
+
+log = logging.getLogger("app.config")
+
+
+def parse_channel_drivers(spec: str) -> dict[str, str]:
+    """`"facebook=meta, zalo_oa=zalo_zns"` → {"facebook": "meta", "zalo_oa": "zalo_zns"}."""
+    out: dict[str, str] = {}
+    for part in (spec or "").split(","):
+        if "=" in part:
+            ch, drv = (x.strip() for x in part.split("=", 1))
+            if ch and drv:
+                out[ch] = drv
+    return out
 
 
 class Settings(BaseSettings):
@@ -186,6 +212,10 @@ class Settings(BaseSettings):
     # sao lưu (k4): đường dẫn pg_dump; không có thì thử `docker exec <container> pg_dump`
     pg_dump_path: str | None = None
     pg_dump_docker_container: str | None = "hangchon-postgres-1"
+    # chép bản sao lưu ra ngoài máy chủ: driver lưu trữ (vd `s3`, dùng S3_*). Bỏ trống: STORAGE_DRIVER=s3 thì bản
+    # sao lưu vốn đã nằm ngoài máy chủ; STORAGE_DRIVER=local mà đã điền S3_BUCKET/S3_ACCESS_KEY/S3_SECRET_KEY thì chép
+    # lên S3/R2; không thì chưa có bản ngoài máy chủ.
+    backup_offsite_driver: str | None = None
 
     @field_validator("*", mode="before")
     @classmethod
@@ -233,7 +263,29 @@ class Settings(BaseSettings):
                 'Sinh khoá bằng `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` '
                 "trước khi chạy production."
             )
+        if self.app_env == "prod":
+            self._warn_mock_integrations()
         return self
+
+    def integration_drivers(self, kind: str) -> list[str]:
+        """Driver đang dùng của một tích hợp: driver chung + driver riêng theo kênh (social, notify)."""
+        base = str(getattr(self, f"{kind}_driver", "mock") or "mock")
+        per_channel = {"social": self.social_channel_drivers, "notify": self.notify_channel_drivers}.get(kind, "")
+        return list(dict.fromkeys([base, *parse_channel_drivers(per_channel).values()]))
+
+    def mock_integrations(self) -> list[str]:
+        """Tích hợp còn ít nhất một kênh chạy driver `mock`."""
+        return [k for k in MOCKABLE_INTEGRATIONS if "mock" in self.integration_drivers(k)]
+
+    def _warn_mock_integrations(self) -> None:
+        """Production còn driver giả: không chặn khởi động, nhưng ghi cảnh báo rõ cho từng tích hợp."""
+        for kind in self.mock_integrations():
+            log.warning(
+                "PRODUCTION còn chạy giả lập: %s_DRIVER=mock (%s). %s",
+                kind.upper(), ",".join(self.integration_drivers(kind)), MOCK_EFFECTS[kind],
+            )  # fmt: skip
+        if self.ai_provider == "fake":
+            log.warning("PRODUCTION: AI_PROVIDER=fake — AI trả lời giả, trừ khi chị đã chọn nhà cung cấp ở Cài đặt.")
 
     @property
     def pricing(self) -> dict[str, dict[str, float]]:

@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import control
-from app.core.timeutil import local_today
+from app.core.money import format_vnd
+from app.core.timeutil import VN_TZ, local_today
 from app.modules.crm import service
 from app.modules.crm.models import CustomerNote, NoteKind, NoteSource, ReminderStatus, ReorderReminder
 from app.modules.crm.service import (
@@ -112,3 +115,55 @@ async def _stats(db: AsyncSession) -> list[control.Stat]:
     ).scalar_one()
     return [control.Stat(key="crm.reorder_due", label="Khách sắp hết đồ", value=due, href="/desk/khach/nhac-mua-lai",
                          order=30)]  # fmt: skip
+
+
+# ---- lệnh bằng lời (i6) ------------------------------------------------------------------------------------------
+
+
+class FindCustomerParams(BaseModel):
+    query: str | None = Field(default=None, description="Tên hoặc số điện thoại khách, đúng như chị nói")
+
+
+@control.intent(
+    "crm.find_customer",
+    "Tìm khách theo tên hoặc số điện thoại",
+    "Mở sổ khách của một người: đã mua mấy đơn, tổng tiền, lần mua gần nhất.",
+    params=FindCustomerParams,
+    examples=["tìm khách tên Lan", "khách số 0912 345 678 là ai", "mở sổ khách chị Hoa"],
+)
+async def _find_customer(ctx: control.CommandContext, params: FindCustomerParams | None) -> control.CommandResult:
+    from app.modules.orders.models import Customer
+
+    query = (params.query if params and params.query else None) or ctx.text
+    digits = re.sub(r"\D", "", query)
+    base = select(Customer).where(Customer.merged_into_id.is_(None))
+    if len(digits) >= 6:  # có số điện thoại: so phần số (bỏ dấu cách, chấm)
+        tail = digits[-9:]
+        rows = list((await ctx.db.execute(base.where(Customer.phone.contains(tail)).limit(5))).scalars())
+    else:
+        pool = list(
+            (await ctx.db.execute(base.where(Customer.name.is_not(None)).order_by(Customer.last_order_at.desc().nulls_last()).limit(2000))).scalars()
+        )  # fmt: skip
+        ids = control.match_names(query, [(c.id, c.name or "") for c in pool])
+        rows = [c for c in pool if c.id in ids][:5]
+    if not rows:
+        return control.CommandResult(
+            message="Em không thấy khách nào như vậy trong sổ. Chị nói rõ tên hoặc số điện thoại nhé.",
+            status="needs_clarification",
+        )
+    if len(rows) > 1:
+        names = "; ".join(f"{c.name or 'Chưa có tên'} ({c.phone or 'không số'})" for c in rows)
+        return control.CommandResult(
+            message=f"Có {len(rows)} khách gần giống: {names}. Chị muốn xem ai?",
+            status="needs_clarification",
+            href="/desk/khach/so-khach",
+            data={"customer_ids": [str(c.id) for c in rows]},
+        )
+    c = rows[0]
+    last = f", lần gần nhất {c.last_order_at.astimezone(VN_TZ):%d/%m/%Y}" if c.last_order_at else ""
+    return control.CommandResult(
+        message=f"{c.name or 'Khách'} ({c.phone or 'không số'}): {c.order_count} đơn, "
+        f"tổng {format_vnd(c.total_spent_vnd)}{last}.",
+        href=f"/desk/khach/so-khach/{c.id}",
+        data={"customer_id": str(c.id)},
+    )

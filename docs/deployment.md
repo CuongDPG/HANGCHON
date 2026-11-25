@@ -125,6 +125,8 @@ chọn vẫn là `mock` — muốn thử luồng giả thì chạy trên máy de
 ## 6. Bật driver thật thay cho `mock`
 
 Mọi tích hợp mặc định là `mock` để chạy trọn luồng không cần tài khoản. Bật từng cái bằng env rồi **Redeploy**.
+Prod vẫn khởi động khi còn `mock`, nhưng log cảnh báo `PRODUCTION còn chạy giả lập: <KIND>_DRIVER=mock …` cho từng tích hợp,
+và *Cài đặt* có thẻ «n tích hợp chạy thật · m còn giả lập» (chi tiết ở *Cài đặt → Tích hợp*).
 Các driver thật đều **viết theo tài liệu công khai, chưa thử với tài khoản thật** — bật từng cái một và thử bằng đơn/bài nhỏ.
 
 | Tích hợp | Biến bật | Khoá cần đặt |
@@ -138,7 +140,7 @@ Các driver thật đều **viết theo tài liệu công khai, chưa thử vớ
 | Sàn | `MARKETPLACES_DRIVER=shopee` hoặc `tiktok_shop` (khung driver: kéo đơn, cập nhật tồn) | Shopee: `SHOPEE_PARTNER_ID`, `SHOPEE_PARTNER_KEY`, `SHOPEE_SHOP_ID`, `SHOPEE_ACCESS_TOKEN`. TikTok Shop: `TIKTOK_SHOP_APP_KEY`, `TIKTOK_SHOP_APP_SECRET`, `TIKTOK_SHOP_ACCESS_TOKEN`, `TIKTOK_SHOP_CIPHER` |
 | Lưu tệp | `STORAGE_DRIVER=s3` (S3, R2, MinIO; chưa kiểm chứng) | `S3_ENDPOINT_URL`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_REGION` |
 | Báo tin cho khách (g5) | `NOTIFY_CHANNEL_DRIVERS=zalo_oa=zalo_zns,email=email` (kênh không khai dùng `NOTIFY_DRIVER`, mặc định `mock`). Kênh chính / dự phòng chị chọn trong *Cài đặt* (`orders.notify_channel`, `orders.notify_fallback_channels`, vd `["email"]`); màn *Đơn hàng → Vận hành → Mẫu tin* hiện kênh nào đang bật và tin nào gửi lỗi | Zalo ZNS (ZBS Template Message): `ZALO_APP_ID`, `ZALO_APP_SECRET` (khoá bí mật **ứng dụng**), `ZALO_OA_ACCESS_TOKEN`, `ZALO_OA_REFRESH_TOKEN`, `ZALO_ZNS_TEMPLATES` (JSON loại tin → `template_id` + `params`, xem `api/.env.example`), `ZALO_ZNS_DEVELOPMENT=true` để gửi thử tới quản trị viên. Email: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_TLS` (`starttls`/`ssl`/`none`), `SMTP_TIMEOUT_SECONDS` |
-| Hoá đơn điện tử (`EINVOICE_DRIVER`) | — | Hiện chỉ có `mock` (chưa chọn nhà cung cấp, xem [status.md](status.md)). |
+| Hoá đơn điện tử (`EINVOICE_DRIVER`) | — | Hiện chỉ có `mock` (chưa chọn nhà cung cấp, xem [status.md](status.md)). Ở prod driver `mock` **từ chối phát hành** (báo lỗi rõ cho chị), không phát số hoá đơn giả. |
 
 **AI đổi ngay trên giao diện.** Chị vào *Cài đặt → AI và khoá API*: chọn nhà cung cấp, dán khoá (lưu mã hoá bằng
 `SECRETS_ENCRYPTION_KEY`, chỉ hiện dạng che `sk-ant-…8AAA`), chọn model và độ kỹ cho «Việc khó»/«Việc nhanh», trần tháng,
@@ -166,7 +168,14 @@ Mẫu ZNS cho tin quảng cáo phải đăng ký đúng loại (tag hậu mãi) 
 Mỗi lần chạy `pg_dump` → gzip → lưu ở
 `private/backups/…` trong volume `apidata`, giữ 14 bản gần nhất (đổi trong cài đặt). Tải về từ cùng màn hình.
 
-Bản sao lưu nằm **cùng máy chủ** với dữ liệu: định kỳ tải về hoặc chép ra nơi khác. Trên máy chủ:
+**Chép ra ngoài máy chủ:** điền `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` (+ `S3_ENDPOINT_URL` cho R2/MinIO) là mỗi bản
+sao lưu tự chép lên S3/R2 cùng khoá tệp, kể cả khi ảnh vẫn lưu trên máy chủ (`STORAGE_DRIVER=local`); `STORAGE_DRIVER=s3` thì
+bản sao lưu vốn đã nằm trên S3. Lỗi chép không làm hỏng bản trên máy chủ, màn *Sao lưu* hiện lỗi đó. (Driver `s3` chưa kiểm
+chứng với dịch vụ thật.) **Kiểm khôi phục** trên màn *Sao lưu* (hoặc nói «kiểm bản sao lưu gần nhất»): tải lại tệp, so
+checksum, giải nén trọn, đọc cấu trúc bản dump (đủ bảng cốt lõi, có dòng kết thúc của `pg_dump`), so checksum bản ngoài máy
+chủ — chỉ đọc, không khôi phục đè dữ liệu.
+
+Chưa bật S3 thì bản sao lưu nằm **cùng máy chủ** với dữ liệu: định kỳ tải về hoặc chép ra nơi khác. Trên máy chủ:
 
 ```bash
 # CSDL: bản SQL nén, chép ra ngoài máy
@@ -205,7 +214,8 @@ Thử khôi phục định kỳ trên máy khác (hoặc bằng `KEEP=1 scripts/
 - [ ] Thông tin ngân hàng thật: `BANK_CODE`, `BANK_ACCOUNT_NO`, `BANK_ACCOUNT_NAME` (mã QR trên trang đặt hàng hiện đúng).
 - [ ] Vận chuyển thật (`ghn`/`ghtk`) đã tạo thử một vận đơn và nhận được webhook trạng thái.
 - [ ] Webhook đã khai ở SePay, Meta, Zalo OA, hãng giao (mục 5).
-- [ ] Chạy *Sao lưu* một lần thành công và tải được tệp về; có lịch chép bản sao lưu ra ngoài máy chủ.
+- [ ] Chạy *Sao lưu* một lần thành công, bấm *Kiểm khôi phục* thấy «dùng được», tải được tệp về; ô «Bản ngoài máy chủ» có giờ (đã điền `S3_*`).
+- [ ] *Cài đặt* không còn tích hợp «giả lập» nào chị cần dùng thật (log API không còn dòng `PRODUCTION còn chạy giả lập` cho chúng).
 - [ ] `docker ps` thấy 5 container `hangchon-*` ở trạng thái `healthy`.
 
 ## 9. Vận hành

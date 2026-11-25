@@ -162,7 +162,21 @@ export type AuditEntry = {
   data: Record<string, unknown>;
 };
 
-export type Integration = { kind: string; label: string; driver: string; is_mock: boolean; available: string[] };
+export type Integration = {
+  kind: string;
+  label: string;
+  driver: string;
+  /** mọi kênh đều giả lập */
+  is_mock: boolean;
+  /** có kênh thật, có kênh còn giả lập */
+  partly_mock: boolean;
+  drivers: string[];
+  /** giả lập nghĩa là gì với chị (vd tin không tới khách) */
+  mock_effect: string | null;
+  /** bản chạy thật từ chối dùng driver giả này (hoá đơn điện tử) */
+  blocked_in_prod: boolean;
+  available: string[];
+};
 
 /** Nguồn cấu hình AI: `settings` = chị lưu ở Cài đặt, `env` = biến môi trường / mặc định của máy chủ. */
 export type AIConfigSource = "settings" | "env";
@@ -228,7 +242,8 @@ export type Intent = { key: string; label: string; description: string; examples
 
 export type CommandResult = {
   text: string;
-  status: "done" | "needs_clarification" | "unknown" | "failed";
+  /** pending = đã đưa vào hàng chờ, chờ chị duyệt (lệnh đổi dữ liệu theo mức tự chủ) */
+  status: "done" | "pending" | "needs_clarification" | "unknown" | "failed";
   intent: string | null;
   label: string | null;
   message: string;

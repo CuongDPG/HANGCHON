@@ -5,10 +5,12 @@ from __future__ import annotations
 
 import uuid
 
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
 from app import control
 from app.core.timeutil import local_day_bounds_utc
+from app.modules.catalog.models import Product, ProductStatus
 from app.modules.content import livestream, planner, publishing, service, video, voice
 from app.modules.content.models import LivestreamScript, PostStatus, ScheduledPost, ScriptStatus
 from app.modules.control.models import ApprovalItem, ApprovalStatus
@@ -228,3 +230,44 @@ async def _stats(db) -> list[control.Stat]:
             order=42,
         ),
     ]
+
+
+# ---- lệnh bằng lời (i6) ------------------------------------------------------------------------------------------
+
+
+class ComposeForProductParams(BaseModel):
+    product: str | None = Field(default=None, description="Tên món (hoặc một phần tên) chị muốn soạn bài, nguyên văn")
+    instruction: str | None = Field(default=None, description="Lời dặn thêm cho bài nếu chị có nói, vd «ngắn thôi»")
+
+
+@control.intent(
+    "content.compose_for_product",
+    "Soạn bài cho một món",
+    "AI soạn bản nháp các kênh (Facebook, Instagram, Threads, TikTok, Zalo) cho một món trên kệ. Bài chưa đăng: "
+    "mỗi bản vẫn chờ chị duyệt.",
+    params=ComposeForProductParams,
+    examples=["soạn bài cho món bình giữ nhiệt", "viết bài facebook cho cái giá phơi gấp gọn"],
+)
+async def _compose_cmd(ctx: control.CommandContext, params: ComposeForProductParams | None) -> control.CommandResult:
+    rows = (
+        await ctx.db.execute(select(Product.id, Product.name).where(Product.status != ProductStatus.ARCHIVED))
+    ).all()
+    query = (params.product if params and params.product else None) or ctx.text
+    found = control.match_names(query, [(r.id, r.name) for r in rows])
+    if len(found) != 1:
+        names = [r.name for r in rows if r.id in found][:4]
+        ask = (
+            f"Chị muốn soạn cho món nào: {'; '.join(names)}?"
+            if names
+            else "Em không thấy món nào tên như vậy. Chị nói tên món rõ hơn nhé."
+        )
+        return control.CommandResult(message=ask, status="needs_clarification")
+    product = await ctx.db.get(Product, found[0])
+    out = await service.compose(ctx.db, product=product, instruction=params.instruction if params else None,
+                                user=ctx.user)  # fmt: skip
+    href = f"/desk/noi-dung/san-pham/{product.id}"
+    return control.CommandResult.from_outcome(
+        out, href=href, data={"product_id": str(product.id)},
+        done=f"Em đã soạn bản nháp cho «{product.name}». Bài chưa đăng, chị xem rồi duyệt từng kênh nhé.",
+        pending=f"Em đã soạn xong cho «{product.name}», đang chờ chị duyệt bản nháp.",
+    )  # fmt: skip

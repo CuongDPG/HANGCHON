@@ -238,28 +238,32 @@ async def get_report(report_id: uuid.UUID, _: CurrentUser, db: DbSession) -> Wee
 
 @router.get("/backups/config", response_model=BackupConfigOut)
 async def backup_config(_: OwnerUser, db: DbSession) -> dict:
-    last = await db.scalar(
-        select(Backup.finished_at)
-        .where(Backup.status == BackupStatus.SUCCEEDED)
-        .order_by(Backup.started_at.desc())
-        .limit(1)
-    )
     return {
         "pg_dump": service.pg_dump_path(),
         "keep": await service.backup_keep(db),
         "schedule": "Hằng ngày lúc 3:15 sáng",
-        "last_success_at": last,
+        **await service.backup_status(db),
     }
 
 
 @router.get("/backups", response_model=Paginated[BackupOut], summary="Các bản sao lưu (k4)")
 async def list_backups(_: OwnerUser, db: DbSession, page: Page) -> Paginated[BackupOut]:
-    return await paginate(db, select(Backup).order_by(Backup.started_at.desc()), page, BackupOut)
+    res = await paginate(db, select(Backup).order_by(Backup.started_at.desc()), page)
+    res.items = await service.with_meta(db, list(res.items))
+    return res  # type: ignore[return-value]
 
 
 @router.post("/backups", response_model=BackupOut, status_code=status.HTTP_201_CREATED, summary="Sao lưu ngay")
-async def create_backup(user: OwnerUser, db: DbSession) -> Backup:
-    return await service.run_backup(db, BackupTrigger.MANUAL, user)
+async def create_backup(user: OwnerUser, db: DbSession) -> dict:
+    b = await service.run_backup(db, BackupTrigger.MANUAL, user)
+    return (await service.with_meta(db, [b]))[0]
+
+
+@router.post("/backups/{backup_id}/verify", response_model=BackupOut,
+             summary="Kiểm khôi phục: giải nén, so checksum, đọc cấu trúc (không khôi phục đè)")  # fmt: skip
+async def verify_backup(backup_id: uuid.UUID, user: OwnerUser, db: DbSession) -> dict:
+    b = await service.verify_backup(db, backup_id, user)
+    return (await service.with_meta(db, [b]))[0]
 
 
 @router.get("/backups/{backup_id}/download", summary="Tải bản sao lưu (.sql.gz)")

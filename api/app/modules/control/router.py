@@ -11,7 +11,7 @@ from sqlalchemy import select
 
 from app.ai import config as ai_config
 from app.core import ratelimit
-from app.core.config import settings
+from app.core.config import MOCK_EFFECTS, MOCKABLE_INTEGRATIONS, settings
 from app.core.db import DbSession
 from app.core.deps import CurrentUser, OwnerUser
 from app.core.errors import BadRequest, Conflict, NotFound, Unauthorized
@@ -453,12 +453,18 @@ async def list_integrations(_: CurrentUser) -> list[IntegrationOut]:
         except ModuleNotFoundError:
             available = []
         name = driver_name(kind)
+        used = settings.integration_drivers(kind) if kind in MOCKABLE_INTEGRATIONS else [name]
+        any_mock = "mock" in used
         out.append(
             IntegrationOut(
                 kind=kind,
                 label=INTEGRATION_LABELS.get(kind, kind),
                 driver=name,
-                is_mock=name == "mock",
+                is_mock=any_mock and set(used) == {"mock"},
+                partly_mock=any_mock and set(used) != {"mock"},
+                drivers=used,
+                mock_effect=MOCK_EFFECTS.get(kind) if any_mock else None,
+                blocked_in_prod=kind == "einvoice" and any_mock and settings.app_env == "prod",
                 available=available,
             )
         )

@@ -4,13 +4,16 @@ Mức mặc định theo hướng thận trọng: mọi thứ khách nhìn thấ
 
 from __future__ import annotations
 
+import re
 import uuid
 
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from unidecode import unidecode
 
 from app import control
-from app.core.errors import NotFound
+from app.core.errors import Forbidden, NotFound
 from app.modules.catalog import drops as drop_svc
 from app.modules.catalog import finds as find_svc
 from app.modules.catalog import products as product_svc
@@ -27,6 +30,7 @@ from app.modules.catalog.models import (
 )
 from app.modules.catalog.models import Product as ProductModel
 from app.modules.catalog.public import DEFAULTS as STORE_DEFAULTS
+from app.modules.control.models import UserRole
 
 GROUP = "Website"
 
@@ -246,3 +250,105 @@ async def _stats(db: AsyncSession) -> list[control.Stat]:
             key="catalog.find_threshold", label="Nhờ tìm đủ người", value=finds, href="/desk/san-pham/nho-tim", order=43
         ),
     ]
+
+
+# ---- lệnh bằng lời (i6): mở / đóng đợt mua chung ------------------------------------------------------------------
+
+control.register_action(
+    "catalog.close_drop", "Đóng đợt bán sớm", GROUP, default="ask", customer_facing=True,
+    description="Chị bảo AI đóng đợt trước hạn chót: khách không đặt thêm được, đơn của đợt được chốt.",
+)  # fmt: skip
+
+
+@control.handler("catalog.close_drop")
+async def _close_drop(ctx: control.ActionContext) -> control.HandlerResult:
+    d = await drop_svc.get_drop(ctx.db, _uuid(ctx, "drop_id"))
+    await drop_svc.close_drop(ctx.db, d, reason="chị bảo đóng bằng lời", user=ctx.user)
+    return control.HandlerResult(result={"drop_id": str(d.id), "status": d.status.value},
+                                 summary=f"Đã đóng {drop_svc.label(d)}", ref_type="drops", ref_id=d.id)  # fmt: skip
+
+
+class DropParams(BaseModel):
+    drop: str | None = Field(default=None, description="Số đợt (vd «12» trong «đợt 12») hoặc tên đợt, đúng như chị nói")
+
+
+async def _find_drop(ctx: control.CommandContext, params: DropParams | None, statuses: tuple[DropStatus, ...]):
+    """Đợt khớp lời chị trong các trạng thái cho phép: «đợt 12» → mã D12, không thì so tên đợt."""
+    rows = list((await ctx.db.execute(select(Drop).where(Drop.status.in_(statuses)))).scalars())
+    query = (params.drop if params and params.drop else None) or ctx.text
+    m = re.search(r"\b(?:dot|d)\s*(\d+)\b", unidecode(query).lower()) or re.fullmatch(r"\s*(\d+)\s*", query)
+    if m:
+        hit = [d for d in rows if d.code == f"D{m.group(1)}"]
+        if hit:
+            return hit
+    ids = control.match_names(query, [(d.id, d.title) for d in rows])
+    if not ids and len(rows) == 1 and not m:
+        return rows  # chỉ có một đợt hợp lệ và chị không nói rõ đợt nào
+    return [d for d in rows if d.id in ids]
+
+
+def _ask_drop(found: list[Drop], what: str) -> control.CommandResult:
+    if not found:
+        msg = f"Em không thấy đợt nào {what} được. Chị nói số đợt (vd «đợt 12») hoặc tên đợt nhé."
+    else:
+        msg = "Chị muốn đợt nào: " + "; ".join(f"{drop_svc.label(d)} «{d.title}»" for d in found[:4]) + "?"
+    return control.CommandResult(message=msg, status="needs_clarification", href="/desk/san-pham/dot")
+
+
+@control.intent(
+    "catalog.open_drop",
+    "Mở đợt mua chung",
+    "Mở một đợt đang soạn cho khách đặt. Đợt mở được đưa vào hàng chờ để chị xem lại trước khi khách thấy.",
+    params=DropParams,
+    examples=["mở đợt 12", "mở đợt mua chung đồ bếp gọn"],
+)
+async def _open_drop_cmd(ctx: control.CommandContext, params: DropParams | None) -> control.CommandResult:
+    found = await _find_drop(ctx, params, drop_svc.OPENABLE)
+    if len(found) != 1:
+        return _ask_drop(found, "đang soạn để mở")
+    d = found[0]
+    # Như nút «Mở đợt» nhưng không tự duyệt thay chị: lời nói có thể bị hiểu nhầm đợt, nên để chị xem lại.
+    await drop_svc._validate_openable(ctx.db, d)
+    out = await control.propose(
+        "catalog.open_drop", f"Mở {drop_svc.label(d)}: {d.title}", {"drop_id": str(d.id)},
+        {"title": d.title, "closes_at": d.closes_at.isoformat() if d.closes_at else None, "items": len(d.items),
+         "slots": sum(i.slots_total or 0 for i in d.items)},
+        db=ctx.db, summary=f"Chị bảo mở bằng lời: «{ctx.text}»", ref_type="drops", ref_id=d.id,
+        dedupe_key=f"drop:{d.id}", ai_generated=False,
+    )  # fmt: skip
+    if out.status == "pending":
+        d.approval_item_id = out.item_id
+        d.status = DropStatus.PENDING_REVIEW
+        await ctx.db.flush()
+    return control.CommandResult.from_outcome(
+        out, href=f"/desk/san-pham/dot/{d.id}", data={"drop_id": str(d.id)},
+        done=f"Đã mở {drop_svc.label(d)} «{d.title}».",
+        pending=f"Em đã đưa việc mở {drop_svc.label(d)} «{d.title}» vào hàng chờ, chị duyệt là đợt mở.",
+    )  # fmt: skip
+
+
+@control.intent(
+    "catalog.close_drop",
+    "Đóng đợt mua chung",
+    "Đóng sớm một đợt đang mở (trước hạn chót). Đi qua hàng chờ theo mức tự chủ của «Đóng đợt bán sớm».",
+    params=DropParams,
+    examples=["dừng nhận đơn đợt 11", "đóng đợt 11", "đóng đợt mua chung đồ bếp gọn"],
+)
+async def _close_drop_cmd(ctx: control.CommandContext, params: DropParams | None) -> control.CommandResult:
+    if ctx.user is None or ctx.user.role != UserRole.OWNER:  # cùng quyền với nút «Đóng đợt»
+        raise Forbidden("Chỉ chị (chủ cửa hàng) đóng được đợt.")
+    found = await _find_drop(ctx, params, (DropStatus.OPEN, DropStatus.SCHEDULED))
+    if len(found) != 1:
+        return _ask_drop(found, "đang mở để đóng")
+    d = found[0]
+    out = await control.propose(
+        "catalog.close_drop", f"Đóng sớm {drop_svc.label(d)}: {d.title}", {"drop_id": str(d.id)},
+        {"title": d.title, "closes_at": d.closes_at.isoformat() if d.closes_at else None},
+        db=ctx.db, summary=f"Chị bảo đóng bằng lời: «{ctx.text}»", ref_type="drops", ref_id=d.id,
+        dedupe_key=f"drop-close:{d.id}", ai_generated=False,
+    )  # fmt: skip
+    return control.CommandResult.from_outcome(
+        out, href=f"/desk/san-pham/dot/{d.id}", data={"drop_id": str(d.id)},
+        done=f"Đã đóng {drop_svc.label(d)} «{d.title}».",
+        pending=f"Em đã đưa việc đóng {drop_svc.label(d)} «{d.title}» vào hàng chờ, chị duyệt là đợt đóng.",
+    )  # fmt: skip
