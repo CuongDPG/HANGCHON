@@ -128,16 +128,19 @@ for (const p of [
 
 test("chị tạo vận đơn từ mục Chờ giao rồi in nhãn A6", async ({ page }, info) => {
   test.skip(!(await login(page)), "Cần API đang chạy với tài khoản chị");
-  const list = await (await page.request.get("/api/desk/orders?nhom=cho_giao")).json();
-  const target = list.items[info.project.name === "mobile" ? 0 : 1]; // hai cấu hình chạy song song: mỗi bên một đơn
-  test.skip(!target, "Không còn đơn chờ giao (chạy lại seed)");
+  // mỗi khổ màn hình một đơn giữ sẵn của dữ liệu mẫu (theo tên người nhận). Không lấy theo vị trí: đơn của bài vòng đời
+  // chạy song song cũng vào «Chờ giao» và đứng đầu danh sách (mới nhất) → bài này sẽ tạo mất vận đơn của nó.
+  const list = (await (await page.request.get("/api/desk/orders?nhom=cho_giao&size=50")).json()) as { items: { code: string; recipient_name: string }[] };
+  const who = info.project.name === "mobile" ? "Phạm Ngọc Lan" : "Trần Thu Hương";
+  const target = list.items.find((o) => o.recipient_name === who);
+  test.skip(!target, `Không còn đơn chờ giao của ${who} (chạy lại seed)`);
   await page.goto("/desk/don-hang?nhom=cho_giao");
   const main = page.getByRole("main");
-  await main.getByRole("checkbox", { name: `Chọn đơn ${target.code}` }).check();
+  await main.getByRole("checkbox", { name: `Chọn đơn ${target!.code}` }).check();
   await main.getByRole("button", { name: /Tạo vận đơn/ }).click();
   await expect(page).toHaveURL(/\/desk\/don-hang\/in-nhan\?ids=/);
   await expect(page.getByRole("heading", { level: 1, name: "In nhãn" })).toBeVisible();
-  await expect(page.locator("article.nhan").first()).toContainText(target.code);
+  await expect(page.locator("article.nhan").first()).toContainText(target!.code);
   await shot(page, "desk-in-nhan", info.project.name);
   await noOverflow(page);
 });

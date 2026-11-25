@@ -272,11 +272,16 @@ export const contentKeys = {
   pick: (what: string) => ["content", "pick", what] as const,
 };
 
+/**
+ * Dùng làm `onSuccess` của mutation: trả promise để mutation chỉ xong (hết `isPending`, rồi mới tới toast của màn hình)
+ * khi dữ liệu Nội dung đã tải lại. Viết lại / sửa tay sinh bản nháp MỚI (id khác); nếu báo xong sớm, màn hình còn bản cũ
+ * vài trăm ms — chị kịp mở «Duyệt, xếp lịch» trên bản cũ rồi hộp bị gỡ khi bản mới về.
+ */
 function useInvalidateContent() {
   const qc = useQueryClient();
   return () => {
-    void qc.invalidateQueries({ queryKey: contentKeys.all });
     void qc.invalidateQueries({ queryKey: ["control"] });
+    return qc.invalidateQueries({ queryKey: contentKeys.all });
   };
 }
 
