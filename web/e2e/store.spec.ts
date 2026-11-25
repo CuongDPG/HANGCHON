@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 /**
  * Luồng chính của khách trên website (lát cắt store): kệ hàng → tìm không dấu → trang sản phẩm (con dấu, lý do chọn)
- * → hồ sơ chọn → hỏi trợ lý → đợt gom → nhờ chị tìm.
+ * → hồ sơ chọn → hỏi trợ lý → mua chung → nhờ tìm.
  * Cần API đang chạy với dữ liệu mẫu (`uv run python -m app.seed --demo`, scripts/e2e.sh tự dựng); không có thì bỏ qua.
  */
 test.describe("website: kệ hàng → sản phẩm → hồ sơ chọn", () => {
@@ -34,15 +34,17 @@ test.describe("website: kệ hàng → sản phẩm → hồ sơ chọn", () => 
     const ask = main.getByRole("textbox", { name: /Câu hỏi về/ });
     await ask.fill("Có bảo hành không?");
     await main.getByRole("button", { name: "Gửi câu hỏi" }).click();
-    await expect(main.getByText("Đã chuyển cho chị", { exact: true })).toBeVisible();
+    await expect(main.getByText("Đã ghi lại, mình sẽ trả lời", { exact: true })).toBeVisible();
 
     await main.getByRole("link", { name: "Xem hồ sơ chọn" }).click();
     await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toContainText("chọn 1");
     await expect(page.getByRole("main").getByText("Mẫu B", { exact: false }).first()).toBeVisible();
   });
 
-  test("đợt gom và nhờ chị tìm", async ({ page }) => {
+  test("mua chung và nhờ tìm", async ({ page }) => {
     await page.goto("/dot");
+    await expect(page.getByRole("main").getByRole("heading", { level: 1, name: "Mua chung" })).toBeVisible();
+    await expect(page.getByRole("main").getByText("Gom đơn mua chung để có giá tốt nhất")).toBeVisible();
     await expect(page.getByRole("main").getByText(/Đang mở/).first()).toBeVisible();
     await expect(page.getByRole("main").getByText(/^Còn \d+ (ngày|giờ|phút)/).first()).toBeVisible();
 
@@ -50,6 +52,6 @@ test.describe("website: kệ hàng → sản phẩm → hồ sơ chọn", () => 
     const main = page.getByRole("main");
     await main.getByRole("textbox", { name: "Món bạn cần tìm" }).fill(`Móc treo khăn dán tường thử ${Date.now() % 100000}`);
     await main.getByRole("button", { name: "Gửi" }).click();
-    await expect(main.getByRole("status")).toContainText("Chị xem qua rồi mới hiện");
+    await expect(main.getByRole("status")).toContainText("Mình xem qua rồi mới hiện");
   });
 });

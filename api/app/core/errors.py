@@ -102,6 +102,28 @@ _FIELD_MESSAGES = {
 }
 
 
+_VALIDATION_MESSAGE = "Dữ liệu chưa hợp lệ, chị kiểm tra lại các ô được đánh dấu."
+_INTERNAL_MESSAGE = "Hệ thống gặp lỗi, chị thử lại sau ít phút."
+
+# Câu mặc định ở trên viết cho bàn làm việc (gọi người dùng là «chị»). Route khách (`/api/store/**`) dùng giọng
+# với khách: người bán xưng «mình», gọi khách «bạn».
+_STORE_MESSAGES = {
+    Unauthorized.message: "Bạn cần mở lại đúng đường link để tiếp tục.",
+    Conflict.message: "Dữ liệu vừa thay đổi, bạn tải lại trang rồi thử lại nhé.",
+    ServiceUnavailable.message: "Dịch vụ tạm thời không phản hồi, bạn thử lại sau ít phút nhé.",
+    _HTTP_MESSAGES[429]: "Thao tác hơi nhanh, bạn đợi một chút rồi thử lại nhé.",
+    _VALIDATION_MESSAGE: "Thông tin chưa hợp lệ, bạn kiểm tra lại các ô được đánh dấu nhé.",
+    _INTERNAL_MESSAGE: "Hệ thống gặp lỗi, bạn thử lại sau ít phút nhé.",
+}
+
+
+def _voice(request: Request, message: str) -> str:
+    """Câu lỗi mặc định theo người đọc: route khách thì đổi sang giọng với khách."""
+    if request.url.path.startswith("/api/store/"):
+        return _STORE_MESSAGES.get(message, message)
+    return message
+
+
 def _body(detail: str, code: str, errors: list[dict[str, Any]] | None = None, data: Any = None) -> dict[str, Any]:
     body: dict[str, Any] = {"detail": detail, "code": code}
     if errors:
@@ -113,11 +135,11 @@ def _body(detail: str, code: str, errors: list[dict[str, Any]] | None = None, da
 
 def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
-    async def _app_error(_: Request, exc: AppError) -> JSONResponse:
-        return JSONResponse(_body(exc.message, exc.code, data=exc.data), status_code=exc.status_code)
+    async def _app_error(request: Request, exc: AppError) -> JSONResponse:
+        return JSONResponse(_body(_voice(request, exc.message), exc.code, data=exc.data), status_code=exc.status_code)
 
     @app.exception_handler(RequestValidationError)
-    async def _validation(_: Request, exc: RequestValidationError) -> JSONResponse:
+    async def _validation(request: Request, exc: RequestValidationError) -> JSONResponse:
         errors = []
         for err in exc.errors():
             loc = [str(p) for p in err.get("loc", ()) if p not in ("body", "query", "path")]
@@ -128,14 +150,14 @@ def install_error_handlers(app: FastAPI) -> None:
                     msg = msg.removeprefix("Value error, ")
             errors.append({"field": ".".join(loc), "message": msg, "type": err.get("type")})
         return JSONResponse(
-            _body("Dữ liệu chưa hợp lệ, chị kiểm tra lại các ô được đánh dấu.", "validation_error", errors),
+            _body(_voice(request, _VALIDATION_MESSAGE), "validation_error", errors),
             status_code=422,
         )
 
     @app.exception_handler(StarletteHTTPException)
-    async def _http(_: Request, exc: StarletteHTTPException) -> JSONResponse:
+    async def _http(request: Request, exc: StarletteHTTPException) -> JSONResponse:
         detail = exc.detail if isinstance(exc.detail, str) and not exc.detail.isascii() else None
-        message = detail or _HTTP_MESSAGES.get(exc.status_code, "Có lỗi xảy ra.")
+        message = _voice(request, detail or _HTTP_MESSAGES.get(exc.status_code, "Có lỗi xảy ra."))
         return JSONResponse(
             _body(message, f"http_{exc.status_code}"),
             status_code=exc.status_code,
@@ -145,4 +167,4 @@ def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(Exception)
     async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
         log.exception("Lỗi không xử lý được ở %s %s", request.method, request.url.path, exc_info=exc)
-        return JSONResponse(_body("Hệ thống gặp lỗi, chị thử lại sau ít phút.", "internal_error"), status_code=500)
+        return JSONResponse(_body(_voice(request, _INTERNAL_MESSAGE), "internal_error"), status_code=500)

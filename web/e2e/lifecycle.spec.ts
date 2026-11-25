@@ -157,7 +157,7 @@ test("một món hàng từ đề tìm tới đánh giá của khách", async ({
   await main.getByRole("link", { name: "Xem hồ sơ chọn" }).click();
   await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toContainText("chọn 1");
   await page.goBack();
-  await page.getByRole("region", { name: "Đặt mua" }).filter({ visible: true }).first().getByRole("button", { name: /Đặt ngay|Đặt trong đợt/ }).click();
+  await page.getByRole("region", { name: "Đặt mua" }).filter({ visible: true }).first().getByRole("button", { name: /Đặt ngay|Đặt mua chung/ }).click();
   await expect(page).toHaveURL(/\/(gio-hang|dat-hang)/);
   if (page.url().includes("/gio-hang")) await main.getByRole("link", { name: "Đặt hàng" }).click();
   await main.getByLabel("Số điện thoại").fill("0900000777");

@@ -453,7 +453,7 @@ def fake_insights(inp: InsightIn) -> InsightOut:
 
 GENERIC_Q = [
     ("Dùng được bao lâu thì phải thay?", "trial"),
-    ("Vì sao chị chọn món này?", "reason"),
+    ("Vì sao chọn món này?", "reason"),
     ("Có điểm gì chưa ưng không?", "meh"),
     ("Giá bao nhiêu, có giữ suất không?", "price"),
 ]

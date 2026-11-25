@@ -174,6 +174,53 @@ test("mọi trang website", async ({ page }, info) => {
   for (const url of STORE(ids).filter(Boolean) as string[]) await check(page, url, info.project.name, errors);
 });
 
+/**
+ * Giọng với khách: người bán xưng «mình», gọi khách «bạn». «Chị» là cách gọi nội bộ ở bàn làm việc, không được lọt ra
+ * website — kể cả tiêu đề, mô tả SEO, JSON-LD, nhãn ảnh/nút, nguồn cấp sản phẩm và trang 404.
+ */
+const CHI = /(^|[^\p{L}])chị(?!\p{L})/iu;
+
+async function customerText(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const attr = (sel: string, name: string) => [...document.querySelectorAll(sel)].map((el) => el.getAttribute(name) ?? "");
+    return [
+      document.title,
+      document.body.innerText,
+      ...attr('meta[name="description"], meta[property^="og:"], meta[name^="twitter:"]', "content"),
+      ...[...document.querySelectorAll('script[type="application/ld+json"]')].map((s) => s.textContent ?? ""),
+      ...attr("[aria-label]", "aria-label"),
+      ...attr("[placeholder]", "placeholder"),
+      ...attr("img[alt]", "alt"),
+    ].join("\n");
+  });
+}
+
+function chiLines(text: string): string[] {
+  return text.split("\n").filter((l) => CHI.test(l));
+}
+
+test("website không gọi người bán là «chị»", async ({ page }) => {
+  test.setTimeout(180_000);
+  const ids = await collectIds(page.request);
+  await page.context().clearCookies();
+  const urls = [...(STORE(ids).filter(Boolean) as string[]), "/khong-co-trang-nay"];
+  const found: string[] = [];
+  for (const url of urls) {
+    await page.goto(url);
+    await page.waitForLoadState("networkidle");
+    found.push(...chiLines(await customerText(page)).map((l) => `${url}: ${l.trim()}`));
+  }
+  // hỏi một câu trợ lý chưa có căn cứ → câu trả lời mẫu và nhãn «đã ghi lại»
+  await page.goto("/hoi");
+  await page.getByRole("main").getByRole("textbox", { name: "Câu hỏi" }).fill("Có bảo hành mấy năm không?");
+  await page.getByRole("main").getByRole("button", { name: "Gửi câu hỏi" }).click();
+  await expect(page.getByRole("main").getByText("Đã ghi lại, mình sẽ trả lời", { exact: true })).toBeVisible();
+  found.push(...chiLines(await customerText(page)).map((l) => `/hoi (sau khi hỏi): ${l.trim()}`));
+  const feed = await page.request.get("/feed.xml");
+  if (feed.ok()) found.push(...chiLines(await feed.text()).map((l) => `/feed.xml: ${l.trim()}`));
+  expect(found, "chữ «chị» trên website").toEqual([]);
+});
+
 test("mọi trang bàn làm việc", async ({ page }, info) => {
   test.setTimeout(300_000);
   const ids = await collectIds(page.request);

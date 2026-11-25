@@ -224,7 +224,7 @@ def reminder_text(drop: Drop) -> str:
 
     deadline = f", hạn chót {drop.closes_at:%d/%m}" if drop.closes_at else ""
     return (
-        f"Hàng Chọn: {label(drop)} «{drop.title}» đã mở{deadline}. "
+        f"Hàng Chọn: mua chung «{drop.title}» ({label(drop)}) đã mở{deadline}. "
         f"Xem các món: {settings.web_base_url.rstrip('/')}/dot/{drop.slug}"
     )
 

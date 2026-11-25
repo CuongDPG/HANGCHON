@@ -134,7 +134,7 @@ async def on_drop_closed(db: AsyncSession, drop_id: uuid.UUID) -> int:
         if o.id in done:
             continue
         service.add_event(
-            db, o, "drop_closed", f"Chốt đợt {drop.code}, chị đặt nhà cung cấp",
+            db, o, "drop_closed", f"Chốt đợt {drop.code}, đã đặt nhà cung cấp",
             data={"drop_id": str(drop.id)},
         )  # fmt: skip
         n += 1
@@ -179,7 +179,7 @@ async def on_inbound_arrived(db: AsyncSession, inbound_id: uuid.UUID) -> int:
         return 0
     n = 0
     for o in orders:
-        if service.set_status(db, o, OrderStatus.READY_TO_SHIP, "Hàng đã về tới kho, chị kiểm từng món rồi gửi bạn"):
+        if service.set_status(db, o, OrderStatus.READY_TO_SHIP, "Hàng đã về tới kho, mình kiểm từng món rồi gửi bạn"):
             n += 1
     await db.flush()
     return n

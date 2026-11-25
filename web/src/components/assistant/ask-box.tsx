@@ -10,11 +10,14 @@ import { notifyError, notifySuccess } from "@/components/ui/toast";
 import { assistantApi, conversationStorageKey, type AssistantConversation, type AssistantMessage } from "@/lib/api/assistant";
 import { errorMessage } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
+import { ownerReplyLabel } from "@/lib/picker";
 
 type AskBoxProps = {
   /** Có thì hỏi về đúng món này (trả lời từ hồ sơ của món); không có thì hỏi chung về các món trên kệ. */
   productSlug?: string | null;
   productName?: string | null;
+  /** Tên người chọn (`store.picker_name`) cho nhãn «… trả lời»; chưa đặt thì «Người chọn trả lời». */
+  pickerName?: string | null;
   /** Câu hỏi gợi ý bấm nhanh. */
   suggestions?: string[];
   placeholder?: string;
@@ -22,10 +25,10 @@ type AskBoxProps = {
 };
 
 /**
- * Hỏi trợ lý (e7): trả lời chỉ từ hồ sơ của chị, mỗi câu dẫn về một mục trong hồ sơ.
- * Không có dữ liệu → nói không biết, chuyển cho chị; chị trả lời thì hiện ở đây khi khách mở lại.
+ * Hỏi trợ lý (e7): trả lời chỉ từ hồ sơ chọn, mỗi câu dẫn về một mục trong hồ sơ.
+ * Không có dữ liệu → nói chưa chắc, ghi lại cho người chọn; người chọn trả lời thì hiện ở đây khi khách mở lại.
  */
-export function AskBox({ productSlug, productName, suggestions = [], placeholder, className }: AskBoxProps) {
+export function AskBox({ productSlug, productName, pickerName, suggestions = [], placeholder, className }: AskBoxProps) {
   const [conv, setConv] = useState<AssistantConversation | null>(null);
   const [question, setQuestion] = useState("");
   const [sending, setSending] = useState(false);
@@ -34,7 +37,7 @@ export function AskBox({ productSlug, productName, suggestions = [], placeholder
   const listRef = useRef<HTMLOListElement>(null);
   const storageKey = conversationStorageKey(productSlug);
 
-  // mở lại cuộc trò chuyện cũ trong phiên (để thấy câu chị trả lời)
+  // mở lại cuộc trò chuyện cũ trong phiên (để thấy câu người chọn trả lời)
   useEffect(() => {
     const id = sessionStorage.getItem(storageKey);
     if (!id) return;
@@ -79,7 +82,7 @@ export function AskBox({ productSlug, productName, suggestions = [], placeholder
     if (!conv || contact.trim().length < 6) return;
     try {
       setConv(await assistantApi.contact(conv.id, contact.trim()));
-      notifySuccess("Đã lưu, chị sẽ nhắn lại cho bạn.");
+      notifySuccess("Đã lưu, mình sẽ nhắn lại cho bạn.");
     } catch (err) {
       notifyError(err);
     }
@@ -111,7 +114,7 @@ export function AskBox({ productSlug, productName, suggestions = [], placeholder
                 {m.role !== "user" ? (
                   <span className="mb-1 flex items-center gap-1.5 text-[12px] font-semibold text-ink-2">
                     {m.role === "owner" ? <UserRound className="size-3.5" aria-hidden /> : <Bot className="size-3.5" aria-hidden />}
-                    {m.role === "owner" ? "Chị trả lời" : "Trợ lý AI"}
+                    {m.role === "owner" ? ownerReplyLabel(pickerName) : "Trợ lý AI"}
                   </span>
                 ) : null}
                 <p className="whitespace-pre-line">{m.content}</p>
@@ -121,7 +124,7 @@ export function AskBox({ productSlug, productName, suggestions = [], placeholder
                   </p>
                 ) : null}
               </div>
-              {m.role === "assistant" && m.unknown ? <Badge tone="accent">Đã chuyển cho chị</Badge> : null}
+              {m.role === "assistant" && m.unknown ? <Badge tone="accent">Đã ghi lại, mình sẽ trả lời</Badge> : null}
               {m.role === "assistant" && !m.unknown ? (
                 <span className="flex gap-0.5">
                   <IconButton
@@ -160,7 +163,7 @@ export function AskBox({ productSlug, productName, suggestions = [], placeholder
 
       {handedOff && conv && !conv.contact_saved ? (
         <form onSubmit={saveContact} className="flex flex-col gap-2 rounded-md border border-line bg-surface p-3">
-          <p className="text-[14px] text-ink-2">Muốn chị nhắn lại? Để lại số điện thoại hoặc Zalo (không bắt buộc).</p>
+          <p className="text-[14px] text-ink-2">Muốn mình nhắn lại? Để lại số điện thoại hoặc Zalo (không bắt buộc).</p>
           <div className="flex gap-2">
             <Input
               value={contact}

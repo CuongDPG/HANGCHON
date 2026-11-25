@@ -7,7 +7,7 @@ import { catalogApi } from "@/lib/api/catalog";
 
 export const metadata: Metadata = {
   title: "Hỏi trợ lý",
-  description: "Hỏi về món hàng, cách dùng, đợt bán. Câu nào chưa rõ sẽ được chuyển cho chị.",
+  description: "Hỏi về món hàng, cách dùng, đợt mua chung. Câu nào trợ lý chưa chắc, mình sẽ tự trả lời bạn.",
   alternates: { canonical: "/hoi" },
 };
 
@@ -28,22 +28,32 @@ async function AskBody({ searchParams }: { searchParams: PageProps<"/hoi">["sear
   const sp = await searchParams;
   const slug = typeof sp.mon === "string" ? sp.mon : null;
   let name: string | null = null;
+  let picker: string | null = null;
   if (slug) {
     try {
-      name = (await catalogApi.product(slug)).name;
+      const p = await catalogApi.product(slug);
+      name = p.name;
+      picker = p.picker_name ?? null;
     } catch {
       name = null;
+    }
+  }
+  if (!name) {
+    try {
+      picker = (await catalogApi.about()).picker_name;
+    } catch {
+      picker = null; // không có tên thì nhãn là «Người chọn trả lời»
     }
   }
   return (
     <>
       <PageHeader
         title={name ? `Hỏi về ${name}` : "Hỏi trợ lý"}
-        description="Hỏi về món hàng, cách dùng, đợt bán. Câu nào chưa rõ sẽ được chuyển cho chị trả lời."
+        description="Hỏi về món hàng, cách dùng, đợt mua chung. Câu nào trợ lý chưa chắc, mình sẽ tự trả lời bạn."
         backHref={name && slug ? `/san-pham/${slug}` : undefined}
       />
       <Suspense fallback={<Skeleton className="h-40 w-full" />}>
-        <AskBox productSlug={name ? slug : null} productName={name} suggestions={name ? [] : SUGGESTIONS} />
+        <AskBox productSlug={name ? slug : null} productName={name} pickerName={picker} suggestions={name ? [] : SUGGESTIONS} />
       </Suspense>
     </>
   );

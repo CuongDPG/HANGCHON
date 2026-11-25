@@ -36,10 +36,10 @@ PER_DAY = 40
 PER_DAY_IP = 120
 MAX_QUESTION = 500
 HANDOFF_TEXT = (
-    "Câu này mình chưa có thông tin chắc chắn trong hồ sơ nên đã chuyển cho chị. "
-    "Chị thường trả lời trong buổi tối; bạn để lại số điện thoại hoặc Zalo nếu muốn chị nhắn lại."
+    "Câu này mình chưa có thông tin chắc chắn nên đã ghi lại, mình sẽ trả lời bạn sớm (thường trong buổi tối). "
+    "Bạn để lại số điện thoại hoặc Zalo nếu muốn mình nhắn lại."
 )
-OFFLINE_TEXT = "Trợ lý đang tạm nghỉ, mình đã chuyển câu hỏi của bạn cho chị."
+OFFLINE_TEXT = "Trợ lý đang tạm nghỉ. Mình đã ghi lại câu hỏi và sẽ trả lời bạn sớm."
 
 
 class RateLimited(AppError):
@@ -90,9 +90,9 @@ async def product_facts(db: AsyncSession, p: Product) -> list[Fact]:
     add("reason_selected", "Vì sao mình chọn", p.reason_selected)
     add("not_satisfied", "Điều mình chưa ưng", p.not_satisfied)
     if p.trial_days:
-        add("trial_days", "Thời gian thử", f"Chị đã dùng thử {p.trial_days} ngày trước khi chọn.")
+        add("trial_days", "Thời gian thử", f"Mình đã dùng thử {p.trial_days} ngày trước khi chọn.")
     if p.considered_count:
-        add("seal", "Con dấu", f"Chị xem {p.considered_count} mẫu cùng loại, chọn {p.selected_count}.")
+        add("seal", "Con dấu", f"Mình xem {p.considered_count} mẫu cùng loại, chọn {p.selected_count}.")
     if p.weight_grams:
         add("weight", "Thông số · Khối lượng", f"{p.weight_grams} g")
     if p.shipping_notes:
@@ -200,9 +200,9 @@ async def ask(
     if ip_hash:
         await _check_burst(f"ip:{ip_hash}")
         if not await ratelimit.hit(f"assistant:day:{ip_hash}", PER_DAY_IP, 86400):
-            raise RateLimited("Hôm nay bạn đã hỏi nhiều rồi. Bạn nhắn thẳng cho chị qua Zalo giúp mình nhé.")
+            raise RateLimited("Hôm nay bạn đã hỏi nhiều rồi. Bạn nhắn thẳng cho mình qua Zalo nhé.")
     if await _day_count(db, session_key) >= PER_DAY:
-        raise RateLimited("Hôm nay bạn đã hỏi nhiều rồi. Bạn nhắn thẳng cho chị qua Zalo giúp mình nhé.")
+        raise RateLimited("Hôm nay bạn đã hỏi nhiều rồi. Bạn nhắn thẳng cho mình qua Zalo nhé.")
 
     product: Product | None = None
     if product_slug:

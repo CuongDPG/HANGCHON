@@ -149,7 +149,7 @@ async def quote(body: QuoteIn, request: Request, db: DbSession) -> QuoteOut:
         else:
             hint += "."
     elif resolved and not problems:
-        hint = "Hàng có sẵn, chị gửi trong 1–2 ngày."
+        hint = "Hàng có sẵn, mình gửi trong 1–2 ngày."
     return QuoteOut(
         lines=[service.quote_line(r) for r in resolved], subtotal_vnd=subtotal, shipping_fee_vnd=fee,
         shipping_estimated=estimated, total_vnd=total, deposit_required_vnd=service.deposit_for(drop, total, method),
@@ -241,7 +241,7 @@ async def ask_question(code: str, body: QuestionIn, request: Request, db: DbSess
     await ratelimit.limit(f"orders:question:{ratelimit.client_ip(request)}", 10, 600)
     order = await _public_order(db, code, body.t)
     ev = service.add_event(
-        db, order, "customer_question", "Bạn đã hỏi chị về đơn này", detail=body.message, actor=Actor.CUSTOMER
+        db, order, "customer_question", "Bạn đã hỏi về đơn này", detail=body.message, actor=Actor.CUSTOMER
     )
     await db.flush()
     await control.propose(
@@ -261,7 +261,7 @@ async def change_address(code: str, body: AddressChangeIn, db: DbSession) -> Pub
     order = await _public_order(db, code, body.t, lock=True)
     view = await public.public_view(db, order)
     if not view.can_change_address:
-        raise Conflict("Đơn đã giao cho hãng vận chuyển, bạn nhắn chị để đổi địa chỉ nhé.", code="address_locked")
+        raise Conflict("Đơn đã giao cho hãng vận chuyển, bạn nhắn mình để đổi địa chỉ nhé.", code="address_locked")
     addr = _address(body)
     if not (addr.get("address_line") and addr.get("province")):
         raise BadRequest("Bạn ghi đủ số nhà, đường và tỉnh/thành giúp mình.")

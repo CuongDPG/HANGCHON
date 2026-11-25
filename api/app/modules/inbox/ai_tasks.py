@@ -113,6 +113,8 @@ ai.task(
         "khoẻ, an toàn, dị ứng, phụ nữ có thai, trẻ sơ sinh), find_request (nhờ tìm món chưa bán), small_talk (chào, cảm "
         "ơn), other.\n"
         "2. Soạn `reply` bằng giọng của chị (theo `voice`), ngắn gọn 1–3 câu, lịch sự, tự nhiên như người bán thật. "
+        "Trong mọi câu gửi khách (`reply` và câu trả lời trong `options`): người bán tự xưng «mình», gọi khách «bạn»; "
+        "không bao giờ gọi người bán là «chị» (đó là cách gọi nội bộ) và không gọi khách là «chị»/«anh». "
         "Bình luận công khai thì không nhắc số điện thoại, địa chỉ hay thông tin đơn của khách — mời khách nhắn riêng.\n"
         "3. Ghi `facts`: mỗi dữ kiện đã dùng (giá, số còn, ngày hàng về...) kèm nguồn.\n\n"
         "Bắt buộc:\n"
@@ -178,8 +180,8 @@ def _lower_first(s: str) -> str:
 
 
 def _salute(inp: DraftReplyIn) -> str:
-    rules = " ".join(str(r) for r in inp.voice.get("rules", []))
-    return "bạn" if "bạn" in rules else "chị"
+    """Với khách luôn gọi «bạn» (người bán xưng «mình»); «chị» chỉ là cách gọi người bán trong nội bộ."""
+    return "bạn"
 
 
 def _date(iso: str | None) -> str | None:

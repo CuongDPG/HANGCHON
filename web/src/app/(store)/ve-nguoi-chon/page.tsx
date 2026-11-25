@@ -7,8 +7,7 @@ import { EmptyState, Skeleton } from "@/components/ui/feedback";
 import { catalogApi, siteUrl, type About } from "@/lib/api/catalog";
 import { errorMessage } from "@/lib/api/client";
 import { formatNumber } from "@/lib/format";
-
-const DEFAULT_PICKER_NAME = "Người chọn hàng";
+import { pickerName } from "@/lib/picker";
 
 export const metadata: Metadata = {
   title: "Về người chọn",
@@ -16,7 +15,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/ve-nguoi-chon" },
 };
 
-/** Về người chọn: trang bảo lãnh — chị là ai, chọn theo nguyên tắc nào, AI làm gì. Số liệu lấy thẳng từ Bàn chọn. */
+/** Về người chọn: trang bảo lãnh — người chọn là ai, chọn theo nguyên tắc nào, AI làm gì. Số liệu lấy thẳng từ Bàn chọn. */
 export default function AboutPage() {
   return (
     <Suspense fallback={<Skeleton className="h-96 w-full" />}>
@@ -34,7 +33,7 @@ async function AboutBody() {
   }
   const url = siteUrl("/ve-nguoi-chon");
   // chưa đặt tên trong Cài đặt (store.picker_name) thì API trả tên trung tính mặc định
-  const named = a.picker_name !== DEFAULT_PICKER_NAME;
+  const named = pickerName(a.picker_name) !== null;
   const jsonld = [
     {
       "@context": "https://schema.org",
@@ -82,7 +81,7 @@ async function AboutBody() {
           </div>
         ))}
       </dl>
-      <p className="-mt-3 text-[12.5px] text-ink-3">Con số lấy thẳng từ bàn chọn của chị, tự cập nhật.</p>
+      <p className="-mt-3 text-[12.5px] text-ink-3">Con số lấy thẳng từ bàn chọn của mình, tự cập nhật.</p>
 
       {a.how_we_choose.length ? (
         <Card>

@@ -127,7 +127,7 @@ async def timeline(
     )
     if drop is not None:
         closed = drop.status in CLOSED_DROP or "drop_closed" in first
-        headline = "Chị đã đặt nhà cung cấp, chờ hàng về" if closed else f"Đã giữ suất, chờ chốt đợt {drop.code}"
+        headline = "Mình đã đặt nhà cung cấp, chờ hàng về" if closed else f"Đã giữ suất, chờ chốt đợt {drop.code}"
         ev = first.get("drop_closed")
         steps.append(TimelineStep(
             key="drop", title=f"Chốt đợt {drop.code}, đã đặt nhà cung cấp" if closed else f"Chốt đợt {drop.code}",
@@ -152,7 +152,7 @@ async def timeline(
         elif not arrived:
             steps.append(TimelineStep(key="inbound", title="Hàng trên đường về Việt Nam", status="todo"))
         steps.append(TimelineStep(
-            key="arrived", title="Về tới kho, chị kiểm từng món", status="done" if arrived else "todo",
+            key="arrived", title="Về tới kho, mình kiểm từng món", status="done" if arrived else "todo",
             at=next((e.occurred_at for e in evs if e.status == OrderStatus.READY_TO_SHIP), None) or lot_in_at,
             meta=None if arrived else (f"Dự kiến {_d(eta)}" if eta else None),
         ))  # fmt: skip
@@ -161,7 +161,7 @@ async def timeline(
         steps.append(
             TimelineStep(
                 key="packing",
-                title="Chị đóng gói",
+                title="Mình đóng gói",
                 status="done" if packed else "todo",
                 at=sh.created_at if sh else None,
             )
@@ -169,7 +169,7 @@ async def timeline(
     delivered = order.status in (OrderStatus.DELIVERED, OrderStatus.COMPLETED)
     carrier_meta = f"Mã vận đơn {sh.tracking_code}" if sh and sh.tracking_code else None
     if order.status == OrderStatus.RETURNED:
-        steps.append(TimelineStep(key="returned", title="Hàng đã hoàn về chị", status="done"))
+        steps.append(TimelineStep(key="returned", title="Hàng đã hoàn về kho", status="done"))
         return _finish(steps, stop=True), "Đơn đã hoàn về"
     if delivered:
         steps.append(
@@ -197,7 +197,7 @@ async def timeline(
             hint = f"Dự kiến {_d(eta + timedelta(days=1))}–{_d(eta + timedelta(days=3))}"
         steps.append(TimelineStep(key="delivered", title="Giao cho bạn", status="todo", meta=hint))
         if order.status == OrderStatus.READY_TO_SHIP:
-            headline = "Chị đang chuẩn bị gói hàng"
+            headline = "Mình đang chuẩn bị gói hàng"
     if order.payment_method == PaymentMethod.BANK_TRANSFER and not paid:
         headline = "Chờ bạn chuyển khoản"
     return _finish(steps), headline

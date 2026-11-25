@@ -87,12 +87,12 @@ async def open_return(
     if order.status == OrderStatus.DRAFT:
         raise Conflict("Đơn nháp chưa đổi trả được.")
     if kind != ReturnKind.REFUND_ONLY and order.status not in (OrderStatus.DELIVERED, OrderStatus.COMPLETED):
-        raise Conflict("Đơn chưa giao xong, chưa đổi trả được. Bạn hỏi chị về đơn này nhé.", code="not_delivered")
+        raise Conflict("Đơn chưa giao xong, chưa đổi trả được. Bạn hỏi mình về đơn này nhé.", code="not_delivered")
     open_count = await db.scalar(
         select(func.count()).where(Return.order_id == order.id, Return.status.in_(OPEN_STATUSES))
     )
     if open_count and actor == Actor.CUSTOMER:
-        raise Conflict("Đơn này đang có một yêu cầu đổi trả, chị đang xem.", code="return_open")
+        raise Conflict("Đơn này đang có một yêu cầu đổi trả, mình đang xem.", code="return_open")
     if order_item_id and not any(i.id == order_item_id for i in order.items):
         raise BadRequest("Dòng hàng không thuộc đơn này.")
     r = Return(
@@ -193,13 +193,13 @@ async def decide(db: AsyncSession, payload: dict[str, Any], *, user: Any = None)
         r.status = ReturnStatus.REJECTED
         r.closed_at = now_utc()
         service.add_event(
-            db, order, "return_rejected", f"Yêu cầu {r.code}: chị chưa nhận đổi trả", detail=message or None
+            db, order, "return_rejected", f"Yêu cầu {r.code}: mình chưa nhận đổi trả", detail=message or None
         )
         await notify.notify_order(
             db,
             order,
             "return_update",
-            {"ma_doi_tra": r.code, "ket_qua": message or "chị chưa nhận đổi trả lần này."},
+            {"ma_doi_tra": r.code, "ket_qua": message or "mình chưa nhận đổi trả lần này."},
             dedupe=f"{r.id}:rejected",
         )
         return f"Từ chối {r.code}"
@@ -257,14 +257,14 @@ async def mark_received(db: AsyncSession, r: Return, *, user: Any = None) -> Ret
         raise Conflict("Yêu cầu này không ở bước chờ nhận hàng trả.")
     order = await service.get_order(db, r.order_id, lock=True)
     r.status = ReturnStatus.RECEIVED
-    service.add_event(db, order, "return_received", f"Chị đã nhận lại hàng ({r.code})")
+    service.add_event(db, order, "return_received", f"Mình đã nhận lại hàng ({r.code})")
     if r.kind == ReturnKind.EXCHANGE:
         r.status = ReturnStatus.EXCHANGED
-        result = "chị đã nhận lại món cũ và sẽ gửi món mới cho bạn."
+        result = "mình đã nhận lại món cũ và sẽ gửi món mới cho bạn."
     else:
         await do_refund(db, r, order, min(r.refund_amount_vnd, refundable(order)), user=user)
         r.status = ReturnStatus.REFUNDED
-        result = f"chị đã nhận lại hàng và hoàn {vnd(r.refund_amount_vnd)}."
+        result = f"mình đã nhận lại hàng và hoàn {vnd(r.refund_amount_vnd)}."
         if order.refunded_vnd >= order.paid_vnd and order.status in (OrderStatus.DELIVERED, OrderStatus.COMPLETED):
             service.set_status(db, order, OrderStatus.RETURNED, "Đơn đã trả lại và hoàn tiền")
     r.closed_at = now_utc()

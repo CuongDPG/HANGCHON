@@ -95,6 +95,8 @@ export type ProductDetail = ProductCard & {
   ai_generated: boolean;
   reviews: PublicReview[];
   url: string;
+  /** Tên người chọn (Cài đặt `store.picker_name`); chưa đặt thì là tên trung tính mặc định. */
+  picker_name?: string | null;
 };
 
 export type Alternative = {

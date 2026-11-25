@@ -10,16 +10,16 @@ import { catalogApi } from "@/lib/api/catalog";
 import { errorMessage } from "@/lib/api/client";
 
 export const metadata: Metadata = {
-  title: "Đợt gom đơn",
+  title: "Mua chung",
   description: "Hàng được gom đơn theo đợt: có hạn chót, số suất và ngày hàng về dự kiến nói rõ từ đầu.",
   alternates: { canonical: "/dot" },
 };
 
-/** Đợt gom đơn (e3): đợt đang mở, sắp mở («Nhắc mình»), đã về kèm đánh giá. */
+/** Mua chung — đợt gom đơn (e3): đợt đang mở, sắp mở («Nhắc mình»), đã về kèm đánh giá. */
 export default function DropsPage() {
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Đợt gom đơn" description="Gom đủ suất thì chị đặt một lô. Hạn chót, số suất và ngày hàng về nói rõ từ đầu." />
+      <PageHeader title="Mua chung" description="Gom đơn mua chung để có giá tốt nhất" />
       <Suspense fallback={<Skeleton className="h-96 w-full" />}>
         <DropsBody />
       </Suspense>
@@ -40,7 +40,7 @@ async function DropsBody() {
       <EmptyState
         icon={<Hourglass />}
         title="Chưa có đợt nào đang mở"
-        description="Đợt đầu tiên sẽ mở khi chị thử xong vài món. Trong lúc chờ, bạn xem kệ hàng nhé."
+        description="Đợt mua chung đầu tiên sẽ mở khi mình thử xong vài món. Trong lúc chờ, bạn xem kệ hàng nhé."
         action={<ButtonLink href="/">Xem kệ hàng</ButtonLink>}
       />
     );

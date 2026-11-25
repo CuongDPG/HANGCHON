@@ -17,7 +17,7 @@ export function ProductCard({ product, priority = false }: { product: Card; prio
         alt={p.name}
         ratio="1/1"
         priority={priority}
-        placeholder="Ảnh chị chụp"
+        placeholder="Ảnh mình tự chụp"
         imgClassName="transition-transform duration-300 group-hover:scale-[1.02]"
         overlay={p.seal.total ? <Seal chosen={p.seal.chosen} total={p.seal.total} size={46} /> : <Seal size={46} />}
       />
@@ -31,7 +31,7 @@ export function ProductCard({ product, priority = false }: { product: Card; prio
       {p.proof ? <span className="text-[13px] text-ink-2">{p.proof}</span> : null}
       {p.drop ? (
         <span className="text-[12.5px] font-medium text-accent">
-          {p.drop.label}
+          Mua chung · {p.drop.label}
           {p.drop.slots_left !== null ? ` · còn ${p.drop.slots_left} suất` : ""}
         </span>
       ) : null}

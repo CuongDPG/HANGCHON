@@ -170,7 +170,7 @@ async def can_market_to(db: AsyncSession, customer: Customer) -> bool:
     return bool(customer.marketing_opt_in) and not customer.is_blocked and not await is_opted_out(db, customer.id)
 
 
-OPT_OUT_FOOTER = "Không muốn nhận tin như này nữa, bạn nhắn «TỪ CHỐI» cho shop nhé."
+OPT_OUT_FOOTER = "Không muốn nhận tin như này nữa, bạn nhắn «TỪ CHỐI» cho mình nhé."
 OPT_OUT_REPLIES = {"tu choi", "tu choi nhan tin", "huy nhan tin", "dung nhan tin", "khong nhan tin", "stop"}
 
 

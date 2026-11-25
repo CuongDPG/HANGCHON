@@ -26,7 +26,7 @@ export async function generateMetadata({ params }: PageProps<"/dot/[slug]">): Pr
   const { slug } = await params;
   const d = await getDrop(slug);
   return {
-    title: `${d.label}: ${d.title}`,
+    title: `Mua chung · ${d.label}: ${d.title}`,
     description: d.description ?? `${d.item_count} món trong đợt${d.expected_arrival_date ? `, hàng về dự kiến ${formatDayMonth(d.expected_arrival_date)}` : ""}.`,
     alternates: { canonical: `/dot/${d.slug}` },
   };
@@ -55,7 +55,7 @@ async function DropBody({ params }: { params: PageProps<"/dot/[slug]">["params"]
   const d = await getDrop(slug);
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader eyebrow={`${d.label} · ${STATUS_WORD[d.status] ?? d.status}`} title={d.title} description={d.description ?? undefined} backHref="/dot" />
+      <PageHeader eyebrow={`Mua chung · ${d.label} · ${STATUS_WORD[d.status] ?? d.status}`} title={d.title} description={d.description ?? undefined} backHref="/dot" />
       <Card tone={d.status === "open" ? "accent" : "default"} className="flex flex-col gap-2.5">
         {d.status === "open" && d.closes_at ? (
           <p className="flex items-center gap-2 text-[16px] font-semibold">
@@ -82,7 +82,7 @@ async function DropBody({ params }: { params: PageProps<"/dot/[slug]">["params"]
             ? `Hàng đã về ${formatDayMonth(d.actual_arrival_date)}`
             : d.expected_arrival_date
               ? `Hàng về dự kiến ${formatDayMonth(d.expected_arrival_date)}`
-              : "Ngày hàng về: chị sẽ báo"}
+              : "Ngày hàng về: mình sẽ báo"}
           {d.deposit_pct ? ` · đặt cọc ${d.deposit_pct}%` : ""}
         </p>
         {d.rating_avg ? (

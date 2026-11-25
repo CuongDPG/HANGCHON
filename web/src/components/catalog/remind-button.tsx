@@ -53,7 +53,7 @@ export function RemindButton({ slug, title }: { slug: string; title: string }) {
       >
         <form id={`remind-${slug}`} onSubmit={submit} className="flex flex-col gap-3">
           <p className="text-[15px] text-ink-2">
-            «{title}» mở là chị nhắn bạn đúng một tin. Không nhắn quảng cáo khác.
+            «{title}» mở là mình nhắn bạn đúng một tin. Không nhắn quảng cáo khác.
           </p>
           <Input
             label="Số điện thoại hoặc Zalo"

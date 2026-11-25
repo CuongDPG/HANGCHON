@@ -98,7 +98,7 @@ async def _answer_question(ctx: control.ActionContext) -> control.HandlerResult:
         await notify.notify_order(
             ctx.db, order, "owner_reply", {"noi_dung": reply}, dedupe=ctx.payload.get("question_id")
         )
-        service.add_event(ctx.db, order, "owner_reply", "Chị đã trả lời câu hỏi của bạn", detail=reply)
+        service.add_event(ctx.db, order, "owner_reply", "Mình đã trả lời câu hỏi của bạn", detail=reply)
     return control.HandlerResult(
         result={"replied": bool(reply)}, summary=f"Trả lời khách đơn {order.code}" if reply else f"Đã xem câu hỏi đơn {order.code}",
         ref_type="orders", ref_id=order.id,

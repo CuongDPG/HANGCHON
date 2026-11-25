@@ -46,8 +46,8 @@ export function ReviewForm({ token, invite }: { token: string; invite: ReviewInv
         <p className="text-[16px] font-semibold">{state === "expired" ? "Đường link đã hết hạn" : "Cảm ơn bạn đã đánh giá!"}</p>
         <p className="mt-1 text-[15px] text-ink-2">
           {state === "expired"
-            ? "Bạn nhắn chị qua Zalo nếu vẫn muốn gửi cảm nhận nhé."
-            : "Chị đọc từng đánh giá trước khi hiện lên trang. Lời chê thật lòng vẫn được hiện."}
+            ? "Bạn nhắn mình qua Zalo nếu vẫn muốn gửi cảm nhận nhé."
+            : "Mình đọc từng đánh giá trước khi hiện lên trang. Lời chê thật lòng vẫn được hiện."}
         </p>
       </Card>
     );

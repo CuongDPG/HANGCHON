@@ -121,7 +121,7 @@ PRICE = {"p_binh": 289000, "p_hop": 329000, "p_gia": 279000, "p_kep": 119000, "p
 # thông số đo khi thử (ghi đè thông số nguồn giả lập trên trang sản phẩm)
 SPECS = {
     "p_binh": ("500 ml · inox 304 · 260 g", [("Dung tích", "500 ml"), ("Chất liệu", "Inox 304, nắp nhựa PP"),
-                                             ("Giữ nóng", "Khoảng 8 giờ (chị đo: 7h sáng → 5h chiều còn ấm)"), ("Khối lượng", "260 g")]),
+                                             ("Giữ nóng", "Khoảng 8 giờ (mình đo: 7h sáng → 5h chiều còn ấm)"), ("Khối lượng", "260 g")]),
     "p_hop": ("3 ngăn · inox 304 · 640 g", [("Số ngăn", "3 ngăn, có nắp kín"), ("Chất liệu", "Inox 304"),
                                             ("Dung tích", "Khoảng 1,2 lít"), ("Khối lượng", "640 g")]),
     "p_gia": ("Gấp gọn · inox · 2,1 kg", [("Kích thước mở", "150 × 60 × 95 cm"), ("Khi gấp", "Dày 6 cm"),
@@ -549,7 +549,7 @@ class Story:
 
         texts = {  # theo món: (sao, lời khách)
             "Giá phơi chữ X gấp gọn": [(5, "Phơi được cả chăn đôi, gấp lại gọn sau cửa. Ốc chân mình vặn lại một lần là chắc."),
-                                       (4, "Giá phơi chắc, giao hơi lâu nhưng đúng như chị tả.")],
+                                       (4, "Giá phơi chắc, giao hơi lâu nhưng đúng như mô tả.")],
             "Khăn tắm sợi tre cho bé": [(5, "Khăn mềm, bé thích quấn. Giặt máy mấy lần vẫn mềm như mới."),
                                         (3, "Khăn ổn nhưng màu nhạt hơn ảnh mình xem.")],
         }  # fmt: skip

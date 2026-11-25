@@ -16,7 +16,7 @@ export function OpenDropCard({ d, headingLevel = 2 }: { d: DropSummary; headingL
   const left = d.slots_total !== null ? Math.max(0, d.slots_total - d.slots_reserved) : null;
   return (
     <Card tone="accent" className="flex flex-col gap-3">
-      <p className="text-[12.5px] font-semibold tracking-[0.08em] text-accent uppercase">{d.label} · Đang mở</p>
+      <p className="text-[12.5px] font-semibold tracking-[0.08em] text-accent uppercase">Mua chung · {d.label} · Đang mở</p>
       <H className="text-[20px] leading-tight font-bold">{d.title}</H>
       <ImageBox src={d.cover?.webp["800"] ?? d.cover?.src} alt="" ratio="16/9" placeholder={`${d.item_count} món trong đợt`} />
       <div className="flex items-baseline justify-between gap-3 text-[15px]">

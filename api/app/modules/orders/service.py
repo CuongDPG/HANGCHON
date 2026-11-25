@@ -667,7 +667,7 @@ async def advance_after_confirm(db: AsyncSession, order: Order, *, actor: Actor 
                 db, order, OrderStatus.AWAITING_STOCK, f"Đã xác nhận, chờ hàng của đợt {drop.code} về", actor=actor
             )
             return
-    set_status(db, order, OrderStatus.READY_TO_SHIP, "Đã xác nhận, chị đang chuẩn bị gói hàng", actor=actor)
+    set_status(db, order, OrderStatus.READY_TO_SHIP, "Đã xác nhận, mình đang chuẩn bị gói hàng", actor=actor)
 
 
 async def mark_paid(db: AsyncSession, order: Order, payment: Payment | None, *, actor: Actor = Actor.SYSTEM) -> bool:

@@ -124,7 +124,7 @@ async def test_public_status_labels_and_found(db, owner_client, client):
                          source_external_id=f"t{i}", title_vi=f"Mẫu {i}"))  # fmt: skip
     await db.commit()
     items = (await client.get("/api/store/catalog/finds")).json()["items"]
-    assert items[0]["status"]["label"] == "Chị đang thử 3 mẫu"
+    assert items[0]["status"]["label"] == "Mình đang thử 3 mẫu"
     r = await owner_client.post(f"/api/desk/catalog/finds/{fr.id}/status", json={"status": "found"})
     assert r.status_code == 400
     p = await published_product(db)

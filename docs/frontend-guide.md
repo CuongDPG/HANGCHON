@@ -75,6 +75,9 @@ export function ApprovalsScreen() {
 - Tìm kiếm phía client dùng `matchesVi(text, query)` (không dấu, đ → d).
 - Đặt tên: route tiếng Việt không dấu gạch nối (`/desk/san-hang`, `/don/[code]`); file kebab-case tiếng Anh
   (`approvals-screen.tsx`); component PascalCase tiếng Anh; chuỗi giao diện tiếng Việt; gọi người dùng là «chị» ở desk, «bạn» ở website.
+  Website và mọi tin gửi khách: người bán tự xưng «mình», gọi khách «bạn», **không bao giờ «chị»** (cách gọi nội bộ);
+  cần ngôi thứ ba thì dùng tên người chọn (`store.picker_name`, `lib/picker.ts`), chưa đặt tên thì «người chọn».
+  Bài e2e «website không gọi người bán là «chị»» (`e2e/routes.spec.ts`) và `api/tests/test_customer_voice.py` canh việc này.
 - Activity (Next 16): rời trang thì trang **được giữ lại ẩn**, không bị huỷ. Sheet/Dialog trong `components/ui` đã tự đóng khi trang bị ẩn;
   menu/popup tự viết thì đóng trong cleanup của `useLayoutEffect`. Đăng xuất tải lại hẳn trang (`useLogout` đã làm).
 
