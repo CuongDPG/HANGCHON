@@ -61,9 +61,11 @@ async def test_ai_cost(owner_client: httpx.AsyncClient) -> None:
 
 async def test_orders_summary_scopes(db, owner_client: httpx.AsyncClient) -> None:
     c = await make_customer(db, "Khách Đơn")
-    ship = await make_order(db, customer=c)
+    # đặt đơn đúng lúc này: mặc định của factory (1 giờ trước) rơi sang «hôm qua» nếu chạy sau nửa đêm giờ VN
+    now = now_utc()
+    ship = await make_order(db, customer=c, placed_at=now)
     ship.status = OrderStatus.READY_TO_SHIP
-    await make_order(db, customer=c, paid=False)
+    await make_order(db, customer=c, paid=False, placed_at=now)
     await db.commit()
 
     body = await say(owner_client, "còn bao nhiêu đơn chờ giao")
