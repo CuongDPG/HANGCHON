@@ -41,7 +41,7 @@ export function LookupScreen() {
   });
 
   return (
-    <div className="mx-auto flex w-full max-w-prose flex-col gap-6">
+    <div className="flex w-full flex-col gap-6">
       <PageHeader title="Tra cứu đơn" description="Nhập số điện thoại và mã đơn (có trong tin nhắn xác nhận) để xem hành trình đơn." />
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
         {error ? (
