@@ -44,7 +44,7 @@ async def test_logout_clears_cookie(owner_client: httpx.AsyncClient) -> None:
 async def test_bearer_token_also_works(client: httpx.AsyncClient, owner: User) -> None:
     from app.core.security import create_access_token
 
-    token = create_access_token(owner.id, "owner")
+    token = create_access_token(owner.id, "owner", owner.password_hash)
     r = await client.get("/api/desk/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 200
 

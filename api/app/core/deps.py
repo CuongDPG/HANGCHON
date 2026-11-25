@@ -10,6 +10,7 @@ async def y(user: OwnerUser): ...          # chỉ chị
 
 from __future__ import annotations
 
+import hmac
 import uuid
 from typing import Annotated
 
@@ -18,7 +19,7 @@ from fastapi import Depends, Request
 from app.core.config import settings
 from app.core.db import DbSession
 from app.core.errors import Forbidden, Unauthorized
-from app.core.security import decode_access_token
+from app.core.security import decode_access_token, password_stamp
 from app.modules.control.models import User, UserRole
 
 
@@ -36,6 +37,8 @@ async def current_user(request: Request, db: DbSession) -> User:
         raise Unauthorized() from e
     if user is None or not user.is_active:
         raise Unauthorized("Tài khoản không còn hoạt động.")
+    if not hmac.compare_digest(str(claims.get("pws", "")), password_stamp(user.password_hash)):
+        raise Unauthorized("Mật khẩu đã đổi, chị đăng nhập lại nhé.")
     return user
 
 

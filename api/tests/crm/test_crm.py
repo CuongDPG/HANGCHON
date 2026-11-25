@@ -41,7 +41,7 @@ async def test_customer_book_search_notes_tags(owner_client, db):
     c = await f.customer(db, "Nguyễn Thị Thu Hà", "0912000111", email="thuha.nguyen@example.com", orders=3)
     await f.customer(db, "Lê Văn Đức", "0988000222")
     await db.commit()
-    for q, n in (("thu ha", 1), ("DUC", 1), ("thuha.nguyen@gmail.com", 1), ("example.com", 0), ("000111", 1)):
+    for q, n in (("thu ha", 1), ("DUC", 1), ("thuha.nguyen@example.net", 1), ("example.com", 0), ("000111", 1)):
         r = await owner_client.get("/api/desk/crm/customers", params={"q": q})
         assert r.json()["total"] == n, q
     r = await owner_client.post(

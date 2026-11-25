@@ -29,6 +29,9 @@ INSECURE_JWT_SECRETS = {
     "doi-chuoi-nay-thanh-chuoi-ngau-nhien-dai-it-nhat-32-ky-tu",
 }
 
+# Mật khẩu chị mặc định (config + api/.env.example) nằm công khai trong repo.
+INSECURE_OWNER_PASSWORDS = {"doimatkhau"}
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=API_DIR / ".env", env_file_encoding="utf-8", extra="ignore")
@@ -204,6 +207,16 @@ class Settings(BaseSettings):
             raise ValueError(
                 "JWT_SECRET còn là giá trị mặc định hoặc ngắn hơn 32 ký tự: đặt chuỗi ngẫu nhiên riêng "
                 "(vd `openssl rand -hex 32`) trước khi chạy production."
+            )
+        if (
+            self.app_env == "prod"
+            and self.create_owner_on_startup
+            and self.owner_password
+            and (self.owner_password in INSECURE_OWNER_PASSWORDS or len(self.owner_password) < 12)
+        ):
+            raise ValueError(
+                "OWNER_PASSWORD còn là mật khẩu mẫu hoặc ngắn hơn 12 ký tự: tài khoản chị được tạo bằng mật khẩu này "
+                "lúc khởi động, đặt chuỗi ngẫu nhiên riêng trước khi chạy production."
             )
         return self
 

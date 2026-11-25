@@ -55,7 +55,8 @@ ENV PATH="/app/.venv/bin:${PATH}" \
     APP_ENV=prod \
     STORAGE_LOCAL_DIR=/data/storage \
     PORT=8000 \
-    UVICORN_WORKERS=1
+    UVICORN_WORKERS=1 \
+    FORWARDED_ALLOW_IPS=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.1
 
 WORKDIR /app
 COPY --from=build --chown=app:app /app/.venv /app/.venv
@@ -71,4 +72,6 @@ HEALTHCHECK --interval=15s --timeout=5s --start-period=60s --retries=5 \
   CMD python -c "import os,urllib.request; urllib.request.urlopen(f'http://127.0.0.1:{os.environ.get(\"PORT\",\"8000\")}/api/health', timeout=4)" || exit 1
 
 # Một head Alembic duy nhất, migrate, rồi mới nhận request. Worker ghi đè lệnh này.
-CMD ["sh", "-c", "set -e; heads=$(alembic heads 2>/dev/null | grep -c '(head)' || true); if [ \"$heads\" != 1 ]; then echo \"Alembic có $heads head (cần đúng 1) — dừng.\" >&2; alembic heads >&2; exit 1; fi; alembic upgrade head; exec uvicorn app.main:app --host 0.0.0.0 --port \"$PORT\" --workers \"$UVICORN_WORKERS\" --proxy-headers --forwarded-allow-ips '*' --no-server-header"]
+# X-Forwarded-For chỉ tin khi yêu cầu tới từ mạng nội bộ Docker (Traefik, web); KHÔNG dùng '*' — khi đó uvicorn lấy
+# địa chỉ đầu danh sách do khách tự gửi, mọi giới hạn tần suất theo IP bị vượt.
+CMD ["sh", "-c", "set -e; heads=$(alembic heads 2>/dev/null | grep -c '(head)' || true); if [ \"$heads\" != 1 ]; then echo \"Alembic có $heads head (cần đúng 1) — dừng.\" >&2; alembic heads >&2; exit 1; fi; alembic upgrade head; exec uvicorn app.main:app --host 0.0.0.0 --port \"$PORT\" --workers \"$UVICORN_WORKERS\" --proxy-headers --forwarded-allow-ips \"$FORWARDED_ALLOW_IPS\" --no-server-header"]

@@ -9,6 +9,7 @@ from fastapi import APIRouter, Request, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import ratelimit
 from app.core.config import settings
 from app.core.db import DbSession
 from app.core.deps import CurrentUser
@@ -45,8 +46,7 @@ def session_key(request: Request, response: Response) -> str:
 
 
 def ip_hash(request: Request) -> str:
-    fwd = request.headers.get("x-forwarded-for")
-    ip = (fwd.split(",")[0].strip() if fwd else None) or (request.client.host if request.client else "?")
+    ip = ratelimit.client_ip(request)
     return hmac_sha256(settings.jwt_secret, f"ip:{ip}".encode())[:64]
 
 

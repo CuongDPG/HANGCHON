@@ -12,6 +12,7 @@ from fastapi import APIRouter, Query, Request, Response, status
 from sqlalchemy import select
 
 from app import control
+from app.core import ratelimit
 from app.core.config import settings
 from app.core.db import DbSession
 from app.core.deps import CurrentUser, OwnerUser
@@ -120,8 +121,9 @@ async def _public_order(db: DbSession, code: str, token: str | None, *, lock: bo
 
 
 @store.post("/quote", response_model=QuoteOut)
-async def quote(body: QuoteIn, db: DbSession) -> QuoteOut:
+async def quote(body: QuoteIn, request: Request, db: DbSession) -> QuoteOut:
     """Giỏ → giá thật, suất còn lại, phí giao (tính qua hãng), cọc, ngày hàng về. Không giữ suất."""
+    await ratelimit.limit(f"orders:quote:{ratelimit.client_ip(request)}", 120, 600)
     resolved = await service.resolve_lines(db, body.items, service.ResolveOptions(store=True))
     problems = [f"{r.name}: {r.problem}" for r in resolved if r.problem]
     drops_map = {r.drop.id: r.drop for r in resolved if r.drop}
@@ -163,8 +165,10 @@ def _attribution(src: str | None) -> dict[str, str] | None:
 
 
 @store.post("", response_model=PublicOrderOut, status_code=status.HTTP_201_CREATED)
-async def checkout(body: CheckoutIn, db: DbSession) -> PublicOrderOut:
+async def checkout(body: CheckoutIn, request: Request, db: DbSession) -> PublicOrderOut:
     """e4: đặt hàng một trang, không cần tài khoản. Giữ suất/tồn ngay trong giao dịch; phát `order.created`."""
+    # đơn giữ suất ngay → chặn một máy giữ hết suất của đợt bằng đơn rác (ngưỡng rộng vì nhà mạng dùng chung IP)
+    await ratelimit.limit(f"orders:checkout:{ratelimit.client_ip(request)}", 20, 600)
     res = await service.create_order(
         db, lines=body.items, name=body.name, phone=body.phone, address=_address(body),
         payment_method=PaymentMethod(body.payment_method), channel=Channel.WEB, customer_note=body.note,
@@ -181,11 +185,17 @@ async def checkout(body: CheckoutIn, db: DbSession) -> PublicOrderOut:
 
 
 @store.post("/lookup", response_model=LookupOut)
-async def lookup(body: LookupIn, db: DbSession) -> LookupOut:
+async def lookup(body: LookupIn, request: Request, db: DbSession) -> LookupOut:
     """e5: tra đơn bằng số điện thoại + mã đơn → mã xem đơn."""
     phone = normalize_phone(body.phone)
+    # mã đơn chỉ 5 chữ số: biết số điện thoại thì dò được → giới hạn theo IP, và theo số điện thoại (chỉ đếm lần sai)
+    await ratelimit.limit(f"orders:lookup:{ratelimit.client_ip(request)}", 30, 600)
+    phone_key = f"orders:lookup:{phone}"
+    if not await ratelimit.hit(phone_key, 10, 3600, record=False):
+        raise ratelimit.RateLimited()
     order = await service.get_by_code(db, normalize_order_code(body.code))
     if order is None or order.status == OrderStatus.DRAFT or order.recipient_phone != phone:
+        await ratelimit.hit(phone_key, 10, 3600)
         raise NotFound("Không thấy đơn khớp số điện thoại và mã này. Bạn kiểm tra lại giúp mình nhé.")
     from app.modules.orders.util import order_access_token
 
@@ -226,8 +236,9 @@ async def qr_svg(code: str, db: DbSession, t: str = Query(min_length=8, max_leng
 
 
 @store.post("/{code}/questions", response_model=PublicOrderOut, status_code=status.HTTP_201_CREATED)
-async def ask_question(code: str, body: QuestionIn, db: DbSession) -> PublicOrderOut:
+async def ask_question(code: str, body: QuestionIn, request: Request, db: DbSession) -> PublicOrderOut:
     """Khách bấm «Hỏi về đơn này» → việc chờ chị (chị ghi câu trả lời rồi duyệt để gửi khách)."""
+    await ratelimit.limit(f"orders:question:{ratelimit.client_ip(request)}", 10, 600)
     order = await _public_order(db, code, body.t)
     ev = service.add_event(
         db, order, "customer_question", "Bạn đã hỏi chị về đơn này", detail=body.message, actor=Actor.CUSTOMER

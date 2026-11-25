@@ -41,7 +41,7 @@ def test_prod_refuses_default_jwt_secret() -> None:
                 "ngan"):  # fmt: skip
         with pytest.raises(ValueError, match="JWT_SECRET"):
             Settings(app_env="prod", jwt_secret=bad, _env_file=None)
-    assert Settings(app_env="prod", jwt_secret="x" * 40, _env_file=None).jwt_secret == "x" * 40
+    assert Settings(app_env="prod", jwt_secret="x" * 40, owner_password="p" * 16, _env_file=None).jwt_secret == "x" * 40
     assert Settings(app_env="dev", jwt_secret="ngan", _env_file=None).app_env == "dev"
 
 
@@ -57,3 +57,15 @@ def test_blank_env_values_fall_back_to_defaults(monkeypatch: pytest.MonkeyPatch)
         True,
         587,
     )
+
+
+def test_prod_refuses_sample_owner_password() -> None:
+    """Tài khoản chị được tạo lúc khởi động bằng OWNER_PASSWORD; mật khẩu mẫu trong repo = ai cũng đăng nhập được."""
+    for bad in ("doimatkhau", "ngan-qua"):
+        with pytest.raises(ValueError, match="OWNER_PASSWORD"):
+            Settings(
+                app_env="prod", jwt_secret="x" * 40, owner_password=bad, create_owner_on_startup=True, _env_file=None
+            )
+    ok = Settings(app_env="prod", jwt_secret="x" * 40, owner_password="doimatkhau", create_owner_on_startup=False,
+                  _env_file=None)  # fmt: skip
+    assert ok.app_env == "prod"

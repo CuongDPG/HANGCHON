@@ -12,10 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import ai
 from app.core.config import settings
 from app.core.db import SessionLocal
+from app.core.errors import Forbidden
 from app.core.money import format_vnd
 from app.core.timeutil import local_day_bounds_utc
 from app.modules.control import service
-from app.modules.control.models import AIActivity, ApprovalItem, ApprovalStatus, AutonomyLevel
+from app.modules.control.models import AIActivity, ApprovalItem, ApprovalStatus, AutonomyLevel, UserRole
 from app.modules.control.registry import (
     ACTIONS,
     ActionContext,
@@ -158,6 +159,9 @@ class SetAutonomyParams(BaseModel):
     examples=["cho AI tự đăng bài", "từ giờ trả lời tin nhắn phải hỏi chị", "tắt việc nhắc mua lại"],
 )
 async def _set_autonomy(ctx: CommandContext, params: SetAutonomyParams) -> CommandResult:
+    # Cùng quyền với PATCH /control/autonomy: lệnh bằng lời không được là cửa sau cho tài khoản phụ.
+    if ctx.user is None or ctx.user.role != UserRole.OWNER:
+        raise Forbidden("Chỉ chị (chủ cửa hàng) đổi được mức tự chủ của AI.")
     spec = ACTIONS.get(params.action)
     if spec is None:
         return CommandResult(message="Em không thấy việc đó trong bảng mức tự chủ.")
