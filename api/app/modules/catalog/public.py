@@ -1,5 +1,6 @@
-"""Dữ liệu công khai cho website (e1, e2, e3, e10): kệ hàng, trang sản phẩm, hồ sơ chọn, đợt, về người chọn,
-nguồn cấp sản phẩm Google Merchant, sơ đồ trang."""
+"""Dữ liệu công khai cho website (e1, e2, e3, e10): kệ hàng, trang sản phẩm, đợt, về người chọn,
+nguồn cấp sản phẩm Google Merchant, sơ đồ trang. Quá trình chọn (dải số sàng lọc, món đã loại) không ra website:
+hồ sơ chọn chỉ ở desk (`dossier.dossier_view`)."""
 
 from __future__ import annotations
 
@@ -184,7 +185,7 @@ async def shelf(db: AsyncSession, *, category: str | None = None, q: str | None 
     }
 
 
-def _bullets(text: str | None) -> list[str]:
+def bullets(text: str | None) -> list[str]:
     if not text:
         return []
     lines = [ln.strip().lstrip("-•*").strip() for ln in text.splitlines()]
@@ -226,10 +227,9 @@ async def product_detail(db: AsyncSession, p: Product) -> dict[str, Any]:
         "description": p.description,
         "specs": p.specs,
         "faq": p.faq,
-        "reason_selected": _bullets(p.reason_selected),
+        "reason_selected": bullets(p.reason_selected),
         "not_satisfied": p.not_satisfied,
         "images": [image_set(i) for i in ready],
-        "funnel": (p.dossier or {}).get("funnel") or {"viewed": p.considered_count, "selected": p.selected_count},
         "weight_grams": p.weight_grams,
         "brand": p.brand,
         "gtin": p.gtin,
@@ -243,33 +243,6 @@ async def product_detail(db: AsyncSession, p: Product) -> dict[str, Any]:
         "reviews": await published_reviews(db, p.id),
         "url": f"{settings.web_base_url.rstrip('/')}/san-pham/{p.slug}",
         # tên người chọn cho nhãn «… trả lời» (chưa đặt thì là tên trung tính mặc định)
-        "picker_name": await setting(db, "store.picker_name"),
-    }
-
-
-async def dossier_page(db: AsyncSession, p: Product) -> dict[str, Any]:
-    d = p.dossier or {}
-    img = primary_image(p)
-    funnel = d.get("funnel") or {"viewed": p.considered_count, "selected": p.selected_count}
-    return {
-        "product": {
-            "slug": p.slug,
-            "name": p.name,
-            "price_vnd": p.price_vnd,
-            "origin": COUNTRY_LABELS.get(p.origin_country or "", p.origin_country),
-            "summary": " · ".join(f"{s.get('label')} {s.get('value')}" for s in p.specs[:3] if isinstance(s, dict)),
-            "image": image_set(img) if img else None,
-            "seal": {"chosen": p.selected_count, "total": p.considered_count},
-            "trial_days": p.trial_days,
-            "reason_selected": _bullets(p.reason_selected),
-            "not_satisfied": p.not_satisfied,
-        },
-        "funnel": funnel,
-        "alternatives": p.rejected_alternatives,
-        "reject_groups": d.get("reject_groups", []),
-        "screened_out": d.get("screened_out", 0),
-        "reviews_read": d.get("reviews_read", 0),
-        "review_languages": d.get("review_languages", []),
         "picker_name": await setting(db, "store.picker_name"),
     }
 
@@ -495,7 +468,6 @@ async def sitemap(db: AsyncSession) -> list[dict[str, Any]]:
         await db.execute(select(Product.slug, Product.updated_at).where(Product.status == ProductStatus.PUBLISHED))
     ).all():
         rows.append({"path": f"/san-pham/{slug}", "lastmod": updated, "priority": 0.8})
-        rows.append({"path": f"/san-pham/{slug}/ho-so-chon", "lastmod": updated, "priority": 0.5})
     for slug, updated in (
         await db.execute(select(Drop.slug, Drop.updated_at).where(Drop.status.in_(drop_svc.PUBLIC)))
     ).all():

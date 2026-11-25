@@ -2,7 +2,7 @@
 
 ra đề → quét ứng viên → thẩm định, chấm điểm → mua mẫu (đơn đặt mẫu chờ duyệt) → đang thử, ghi chú → Đã chọn (AI soạn
 lý do, chị chốt) → sản phẩm nháp → giá vốn, duyệt giá → duyệt và đăng sản phẩm → bài các kênh, soát lời, duyệt, lịch,
-tới giờ đăng → mở đợt → khách thấy con dấu + hồ sơ chọn → giỏ, đặt, chuyển khoản → đã trả, khách nhận tin, sổ doanh
+tới giờ đăng → mở đợt → khách thấy con dấu + lý do chọn → giỏ, đặt, chuyển khoản → đã trả, khách nhận tin, sổ doanh
 thu → khách nhắn, AI soạn, chị gửi → đóng đợt → đơn đặt nguồn, chị duyệt → lô về → vận đơn → giao xong → mời đánh giá,
 khách gửi, chị duyệt → «Hôm nay», nhật ký AI, báo cáo tuần."""
 
@@ -170,11 +170,11 @@ async def test_one_product_full_lifecycle(owner_client: httpx.AsyncClient, clien
     async with SessionLocal() as s:
         assert (await s.get(Drop, uuid.UUID(drop["id"]))).status == DropStatus.OPEN
 
-    # ---- e2: khách thấy món có con dấu và hồ sơ chọn ---------------------------------------------------------------
+    # ---- e2: khách thấy món có con dấu và lý do chọn; hồ sơ chọn đầy đủ chỉ ở desk -----------------------------------
     slug = pub["slug"]
     page = await ok(await client.get(f"/api/store/catalog/products/{slug}"))
-    assert page["seal"]["chosen"] == 1 and page["seal"]["total"] == len(cands)
-    dossier = await ok(await client.get(f"/api/store/catalog/products/{slug}/dossier"))
+    assert page["seal"]["chosen"] == 1 and page["seal"]["total"] == len(cands) and "funnel" not in page
+    dossier = await ok(await c.get(f"{D}/catalog/products/{pid}/dossier"))
     assert "Giữ nóng tới chiều." in str(dossier)
 
     # ---- e4/g2: giỏ → đặt → chuyển khoản → đã trả, khách nhận tin, sổ doanh thu ----------------------------------

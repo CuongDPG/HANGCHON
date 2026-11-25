@@ -35,7 +35,7 @@ export default function ShelfPage({ searchParams }: PageProps<"/">) {
         <Seal chosen={1} total={24} size={56} />
         <p className="text-[14px] text-ink-2">
           <span className="font-semibold text-ink">Con dấu ĐÃ CHỌN 1/24</span> nghĩa là xem 24 món cùng loại, chỉ giữ lại 1.
-          Bấm vào món để xem vì sao chọn và các món đã bị loại.
+          Bấm vào món để xem vì sao mình chọn.
         </p>
       </aside>
     </div>

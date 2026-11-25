@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.enums import SourcePlatform
 from app.core.timeutil import now_utc
 from app.modules.assessment.models import Assessment, AssessmentStatus, ComparisonItem, ReviewDigest
+from app.modules.catalog.models import Product
 from app.modules.catalog.textutil import normalize_vi
 from app.modules.selection.models import Decision, SelectionDecision, TrialNote
 from app.modules.sourcing.models import Candidate, CandidateStage
@@ -379,3 +380,35 @@ async def count_candidates(db: AsyncSession) -> tuple[int, int]:
     total = (await db.execute(select(func.count()).select_from(Candidate))).scalar_one()
     chosen = (await db.execute(select(func.count()).where(Candidate.stage == CandidateStage.SELECTED))).scalar_one()
     return total, chosen
+
+
+async def dossier_view(db: AsyncSession, p: Product) -> dict[str, Any]:
+    """Hồ sơ chọn đầy đủ cho desk (e2): dải số sàng lọc, món được chọn cạnh các món đã loại, nhóm lý do loại.
+    Là dữ liệu theo dõi nội bộ — không có route công khai nào trả về."""
+    # nhập muộn: products/public cùng nhập module này
+    from app.modules.catalog.products import image_set, primary_image
+    from app.modules.catalog.public import bullets, setting
+
+    d = p.dossier or {}
+    img = primary_image(p)
+    return {
+        "product": {
+            "slug": p.slug,
+            "name": p.name,
+            "price_vnd": p.price_vnd,
+            "origin": COUNTRY_LABELS.get(p.origin_country or "", p.origin_country),
+            "summary": " · ".join(f"{s.get('label')} {s.get('value')}" for s in p.specs[:3] if isinstance(s, dict)),
+            "image": image_set(img) if img else None,
+            "seal": {"chosen": p.selected_count, "total": p.considered_count},
+            "trial_days": p.trial_days,
+            "reason_selected": bullets(p.reason_selected),
+            "not_satisfied": p.not_satisfied,
+        },
+        "funnel": d.get("funnel") or {"viewed": p.considered_count, "selected": p.selected_count},
+        "alternatives": p.rejected_alternatives,
+        "reject_groups": d.get("reject_groups", []),
+        "screened_out": d.get("screened_out", 0),
+        "reviews_read": d.get("reviews_read", 0),
+        "review_languages": d.get("review_languages", []),
+        "picker_name": await setting(db, "store.picker_name"),
+    }

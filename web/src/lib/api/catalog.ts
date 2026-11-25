@@ -82,7 +82,6 @@ export type ProductDetail = ProductCard & {
   reason_selected: string[];
   not_satisfied: string | null;
   images: ImageSet[];
-  funnel: Funnel;
   weight_grams: number | null;
   brand: string | null;
   gtin: string | null;
@@ -109,6 +108,7 @@ export type Alternative = {
   stage: "tried" | "compared" | string;
 };
 
+/** Hồ sơ chọn (e2) — chỉ ở desk (`GET /api/desk/catalog/products/{id}/dossier`), không có bản công khai. */
 export type Dossier = {
   product: {
     slug: string;
@@ -212,7 +212,6 @@ export type SitemapEntry = { path: string; lastmod: string | null; priority: num
 export const catalogApi = {
   shelf: (query: { q?: string | null; nhom?: string | null } = {}) => api.get<Shelf>("/api/store/catalog/shelf", { query }),
   product: (slug: string) => api.get<ProductDetail>(`/api/store/catalog/products/${encodeURIComponent(slug)}`),
-  dossier: (slug: string) => api.get<Dossier>(`/api/store/catalog/products/${encodeURIComponent(slug)}/dossier`),
   drops: () => api.get<DropsOverview>("/api/store/catalog/drops"),
   drop: (slug: string) => api.get<DropDetail>(`/api/store/catalog/drops/${encodeURIComponent(slug)}`),
   remind: (slug: string, contact: string) =>
@@ -411,6 +410,7 @@ export const catalogKeys = {
   all: ["catalog"] as const,
   products: (q: object) => ["catalog", "products", q] as const,
   product: (id: string) => ["catalog", "product", id] as const,
+  dossier: (id: string) => ["catalog", "dossier", id] as const,
   categories: ["catalog", "categories"] as const,
   selectable: ["catalog", "selectable"] as const,
   drops: (q: object) => ["catalog", "drops", q] as const,
@@ -428,6 +428,10 @@ export function useDeskProducts(query: { status?: ProductStatus | null; q?: stri
 
 export function useDeskProduct(id: string) {
   return useQuery({ queryKey: catalogKeys.product(id), queryFn: () => api.get<DeskProduct>(`${D}/products/${id}`) });
+}
+
+export function useDeskDossier(id: string) {
+  return useQuery({ queryKey: catalogKeys.dossier(id), queryFn: () => api.get<Dossier>(`${D}/products/${id}/dossier`) });
 }
 
 export function useCategories() {

@@ -15,15 +15,6 @@ export const getProduct = cache(async (slug: string): Promise<ProductDetail> => 
   }
 });
 
-export const getDossier = cache(async (slug: string) => {
-  try {
-    return await catalogApi.dossier(slug);
-  } catch (err) {
-    if (err instanceof ApiError && err.status === 404) notFound();
-    throw err;
-  }
-});
-
 /** JSON-LD schema.org Product + Offer + AggregateRating + FAQPage (e10). */
 export function productJsonLd(p: ProductDetail): Record<string, unknown>[] {
   const url = siteUrl(`/san-pham/${p.slug}`);

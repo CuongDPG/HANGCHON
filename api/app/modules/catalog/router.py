@@ -17,6 +17,7 @@ from app.core.deps import CurrentUser, OwnerUser
 from app.core.errors import BadRequest, NotFound
 from app.core.pagination import Page, Paginated, paginate
 from app.core.security import random_token
+from app.modules.catalog import dossier as dossier_svc
 from app.modules.catalog import drops as drop_svc
 from app.modules.catalog import finds as find_svc
 from app.modules.catalog import products as product_svc
@@ -119,11 +120,6 @@ async def shelf(
 @store.get("/products/{slug}", response_model=ProductDetail)
 async def product(slug: str, db: DbSession) -> Any:
     return await public.product_detail(db, await product_svc.get_by_slug(db, slug))
-
-
-@store.get("/products/{slug}/dossier", response_model=DossierOut)
-async def dossier(slug: str, db: DbSession) -> Any:
-    return await public.dossier_page(db, await product_svc.get_by_slug(db, slug))
 
 
 @store.get("/drops", response_model=DropsOverview)
@@ -357,6 +353,12 @@ async def categories(_: CurrentUser, db: DbSession) -> Any:
 @desk.get("/products/{product_id}", response_model=DeskProduct)
 async def get_product(product_id: uuid.UUID, _: CurrentUser, db: DbSession) -> Any:
     return await _desk_product(db, await product_svc.get_product(db, product_id))
+
+
+@desk.get("/products/{product_id}/dossier", response_model=DossierOut)
+async def product_dossier(product_id: uuid.UUID, _: CurrentUser, db: DbSession) -> Any:
+    """Hồ sơ chọn (e2) — chỉ ở desk: website không hiện quá trình chọn."""
+    return await dossier_svc.dossier_view(db, await product_svc.get_product(db, product_id))
 
 
 @desk.patch("/products/{product_id}", response_model=DeskProduct)

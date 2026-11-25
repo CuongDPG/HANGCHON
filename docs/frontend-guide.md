@@ -60,7 +60,7 @@ export function ApprovalsScreen() {
 2. Mặc định là **Server Component**, lấy dữ liệu bằng `api.get(...)` (không cần cookie). Có dữ liệu sản phẩm thì kèm JSON-LD `Product`/`Offer` (e10).
 3. Phần tương tác (giỏ, chọn số lượng, ô hỏi trợ lý) tách thành Client Component nhỏ.
 4. Với `cacheComponents`: đọc `params`, `searchParams`, `cookies()` hoặc gọi API không cache là **dữ liệu theo request** → đặt trong
-   `<Suspense fallback={…}>` (xem mẫu ở `src/app/(store)/san-pham/[slug]/ho-so-chon/page.tsx`) hoặc cache bằng `"use cache"`. Build sẽ báo lỗi nếu quên.
+   `<Suspense fallback={…}>` (xem mẫu ở `src/app/(store)/san-pham/[slug]/page.tsx`) hoặc cache bằng `"use cache"`. Build sẽ báo lỗi nếu quên.
    Client Component dùng `usePathname`/`useSearchParams` ở route động cũng phải nằm trong `<Suspense>` (xem `store-nav-links.tsx`).
 
 ### Quy ước chung
@@ -200,7 +200,6 @@ Khung: `components/layout/brand.tsx` (`Brand`, `BrandMark`), `components/store/*
 |---|---|---|
 | `/` | Kệ hàng đã chọn (trang chủ, hướng B) | e1, e2 |
 | `/san-pham/[slug]` | Trang sản phẩm | e1, e2, e7, e8 |
-| `/san-pham/[slug]/ho-so-chon` | Hồ sơ chọn | e2 |
 | `/dot`, `/dot/[slug]` | Đợt gom đơn, chi tiết đợt | e3 |
 | `/gio-hang`, `/dat-hang` | Giỏ, đặt hàng một trang | e4 |
 | `/don`, `/don/[code]` | Tra cứu đơn, theo dõi đơn | e5, g5 |
@@ -228,7 +227,7 @@ Nguồn duy nhất: `src/lib/desk-nav.ts` (`DESK_PRIMARY_NAV`, `DESK_MORE_NAV`, 
 | `/desk/nhat-ky-ai` | Nhật ký AI *(Thêm)* | i4, k3 |
 | `/desk/bao-cao` | Báo cáo *(Thêm)* | i5, f7 |
 | `/desk/so-sach` | Sổ sách *(Thêm)* | k1, k5 |
-| `/desk/san-pham` | Sản phẩm *(Thêm)* | e1–e3, e6, e8–e10, g8 |
+| `/desk/san-pham` | Sản phẩm *(Thêm)*; `/desk/san-pham/[id]` có mục «Hồ sơ chọn» (dải số sàng lọc, món đã loại — chỉ ở desk, không ra website; `/san-pham/[slug]/ho-so-chon` cũ chuyển hẳn về trang sản phẩm qua `next.config.ts`) | e1–e3, e6, e8–e10, g8 |
 | `/desk/cai-dat` | Cài đặt *(Thêm)* | k4 |
 | `/desk/dang-nhap` | Đăng nhập (ngoài khung, không cần đăng nhập) | — |
 | `/desk/kit` | Trưng bày hệ thiết kế (ngoài khung, không cần đăng nhập) | — |

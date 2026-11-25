@@ -51,8 +51,7 @@ from app.modules.selection.schemas import (
 from app.modules.sourcing.models import Candidate
 
 router = APIRouter(prefix="/api/desk/selection", tags=["selection"])
-store_router = APIRouter(prefix="/api/store/selection", tags=["selection"])
-routers = [router, store_router]
+routers = [router]
 
 MAX_PHOTO_BYTES = 12 * 1024 * 1024
 MAX_AUDIO_BYTES = 25 * 1024 * 1024
@@ -172,17 +171,6 @@ async def get_reject_reasons(_: CurrentUser, db: DbSession) -> dict:
 @router.get("/rejection-stats", response_model=RejectionStatsOut, summary="Thống kê lý do loại (c4)")
 async def get_rejection_stats(_: CurrentUser, db: DbSession, brief_id: uuid.UUID | None = None) -> dict:
     return await service.rejection_stats(db, brief_id=brief_id)
-
-
-@store_router.get("/rejection-stats", response_model=RejectionStatsOut, summary="Cho trang Hồ sơ chọn (công khai)")
-async def public_rejection_stats(
-    db: DbSession, brief_id: uuid.UUID | None = None, candidate_id: uuid.UUID | None = None
-) -> dict:
-    if candidate_id and not brief_id:
-        brief_id = await db.scalar(select(Candidate.brief_id).where(Candidate.id == candidate_id))
-        if brief_id is None:
-            return {"total": 0, "groups": [], "summary": "0 mẫu loại"}
-    return await service.rejection_stats(db, brief_id=brief_id, public_only=True)
 
 
 # ---- c5: bộ nguyên tắc ---------------------------------------------------------------------------------------------

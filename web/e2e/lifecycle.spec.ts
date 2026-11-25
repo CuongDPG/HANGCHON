@@ -7,7 +7,7 @@ import { expect, test, type APIRequestContext, type Page } from "@playwright/tes
  *
  * ra đề → quét → thẩm định → mua mẫu (đơn mẫu chờ duyệt, chị duyệt) → đang thử, ghi chú → Đã chọn, chị chốt lời →
  * sản phẩm nháp → giá vốn, chị duyệt giá → đăng lên kệ → bài các kênh, chị duyệt, tới giờ đăng → mở đợt → khách thấy
- * con dấu, hồ sơ chọn → giỏ, đặt, chuyển khoản → đã trả, sổ doanh thu → khách nhắn, chị gửi → chốt đợt sớm → đơn đặt
+ * con dấu, lý do chọn → giỏ, đặt, chuyển khoản → đã trả, sổ doanh thu → khách nhắn, chị gửi → chốt đợt sớm → đơn đặt
  * nguồn, chị duyệt → lô về → tạo vận đơn → giao xong → khách đánh giá, chị cho hiện → Hôm nay, nhật ký AI, báo cáo.
  */
 
@@ -148,15 +148,18 @@ test("một món hàng từ đề tìm tới đánh giá của khách", async ({
   await page.getByRole("button", { name: "Mở đợt" }).click();
   await expect(page.getByText("Đã mở đợt")).toBeVisible();
 
-  // ---- e2/e4/g2: khách thấy con dấu + hồ sơ chọn → giỏ → đặt → chuyển khoản ------------------------------------
+  // ---- e2: hồ sơ chọn đầy đủ chỉ ở desk (dải số sàng lọc + món đã loại) --------------------------------------------
+  await page.goto(`/desk/san-pham/${productId}`);
+  await expect(main.getByText("Mẫu A (đã chọn)", { exact: false })).toBeVisible();
+  await expect(main.getByText("đã xem", { exact: true })).toBeVisible();
+
+  // ---- e2/e4/g2: khách thấy con dấu + lý do chọn (không thấy quá trình chọn) → giỏ → đặt → chuyển khoản -------------
   await page.context().clearCookies();
   await page.goto(`/san-pham/${product.slug}?src=${postId.replace(/-/g, "").slice(0, 8)}`);
   await expect(main.getByRole("heading", { level: 1, name: product.name })).toBeVisible();
   await expect(main.getByRole("img", { name: /Đã chọn 1 trong/ }).first()).toBeVisible();
   await expect(main.getByText("Giữ ấm tới chiều.").first()).toBeVisible();
-  await main.getByRole("link", { name: "Xem hồ sơ chọn" }).click();
-  await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toContainText("chọn 1");
-  await page.goBack();
+  await expect(main.getByRole("link", { name: "Xem hồ sơ chọn" })).toHaveCount(0);
   await page.getByRole("region", { name: "Đặt mua" }).filter({ visible: true }).first().getByRole("button", { name: /Đặt ngay|Đặt mua chung/ }).click();
   await expect(page).toHaveURL(/\/(gio-hang|dat-hang)/);
   if (page.url().includes("/gio-hang")) await main.getByRole("link", { name: "Đặt hàng" }).click();

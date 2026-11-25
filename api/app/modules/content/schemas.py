@@ -235,6 +235,8 @@ class StudioDetail(BaseModel):
     drop: StudioDropInfo | None = None
     drafts: list[DraftView]
     compose_pending: bool = False
+    # trang sản phẩm trên website (kênh chính thức): trạng thái của sản phẩm (draft/pending_review/published/…)
+    page_status: str | None = None
 
 
 class ComposeBody(BaseModel):

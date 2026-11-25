@@ -64,7 +64,6 @@ async function collectIds(req: APIRequestContext): Promise<Ids> {
 const STORE = (i: Ids) => [
   "/",
   i.slug && `/san-pham/${i.slug}`,
-  i.slug && `/san-pham/${i.slug}/ho-so-chon`,
   "/dot",
   i.dropSlug && `/dot/${i.dropSlug}`,
   "/gio-hang",

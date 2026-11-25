@@ -113,6 +113,7 @@ async def studio_detail(db: AsyncSession, kind: str, ref_id: uuid.UUID) -> Studi
         not_satisfied=product.not_satisfied,
         trial_days=product.trial_days,
         considered_count=product.considered_count,
+        page_status=product.status.value,
         drop=StudioDropInfo(id=drop.id, code=drop.code, title=drop.title, closes_at=drop.closes_at) if drop else None,
         drafts=[await draft_view(db, d, keys) for d in drafts],
         compose_pending=any(d.status == DraftStatus.DRAFTING for d in drafts),

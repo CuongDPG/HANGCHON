@@ -2,17 +2,17 @@ import { expect, test } from "@playwright/test";
 
 /**
  * Luồng chính của khách trên website (lát cắt store): kệ hàng → tìm không dấu → trang sản phẩm (con dấu, lý do chọn)
- * → hồ sơ chọn → hỏi trợ lý → mua chung → nhờ tìm.
+ * → hỏi trợ lý → mua chung → nhờ tìm. Quá trình chọn (hồ sơ chọn) không ra website, link cũ chuyển về trang sản phẩm.
  * Cần API đang chạy với dữ liệu mẫu (`uv run python -m app.seed --demo`, scripts/e2e.sh tự dựng); không có thì bỏ qua.
  */
-test.describe("website: kệ hàng → sản phẩm → hồ sơ chọn", () => {
+test.describe("website: kệ hàng → sản phẩm → hỏi trợ lý", () => {
   test.beforeEach(async ({ request }) => {
     const res = await request.get("/api/store/catalog/shelf").catch(() => null);
     const ok = res?.ok() ? ((await res.json()) as { total: number }).total > 0 : false;
     test.skip(!ok, "API chưa chạy hoặc chưa có dữ liệu mẫu");
   });
 
-  test("tìm món, xem hồ sơ chọn, hỏi trợ lý", async ({ page }) => {
+  test("tìm món, xem lý do chọn, hỏi trợ lý", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Món nào cũng đã dùng thử");
     await page.getByRole("searchbox", { name: "Tìm trên kệ" }).fill("binh giu nhiet");
@@ -36,9 +36,12 @@ test.describe("website: kệ hàng → sản phẩm → hồ sơ chọn", () => 
     await main.getByRole("button", { name: "Gửi câu hỏi" }).click();
     await expect(main.getByText("Đã ghi lại, mình sẽ trả lời", { exact: true })).toBeVisible();
 
-    await main.getByRole("link", { name: "Xem hồ sơ chọn" }).click();
-    await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toContainText("chọn 1");
-    await expect(page.getByRole("main").getByText("Mẫu B", { exact: false }).first()).toBeVisible();
+    // quá trình chọn (dải số sàng lọc, hồ sơ chọn với món đã loại) không ra website — chỉ ở desk
+    await expect(main.getByRole("link", { name: "Xem hồ sơ chọn" })).toHaveCount(0);
+    await expect(main.getByText("so kỹ", { exact: true })).toHaveCount(0);
+    const productPath = new URL(page.url()).pathname;
+    await page.goto(`${productPath}/ho-so-chon`);
+    await expect(page).toHaveURL(new RegExp(`${productPath}$`));
   });
 
   test("mua chung và nhờ tìm", async ({ page }) => {

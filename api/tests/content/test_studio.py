@@ -94,6 +94,7 @@ async def test_studio_list_and_detail(product_factory, owner_client):
     assert r.status_code == 200, r.text
     detail = r.json()
     assert len(detail["drafts"]) == 5 and detail["name"] == p.name
+    assert detail["page_status"] == "published"  # thẻ «Website · trang sản phẩm» ở studio
     assert all(x["can_approve"] for x in detail["drafts"])
     assert all(x["approval_item_id_pending"] for x in detail["drafts"])
     lst = (await owner_client.get("/api/desk/content/studio")).json()

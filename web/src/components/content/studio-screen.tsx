@@ -26,6 +26,7 @@ import {
   useConfirm,
 } from "@/components/ui";
 import { useSession } from "@/lib/api/auth";
+import { PRODUCT_STATUS_LABELS, type ProductStatus } from "@/lib/api/catalog";
 import {
   useApproveDraft,
   useCompose,
@@ -62,6 +63,7 @@ export function StudioScreen({ kind, id }: { kind: "product" | "drop"; id: strin
         actions={data && drafts.length ? <Badge tone={done === drafts.length ? "success" : "neutral"}>{done}/{drafts.length} đã duyệt</Badge> : null}
       />
       <RelatedLinks links={[kind === "drop" ? { href: `/desk/san-pham/dot/${id}`, label: "Đợt mở bán" } : { href: `/desk/san-pham/${id}`, label: "Sản phẩm" }]} />
+      {kind === "product" && data ? <WebsiteCard detail={data} /> : null}
       {isPending ? (
         <SkeletonList rows={4} />
       ) : error ? (
@@ -83,6 +85,31 @@ export function StudioScreen({ kind, id }: { kind: "product" | "drop"; id: strin
         </div>
       )}
     </div>
+  );
+}
+
+/** Website là kênh chính thức cạnh Facebook/Instagram/Zalo: trang do AI viết ở mục Sản phẩm (`catalog.write_product_page`). */
+function WebsiteCard({ detail }: { detail: StudioDetail }) {
+  const status = (detail.page_status ?? "draft") as ProductStatus;
+  const live = status === "published";
+  return (
+    <Card className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="font-semibold">Website · trang sản phẩm (kênh chính thức)</span>
+        <span className="text-[13px] text-ink-2">AI viết trang từ hồ sơ món ở mục Sản phẩm; chị sửa lời rồi duyệt thì trang lên web.</span>
+      </div>
+      <Badge tone={live ? "success" : "neutral"}>{live ? "Đã đăng" : (PRODUCT_STATUS_LABELS[status] ?? "Nháp")}</Badge>
+      <div className="flex flex-wrap gap-2">
+        <ButtonLink href={`/desk/san-pham/${detail.id}`} variant="secondary" size="sm" icon={<PenLine className="size-4" aria-hidden />}>
+          Sửa trang sản phẩm
+        </ButtonLink>
+        {live ? (
+          <a href={detail.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 self-center text-[13px] text-accent">
+            Xem trang đang đăng <ExternalLink className="size-3.5" aria-hidden />
+          </a>
+        ) : null}
+      </div>
+    </Card>
   );
 }
 

@@ -1,4 +1,4 @@
-"""e1 tự dựng trang sản phẩm, e2 con dấu + hồ sơ chọn, kệ hàng, e10 dữ liệu có cấu trúc."""
+"""e1 tự dựng trang sản phẩm, e2 con dấu (website) + hồ sơ chọn (desk), kệ hàng, e10 dữ liệu có cấu trúc."""
 
 from __future__ import annotations
 
@@ -195,7 +195,8 @@ async def test_from_candidate_endpoint(db, owner_client):
     assert r.status_code == 400
 
 
-async def test_public_product_and_dossier(db, client):
+async def test_public_product_hides_selection_process(db, client):
+    """Website chỉ hiện mô tả + vì sao chọn; dải số sàng lọc và các món đã loại là dữ liệu nội bộ (chỉ ở desk)."""
     _draft_data, draft = await _draft(db, title="Hộp cơm inox")
     p = await published_product(db, brand="HãngBíMật")
     await db.commit()
@@ -206,11 +207,30 @@ async def test_public_product_and_dossier(db, client):
     assert body["seal"] == {"chosen": 1, "total": 6}
     assert body["reason_selected"] == ["Giữ nóng 9 tiếng", "Nắp tháo rời"]
     assert body["not_satisfied"] == "Miệng hẹp." and body["proof"] == "Thử 3 tuần · Nhật"
-    assert body["funnel"]["tried"] == 3 and body["available"] is False
-    d = (await client.get(f"/api/store/catalog/products/{p.slug}/dossier")).json()
-    assert d["product"]["seal"]["total"] == 6 and len(d["alternatives"]) == 2
+    assert body["available"] is False
+    assert "funnel" not in body and "alternatives" not in body and "reject_groups" not in body
+    assert (await client.get(f"/api/store/catalog/products/{p.slug}/dossier")).status_code == 404
+    assert (await client.get("/api/store/selection/rejection-stats")).status_code == 404
+
+
+async def test_desk_dossier(db, client, owner_client):
+    p = await published_product(db, brand="HãngBíMật")
+    await db.commit()
+    url = f"/api/desk/catalog/products/{p.id}/dossier"
+    assert (await client.get(url)).status_code == 401
+    r = await owner_client.get(url)
+    assert r.status_code == 200
+    d = r.json()
+    assert set(d) == {"product", "funnel", "alternatives", "reject_groups", "screened_out", "reviews_read",
+                      "review_languages", "picker_name"}  # fmt: skip
+    assert d["funnel"] == {"viewed": 6, "compared": 3, "tried": 3, "selected": 1}
+    assert d["product"]["slug"] == p.slug and d["product"]["seal"] == {"chosen": 1, "total": 6}
+    assert d["product"]["reason_selected"] == ["Giữ nóng 9 tiếng", "Nắp tháo rời"]
+    assert len(d["alternatives"]) == 2 and {a["stage"] for a in d["alternatives"]} <= {"tried", "compared"}
+    assert all(a["label"].startswith("Mẫu ") and a["reason"] for a in d["alternatives"])
+    assert {g["label"]: g["count"] for g in d["reject_groups"]}["Rò nước"] == 2 and d["screened_out"] == 3
+    assert d["reviews_read"] == 412 and d["review_languages"] == ["tiếng Nhật"]
     assert "HãngBíMật" not in str(d)
-    assert d["reviews_read"] == 412
 
 
 async def test_shelf_search_and_filter(db, client):
@@ -242,6 +262,7 @@ async def test_feed_sitemap_about(db, client):
     assert item.find("g:availability", ns).text == "out_of_stock"
     sm = (await client.get("/api/store/catalog/sitemap")).json()
     assert {"path": f"/san-pham/{p.slug}"}.items() <= sm[0].items()
+    assert not any("ho-so-chon" in row["path"] for row in sm)
     about = (await client.get("/api/store/catalog/about")).json()
     assert about["stats"]["viewed"] == 6 and about["stats"]["chosen"] == 1
     assert about["picker_name"] == "Người chọn hàng"

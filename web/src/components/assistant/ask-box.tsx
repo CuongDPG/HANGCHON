@@ -25,7 +25,7 @@ type AskBoxProps = {
 };
 
 /**
- * Hỏi trợ lý (e7): trả lời chỉ từ hồ sơ chọn, mỗi câu dẫn về một mục trong hồ sơ.
+ * Hỏi trợ lý (e7): trả lời chỉ từ hồ sơ sản phẩm, mỗi câu dẫn về một mục trong hồ sơ.
  * Không có dữ liệu → nói chưa chắc, ghi lại cho người chọn; người chọn trả lời thì hiện ở đây khi khách mở lại.
  */
 export function AskBox({ productSlug, productName, pickerName, suggestions = [], placeholder, className }: AskBoxProps) {

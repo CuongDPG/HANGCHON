@@ -129,6 +129,8 @@ export type StudioDetail = {
   drop: { id: string; code: string; title: string; closes_at: string | null } | null;
   drafts: Draft[];
   compose_pending: boolean;
+  /** Trạng thái trang sản phẩm trên website (chỉ với `kind: "product"`). */
+  page_status?: string | null;
 };
 
 export type PostCard = {

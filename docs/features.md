@@ -41,7 +41,7 @@ Phần của chị. Hệ thống chỉ ghi lại và sắp xếp.
 | c1 | Bảng chọn | Chị quyết | 1 | Ứng viên, Mua mẫu, Đang thử, Đã chọn, Đã loại. Chị chuyển món qua từng cột. |
 | c2 | Nhật ký thử hàng bằng giọng nói | Chị quyết | 1 | Chị nói vài câu và chụp ảnh trong lúc dùng. AI chép lại và xếp vào đúng món. |
 | c3 | Lý do chọn và điều chưa ưng | AI làm, chị duyệt | 1 | Từ ghi chú của chị, AI soạn hai đoạn này cho trang sản phẩm. Chị sửa lời. |
-| c4 | Lý do loại | Chị quyết | 1 | Ghi vì sao loại từng ứng viên. Thành dữ liệu cho trang Hồ sơ chọn. |
+| c4 | Lý do loại | Chị quyết | 1 | Ghi vì sao loại từng ứng viên. Thành dữ liệu cho hồ sơ chọn ở desk (nội bộ, không hiện trên website). |
 | c5 | Bộ nguyên tắc của chị | Chị quyết | 2 | Lưu nguyên tắc chọn theo từng nhóm hàng để AI lọc từ đầu. |
 | c6 | AI học gu chị | AI tự làm | 3 | Sau mỗi lần chọn hoặc loại, AI chỉnh cách xếp hạng ứng viên cho giống mắt chị hơn. |
 
@@ -66,14 +66,14 @@ Nơi khách đọc kỹ, đặt hàng và theo dõi đơn.
 | Mã | Chức năng | Mức | GĐ | Mô tả |
 |---|---|---|---|---|
 | e1 | Tự dựng trang sản phẩm | AI làm, chị duyệt | 1 | Từ hồ sơ đã chọn, AI viết tên, mô tả, thông số, phần hỏi đáp. Chị duyệt rồi đăng. |
-| e2 | Con dấu và hồ sơ chọn | AI tự làm | 1 | Mỗi món hiện tỉ lệ chọn, thời gian thử, lý do chọn, điều chưa ưng và các món đã loại. |
+| e2 | Con dấu và hồ sơ chọn | AI tự làm | 1 | Website hiện con dấu tỉ lệ chọn, thời gian thử, lý do chọn, điều chưa ưng. Quá trình chọn (dải số sàng lọc, các món đã loại kèm lý do) là dữ liệu nội bộ, chỉ xem ở desk. |
 | e3 | Mở bán theo đợt | AI làm, chị duyệt | 1 | Đợt gom đơn có hạn chót, số suất, ngày hàng về dự kiến. |
 | e4 | Đặt hàng một trang | AI tự làm | 1 | Không cần tạo tài khoản. Chuyển khoản bằng mã QR tự xác nhận, hoặc trả tiền khi nhận. |
 | e5 | Theo dõi đơn | AI tự làm | 1 | Khách xem hành trình đơn bằng số điện thoại và mã đơn. |
 | e6 | Xử lý ảnh sản phẩm | AI tự làm | 1 | Ảnh thật chị chụp là chính. AI cắt, cân sáng, làm sạch nền; không tạo ảnh giả. |
 | e7 | Trợ lý hỏi đáp trên web | AI tự làm | 2 | Trả lời từ hồ sơ thẩm định, có dẫn nguồn. Không biết thì nói không biết và chuyển chị. |
 | e8 | Đánh giá có ảnh của khách | AI làm, chị duyệt | 2 | Tự xin đánh giá sau khi khách nhận hàng. AI lọc, chị duyệt hiển thị. |
-| e9 | Trang Nhờ tìm | AI tự làm | 2 | Khách gửi nhu cầu, người khác bấm cùng cần. Đủ số người thì mở tìm. |
+| e9 | Trang Nhờ tìm | AI làm, chị duyệt | 2 | Khách gửi nhu cầu, AI lọc rồi đề xuất, chị duyệt mới hiện. Người khác bấm cùng cần; đủ số người thì AI đề xuất mở đề tìm, chị duyệt. |
 | e10 | Để AI đọc được | AI tự làm | 2 | Dữ liệu sản phẩm có cấu trúc và nguồn cấp cho Google, sẵn sàng cho các trợ lý mua sắm AI. |
 
 ## Xưởng nội dung và đăng bài
@@ -114,7 +114,7 @@ Trả lời nhanh, nhớ từng khách, giữ khách ở lại.
 | Mã | Chức năng | Mức | GĐ | Mô tả |
 |---|---|---|---|---|
 | h1 | Hộp thư gộp | AI tự làm | 1 | Bình luận và tin nhắn Facebook, Instagram, Zalo ở một chỗ. |
-| h2 | AI soạn sẵn câu trả lời | AI làm, chị duyệt | 1 | Câu về giá, còn hàng, phí giao thì AI trả lời ngay. Câu khác AI soạn nháp chờ chị. |
+| h2 | AI soạn sẵn câu trả lời | AI làm, chị duyệt | 1 | Câu về giá, còn hàng, phí giao: AI soạn ngay, chị duyệt rồi mới gửi (đặt «AI tự làm» ở Mức tự chủ thì gửi ngay và ghi nhật ký). Câu khác AI soạn nháp chờ chị. |
 | h3 | Chuyển cho chị | Chị quyết | 1 | Khiếu nại, hàng lỗi, câu hỏi về sức khoẻ: AI không tự trả lời. |
 | h4 | Sổ khách | AI tự làm | 1 | Mỗi khách: đã mua gì, hỏi gì, quan tâm gì. |
 | h5 | Nhóm khách quen | AI làm, chị duyệt | 2 | Nhóm Zalo kín. AI soạn tin báo đợt mới và tóm tắt thảo luận trong nhóm. |

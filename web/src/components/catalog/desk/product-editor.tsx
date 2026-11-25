@@ -13,7 +13,6 @@ import { Input, Textarea } from "@/components/ui/field";
 import { IconButton } from "@/components/ui/icon-button";
 import { InlineSelect } from "@/components/ui/inline-select";
 import { PageHeader } from "@/components/ui/page-header";
-import { Seal } from "@/components/ui/seal";
 import { Segmented } from "@/components/ui/segmented";
 import { Sheet } from "@/components/ui/overlay";
 import { notifySuccess } from "@/components/ui/toast";
@@ -31,6 +30,7 @@ import {
 } from "@/lib/api/catalog";
 import { api } from "@/lib/api/client";
 import { ImageManager } from "./image-manager";
+import { SelectionDossier } from "./selection-dossier";
 import { sellerAddressIssues } from "./seller-voice";
 import { STATUS_TONE } from "./products-screen";
 import { RelatedLinks } from "@/components/desk/related-links";
@@ -222,7 +222,6 @@ export function ProductEditor({ id }: { id: string }) {
       ]
     : [];
   const voice = draftVoiceIssues(draft);
-  const funnel = p.dossier?.funnel;
 
   return (
     <div className="flex flex-col gap-5 pb-24">
@@ -399,23 +398,7 @@ export function ProductEditor({ id }: { id: string }) {
       </Section>
 
       <Section title="Hồ sơ chọn (tự lấy từ Bàn chọn)">
-        <div className="flex items-center gap-3">
-          {p.considered_count ? <Seal chosen={p.selected_count} total={p.considered_count} size={52} /> : null}
-          <p className="text-[14px] text-ink-2">
-            {funnel ? `Xem ${funnel.viewed ?? "?"} · so kỹ ${funnel.compared ?? 0} · mua thử ${funnel.tried ?? 0} · chọn ${funnel.selected ?? 1}` : "Chưa có số liệu sàng lọc."}
-          </p>
-        </div>
-        {p.rejected_alternatives.length ? (
-          <ul className="flex flex-col gap-1.5 text-[14px]">
-            {p.rejected_alternatives.map((a) => (
-              <li key={a.label}>
-                <span className="font-semibold">{a.label}</span>
-                {a.origin ? ` · ${a.origin}` : ""} — {a.reason ?? "không ghi lý do"}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        <p className="text-[12.5px] text-ink-3">Món bị loại hiện không kèm tên thương hiệu hay tên shop.</p>
+        <SelectionDossier productId={p.id} />
       </Section>
 
       {dirty ? (

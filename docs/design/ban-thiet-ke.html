@@ -1172,7 +1172,7 @@ td:first-child{font-weight:600}
       <ol class="notes">
         <li>Câu về cách dùng: AI soạn, chị bấm Gửi.</li>
         <li>Khiếu nại: AI chỉ đưa phương án, chị chọn.</li>
-        <li>Câu về giá, tồn kho: AI trả lời ngay và ghi vào nhật ký.</li>
+        <li>Câu về giá, tồn kho: AI soạn ngay, chị duyệt rồi gửi (đặt «AI tự làm» thì gửi ngay, ghi nhật ký).</li>
       </ol>
     </figure>
 
@@ -1522,7 +1522,7 @@ var MODS = [
   ["c1","Bảng chọn","Ứng viên, Mua mẫu, Đang thử, Đã chọn, Đã loại. Chị chuyển món qua từng cột.","h",1],
   ["c2","Nhật ký thử hàng bằng giọng nói","Chị nói vài câu và chụp ảnh trong lúc dùng. AI chép lại và xếp vào đúng món.","h",1],
   ["c3","Lý do chọn và điều chưa ưng","Từ ghi chú của chị, AI soạn hai đoạn này cho trang sản phẩm. Chị sửa lời.","r",1],
-  ["c4","Lý do loại","Ghi vì sao loại từng ứng viên. Thành dữ liệu cho trang Hồ sơ chọn.","h",1],
+  ["c4","Lý do loại","Ghi vì sao loại từng ứng viên. Thành dữ liệu cho hồ sơ chọn ở desk (nội bộ, không hiện trên website).","h",1],
   ["c5","Bộ nguyên tắc của chị","Lưu nguyên tắc chọn theo từng nhóm hàng để AI lọc từ đầu.","h",2],
   ["c6","AI học gu chị","Sau mỗi lần chọn hoặc loại, AI chỉnh cách xếp hạng ứng viên cho giống mắt chị hơn.","a",3]
  ]},
@@ -1537,14 +1537,14 @@ var MODS = [
  ]},
  {t:"Website Hàng Chọn", d:"Nơi khách đọc kỹ, đặt hàng và theo dõi đơn.", f:[
   ["e1","Tự dựng trang sản phẩm","Từ hồ sơ đã chọn, AI viết tên, mô tả, thông số, phần hỏi đáp. Chị duyệt rồi đăng.","r",1],
-  ["e2","Con dấu và hồ sơ chọn","Mỗi món hiện tỉ lệ chọn, thời gian thử, lý do chọn, điều chưa ưng và các món đã loại.","a",1],
+  ["e2","Con dấu và hồ sơ chọn","Website hiện con dấu tỉ lệ chọn, thời gian thử, lý do chọn, điều chưa ưng. Quá trình chọn (dải số sàng lọc, các món đã loại kèm lý do) là dữ liệu nội bộ, chỉ xem ở desk.","a",1],
   ["e3","Mở bán theo đợt","Đợt gom đơn có hạn chót, số suất, ngày hàng về dự kiến.","r",1],
   ["e4","Đặt hàng một trang","Không cần tạo tài khoản. Chuyển khoản bằng mã QR tự xác nhận, hoặc trả tiền khi nhận.","a",1],
   ["e5","Theo dõi đơn","Khách xem hành trình đơn bằng số điện thoại và mã đơn.","a",1],
   ["e6","Xử lý ảnh sản phẩm","Ảnh thật chị chụp là chính. AI cắt, cân sáng, làm sạch nền; không tạo ảnh giả.","a",1],
   ["e7","Trợ lý hỏi đáp trên web","Trả lời từ hồ sơ thẩm định, có dẫn nguồn. Không biết thì nói không biết và chuyển chị.","a",2],
   ["e8","Đánh giá có ảnh của khách","Tự xin đánh giá sau khi khách nhận hàng. AI lọc, chị duyệt hiển thị.","r",2],
-  ["e9","Trang Nhờ chị tìm","Khách gửi nhu cầu, người khác bấm cùng cần. Đủ số người thì mở tìm.","a",2],
+  ["e9","Trang Nhờ chị tìm","Khách gửi nhu cầu, AI lọc rồi đề xuất, chị duyệt mới hiện. Người khác bấm cùng cần; đủ số người thì AI đề xuất mở đề tìm, chị duyệt.","r",2],
   ["e10","Để AI đọc được","Dữ liệu sản phẩm có cấu trúc và nguồn cấp cho Google, sẵn sàng cho các trợ lý mua sắm AI.","a",2]
  ]},
  {t:"Xưởng nội dung và đăng bài", d:"Từ một hồ sơ chọn ra bài cho mọi kênh.", f:[
@@ -1570,7 +1570,7 @@ var MODS = [
  ]},
  {t:"Chăm khách và cộng đồng", d:"Trả lời nhanh, nhớ từng khách, giữ khách ở lại.", f:[
   ["h1","Hộp thư gộp","Bình luận và tin nhắn Facebook, Instagram, Zalo ở một chỗ.","a",1],
-  ["h2","AI soạn sẵn câu trả lời","Câu về giá, còn hàng, phí giao thì AI trả lời ngay. Câu khác AI soạn nháp chờ chị.","r",1],
+  ["h2","AI soạn sẵn câu trả lời","Câu về giá, còn hàng, phí giao: AI soạn ngay, chị duyệt rồi mới gửi (đặt «AI tự làm» ở Mức tự chủ thì gửi ngay và ghi nhật ký). Câu khác AI soạn nháp chờ chị.","r",1],
   ["h3","Chuyển cho chị","Khiếu nại, hàng lỗi, câu hỏi về sức khoẻ: AI không tự trả lời.","h",1],
   ["h4","Sổ khách","Mỗi khách: đã mua gì, hỏi gì, quan tâm gì.","a",1],
   ["h5","Nhóm khách quen","Nhóm Zalo kín. AI soạn tin báo đợt mới và tóm tắt thảo luận trong nhóm.","r",2],

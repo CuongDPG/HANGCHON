@@ -107,10 +107,8 @@ async def test_reject_requires_reason_and_feeds_stats(owner_client: httpx.AsyncC
 
     stats = (await owner_client.get(f"{B}/rejection-stats", params={"brief_id": str(brief.id)})).json()
     assert stats["total"] == 2 and stats["summary"].startswith("2 mẫu loại: ")
-    # công khai cho trang Hồ sơ chọn; ẩn món chị không muốn hiện
-    await owner_client.patch(f"{B}/decisions/{d['id']}", json={"show_on_profile": False})
-    pub = (await client.get("/api/store/selection/rejection-stats", params={"candidate_id": str(b.id)})).json()
-    assert pub["total"] == 1 and pub["groups"] == [{"key": "mui", "label": "Có mùi", "count": 1}]
+    # thống kê lý do loại chỉ ở desk, không còn route công khai
+    assert (await client.get("/api/store/selection/rejection-stats")).status_code == 404
 
     reasons = (await owner_client.get(f"{B}/reject-reasons")).json()
     assert reasons["frequent"][0]["count"] >= 1 and any(g["key"] == "ro_ri" for g in reasons["groups"])

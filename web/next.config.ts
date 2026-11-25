@@ -17,6 +17,10 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: SECURITY_HEADERS_SOURCE, headers: SECURITY_HEADERS }];
   },
+  async redirects() {
+    // Hồ sơ chọn không còn là trang công khai (chỉ ở desk, «Sản phẩm» → «Hồ sơ chọn»): link cũ về trang sản phẩm.
+    return [{ source: "/san-pham/:slug/ho-so-chon", destination: "/san-pham/:slug", permanent: true }];
+  },
   async rewrites() {
     return [{ source: "/api/:path*", destination: `${API_ORIGIN}/api/:path*` }];
   },

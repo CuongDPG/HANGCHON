@@ -4,7 +4,6 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { AskBox } from "@/components/assistant/ask-box";
 import { Countdown } from "@/components/catalog/countdown";
-import { FunnelStrip } from "@/components/catalog/funnel-strip";
 import { PlainText } from "@/components/catalog/plain-text";
 import { getProduct, productJsonLd } from "@/components/catalog/product-data";
 import { Stars } from "@/components/catalog/stars";
@@ -75,7 +74,6 @@ function ProductSkeleton() {
 async function ProductBody({ params }: { params: PageProps<"/san-pham/[slug]">["params"] }) {
   const { slug } = await params;
   const p = await getProduct(slug);
-  const dossierHref = `/san-pham/${p.slug}/ho-so-chon`;
   return (
     <article className="flex flex-col gap-6">
       <JsonLd data={productJsonLd(p)} />
@@ -115,8 +113,6 @@ async function ProductBody({ params }: { params: PageProps<"/san-pham/[slug]">["
               {p.trial_days ? <p className="mt-2 text-[13px] text-ink-2">Mình dùng thử {p.trial_days} ngày trước khi chọn.</p> : null}
             </Card>
           ) : null}
-
-          <FunnelStrip funnel={p.funnel} href={dossierHref} />
 
           {p.not_satisfied ? (
             <Card>

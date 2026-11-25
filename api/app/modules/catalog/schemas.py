@@ -478,7 +478,6 @@ class ProductDetail(ProductCard):
     reason_selected: list[str]
     not_satisfied: str | None
     images: list[ImageSet]
-    funnel: Funnel
     weight_grams: int | None
     brand: str | None
     gtin: str | None
