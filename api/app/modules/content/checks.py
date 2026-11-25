@@ -4,6 +4,8 @@ Mỗi bản nháp có một danh sách mục soát (chip ✓/!):
   numbers   «Đúng số liệu trong hồ sơ»   giá, số ngày thử, số món đã thử phải khớp hồ sơ
   claims    «Không nói quá công dụng»     từ cấm trong quảng cáo (chữa bệnh, tốt nhất, 100%...)
   length    «Độ dài hợp kênh»             theo giới hạn của từng kênh
+  voice     «Xưng hô với khách»           người bán xưng «mình», gọi khách «bạn»; không gọi người bán là «chị»
+                                         (lời khách trích trong ngoặc «…» không tính)
   ai_label  «Nhãn nội dung AI»            có phần do AI tạo → gắn nhãn khi đăng (luôn ✓, chỉ báo)
 
 Mục không đạt (`ok=False`) chặn nút «Duyệt» cho tới khi sửa, hoặc chị xác nhận bỏ qua có lý do (`overridden`).
@@ -15,6 +17,7 @@ import re
 from typing import Any
 
 from app.core.enums import Channel
+from app.modules.catalog.textutil import seller_address_issues
 from app.modules.content.ai_io import CheckOut, DropFacts, ProductFacts
 from app.modules.content.channels import LENGTH_LIMITS, MAX_HASHTAGS, VIDEO_SECONDS
 from app.modules.content.models import CheckStatus
@@ -23,6 +26,7 @@ CHECK_LABELS = {
     "numbers": "Đúng số liệu trong hồ sơ",
     "claims": "Không nói quá công dụng",
     "length": "Độ dài hợp kênh",
+    "voice": "Xưng hô với khách",
     "ai_label": "Nhãn nội dung AI",
 }
 
@@ -155,6 +159,14 @@ def check_length(channel: Channel, body: str, hashtags: list[str], scenes: list[
     return problems
 
 
+def check_voice(text: str) -> tuple[list[str], str | None]:
+    """Câu còn gọi người bán là «chị» → (vấn đề, gợi ý sửa câu đầu tiên)."""
+    hits = seller_address_issues(text)
+    problems = [f"«{h['quote']}» gọi người bán là «chị»." for h in hits]
+    suggestion = f"Đổi thành «{hits[0]['suggestion']}» (xưng «mình», gọi khách «bạn»)." if hits else None
+    return problems, suggestion
+
+
 def full_text(body: str, title: str | None, scenes: list[dict[str, Any]], slides: list[dict[str, Any]]) -> str:
     parts = [title or "", body]
     for s in scenes:
@@ -184,15 +196,17 @@ def build_findings(
     numbers = check_numbers(text, product, drop) + [f"{i.quote}: {i.detail}" for i in (ai.number_issues if ai else [])]
     claims = check_claims(text) + [f"{i.quote}: {i.detail}" for i in (ai.claim_issues if ai else [])]
     length = check_length(channel, body, hashtags, scenes)
+    voice, voice_fix = check_voice(text)
     suggestions = {
         "numbers": next((i.suggestion for i in (ai.number_issues if ai else []) if i.suggestion), None)
         or "Sửa số cho khớp hồ sơ, hoặc bỏ con số.",
         "claims": next((i.suggestion for i in (ai.claim_issues if ai else []) if i.suggestion), None)
         or "Kể trải nghiệm thật thay cho lời khẳng định.",
         "length": "Bấm «Ngắn hơn» hoặc sửa tay cho vừa kênh.",
+        "voice": voice_fix,
     }
     items = []
-    for key, problems in (("numbers", numbers), ("claims", claims), ("length", length)):
+    for key, problems in (("numbers", numbers), ("claims", claims), ("length", length), ("voice", voice)):
         items.append(
             {
                 "key": key,
@@ -225,6 +239,7 @@ def _ok_detail(key: str) -> str:
         "numbers": "Giá và số liệu khớp hồ sơ sản phẩm.",
         "claims": "Không có lời nói quá công dụng.",
         "length": "Độ dài vừa với kênh.",
+        "voice": "Xưng «mình», gọi khách «bạn».",
     }[key]
 
 

@@ -1,17 +1,52 @@
 "use client";
 
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, ImagePlus, Star, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/choice";
 import { useConfirm } from "@/components/ui/confirm";
 import { IconButton } from "@/components/ui/icon-button";
 import { ImageBox } from "@/components/ui/image-box";
 import { Spinner } from "@/components/ui/button";
 import { notifyError, notifySuccess } from "@/components/ui/toast";
+import { useSession } from "@/lib/api/auth";
 import { deskProductApi, useProductMutation, type DeskProduct } from "@/lib/api/catalog";
 import { api } from "@/lib/api/client";
 
-/** Ảnh sản phẩm (e6): tải lên → tự xoay, cân sáng, cắt vuông giữ món ở giữa; sắp thứ tự, đặt ảnh bìa. */
+const CLEAN_BG = "catalog.image_clean_background";
+
+/** Bật/tắt làm sạch nền (cài đặt chung, áp cho ảnh tải lên sau đó). Chỉ chị đổi được. */
+function CleanBackgroundSwitch() {
+  const qc = useQueryClient();
+  const { user } = useSession();
+  const settings = useQuery({
+    queryKey: ["control", "settings"],
+    queryFn: () => api.get<{ key: string; value: unknown }[]>("/api/desk/control/settings"),
+  });
+  const save = useMutation({
+    mutationFn: (v: boolean) => api.patch(`/api/desk/control/settings/${CLEAN_BG}`, { value: v }),
+    onSuccess: (_, v) => {
+      qc.invalidateQueries({ queryKey: ["control", "settings"] });
+      notifySuccess(v ? "Ảnh mới sẽ được làm sạch nền" : "Đã tắt làm sạch nền cho ảnh mới");
+    },
+    onError: notifyError,
+  });
+  const value = settings.data?.find((s) => s.key === CLEAN_BG)?.value;
+  if (settings.isPending || value === undefined) return null;
+  return (
+    <Switch
+      label="Làm sạch nền sáng"
+      description="Nền trắng, xám nhạt đều màu được đưa về trắng; nền phức tạp giữ nguyên. Áp cho ảnh tải lên sau."
+      checked={value !== false}
+      disabled={user?.role !== "owner" || save.isPending}
+      onChange={(v) => save.mutate(v)}
+    />
+  );
+}
+
+/** Ảnh sản phẩm (e6): tải lên → tự xoay, cân sáng, làm sạch nền sáng (tắt được), cắt vuông giữ món ở giữa; sắp thứ
+ * tự, đặt ảnh bìa. */
 export function ImageManager({ product }: { product: DeskProduct }) {
   const input = useRef<HTMLInputElement>(null);
   const confirm = useConfirm();
@@ -100,8 +135,9 @@ export function ImageManager({ product }: { product: DeskProduct }) {
           <input ref={input} type="file" accept="image/*" multiple className="sr-only" onChange={(e) => onFiles(e.target.files)} aria-label="Chọn ảnh" />
         </li>
       </ul>
+      <CleanBackgroundSwitch />
       <p className="text-[13px] text-ink-3">
-        Chỉ chỉnh ảnh thật: xoay theo EXIF, cân sáng nhẹ, cắt vuông giữ món ở giữa, tạo bản webp. Không tạo ảnh giả. Hoàn tác được trong Nhật ký AI.
+        Chỉ chỉnh ảnh thật: xoay theo EXIF, cân sáng nhẹ, làm trắng nền sáng khi nền đủ đơn giản, cắt vuông giữ món ở giữa, tạo bản webp. Không tách nền bằng AI, không tạo ảnh giả. Hoàn tác từng ảnh trong Nhật ký AI.
       </p>
     </div>
   );

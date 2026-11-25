@@ -130,6 +130,9 @@ class CheckOut(BaseModel):
 class VoiceLearnIn(BaseModel):
     samples: list[str]
     notes: str | None = None
+    spoken: list[str] = Field(
+        default_factory=list, description="Lời chị nói, chép từ giọng nói (không có dấu câu chuẩn)"
+    )
     current: VoiceCard = Field(default_factory=VoiceCard)
 
 

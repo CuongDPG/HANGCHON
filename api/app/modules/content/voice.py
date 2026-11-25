@@ -52,15 +52,19 @@ def snapshot(vp: VoiceProfile) -> dict[str, Any]:
     }
 
 
-async def learn(db: AsyncSession, samples: list[str], notes: str | None, user: User | None) -> control.ProposeOutcome:
+async def learn(
+    db: AsyncSession, samples: list[str], notes: str | None, user: User | None, spoken: list[str] | None = None
+) -> control.ProposeOutcome:
+    """Học từ bài cũ, ghi chú và lời chị nói (chép từ giọng nói ở trình duyệt, f2 «ghi âm của chị»)."""
     clean = [s.strip()[:MAX_SAMPLE_CHARS] for s in samples if s and s.strip()][:MAX_SAMPLES]
-    if not clean and not (notes or "").strip():
-        raise BadRequest("Chị dán ít nhất một bài cũ hoặc ghi chú để AI học giọng.")
+    said = [s.strip()[:MAX_SAMPLE_CHARS] for s in spoken or [] if s and s.strip()][:10]
+    if not clean and not said and not (notes or "").strip():
+        raise BadRequest("Chị dán ít nhất một bài cũ, nói vài câu hoặc ghi chú để AI học giọng.")
     vp = await facts.active_voice(db, create=True)
     assert vp is not None
     res = await ai.run(
         "content.learn_voice",
-        VoiceLearnIn(samples=clean, notes=(notes or "").strip() or None, current=facts.voice_card(vp)),
+        VoiceLearnIn(samples=clean, notes=(notes or "").strip() or None, spoken=said, current=facts.voice_card(vp)),
         VoiceLearnOut,
     )
     out = res.output
@@ -71,13 +75,16 @@ async def learn(db: AsyncSession, samples: list[str], notes: str | None, user: U
             "voice_profile_id": str(vp.id),
             "profile": out.model_dump(),
             "samples": clean,
+            "spoken": said,
             "notes": notes,
             "ai_run_id": str(res.run_id),
         },
         preview={"style_summary": out.style_summary, "pronouns": out.pronouns},
         db=db,
         summary=out.style_summary,
-        rationale=f"Học từ {len(clean)} bài mẫu" + (" và ghi chú của chị" if notes else ""),
+        rationale=f"Học từ {len(clean)} bài mẫu"
+        + (f", {len(said)} đoạn chị nói" if said else "")
+        + (" và ghi chú của chị" if notes else ""),
         ref_type="voice_profiles",
         ref_id=vp.id,
         ai_run_id=res.run_id,
@@ -97,6 +104,7 @@ async def apply_learn(db: AsyncSession, payload: dict[str, Any]) -> control.Hand
     vp.sample_sources = [
         *vp.sample_sources,
         *[{"kind": "post", "text": s, "added_at": now_utc().isoformat()} for s in payload.get("samples") or []],
+        *[{"kind": "voice", "text": s, "added_at": now_utc().isoformat()} for s in payload.get("spoken") or []],
     ][-50:]
     if payload.get("notes"):
         vp.sample_sources = [*vp.sample_sources, {"kind": "note", "text": payload["notes"]}][-50:]

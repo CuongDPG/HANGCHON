@@ -1,4 +1,4 @@
-"""Trang Nhờ chị tìm (e9): khách gửi nhu cầu (chống spam cơ bản), người khác bấm «mình cũng cần» (một lượt mỗi
+"""Trang Nhờ tìm (e9): khách gửi nhu cầu (chống spam cơ bản), người khác bấm «mình cũng cần» (một lượt mỗi
 thiết bị); đủ ngưỡng (mặc định 30) thì phát `find_request.threshold` để module sourcing đề xuất mở đề tìm."""
 
 from __future__ import annotations

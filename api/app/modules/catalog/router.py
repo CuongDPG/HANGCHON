@@ -74,6 +74,7 @@ from app.modules.catalog.schemas import (
     SelectableCandidate,
     ShelfOut,
     SitemapEntry,
+    VoiceIssue,
     VoteIn,
     VoteOut,
 )
@@ -298,6 +299,7 @@ async def _desk_product(db: AsyncSession, p: Product) -> DeskProduct:
         **ProductOut.model_validate(p).model_dump(),
         images=[ImageSet.model_validate(image_set(i)) for i in sorted(p.images, key=lambda i: i.position)],
         candidate_title=c.title_vi if c else None,
+        voice_issues=[VoiceIssue.model_validate(i) for i in product_svc.voice_issues(p)],
     )
 
 
@@ -578,7 +580,7 @@ async def reply_review(review_id: uuid.UUID, body: ReviewReplyIn, user: OwnerUse
     return await _desk_review(db, r)
 
 
-# ==== desk: nhờ chị tìm ===========================================================================================
+# ==== desk: nhờ tìm ===========================================================================================
 
 
 async def _desk_find(db: AsyncSession, fr: FindRequest) -> DeskFindRequest:

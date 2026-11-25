@@ -14,7 +14,7 @@ export type PostStatus = "planned" | "approved" | "publishing" | "published" | "
 export type DisplayStatus = "published" | "draft_pushed" | "approved" | "pending" | "needs_fix" | "failed" | "publishing";
 
 export type CheckFinding = {
-  key: "numbers" | "claims" | "length" | "ai_label";
+  key: "numbers" | "claims" | "length" | "voice" | "ai_label";
   label: string;
   ok: boolean;
   detail: string;
@@ -426,7 +426,7 @@ export function useEditVoice() {
 export function useLearnVoice() {
   const inv = useInvalidateContent();
   return useMutation({
-    mutationFn: (body: { samples: string[]; notes?: string }) => api.post<{ status: string; voice: Voice }>(`${B}/voice/learn`, body),
+    mutationFn: (body: { samples: string[]; notes?: string; spoken?: string[] }) => api.post<{ status: string; voice: Voice }>(`${B}/voice/learn`, body),
     onSuccess: inv,
   });
 }

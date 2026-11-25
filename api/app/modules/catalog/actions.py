@@ -35,7 +35,7 @@ control.register_action(
     description="AI viết trang từ hồ sơ chọn; chị sửa lời rồi duyệt thì món lên kệ.",
 )  # fmt: skip
 control.register_action(
-    "catalog.process_image", "Xử lý ảnh sản phẩm (xoay, cân sáng, cắt vuông)", GROUP, default="auto",
+    "catalog.process_image", "Xử lý ảnh sản phẩm (xoay, cân sáng, làm sạch nền, cắt vuông)", GROUP, default="auto",
     description="Chỉ chỉnh ảnh thật chị chụp, không tạo ảnh giả. Hoàn tác được: quay về ảnh chỉ cắt vuông.",
 )  # fmt: skip
 control.register_action(
@@ -55,9 +55,12 @@ control.register_action(
     description="AI lọc spam, thô tục, lộ thông tin cá nhân; chê thật lòng vẫn được hiện.",
 )  # fmt: skip
 control.register_action(
-    "catalog.publish_find_request", "Hiện lời Nhờ chị tìm của khách", GROUP, default="ask", customer_facing=True,
+    "catalog.publish_find_request", "Hiện lời Nhờ tìm của khách", GROUP, default="ask", customer_facing=True,
 )  # fmt: skip
 
+control.register_setting(product_svc.CLEAN_BG_SETTING, "Làm sạch nền ảnh sản phẩm", True, group="Website",
+                         description="Nền sáng, đều màu (trắng, xám nhạt) được đưa về trắng. Nền phức tạp giữ nguyên. "
+                         "Tắt thì ảnh mới chỉ xoay, cân sáng, cắt vuông.")  # fmt: skip
 control.register_setting(find_svc.THRESHOLD_SETTING, "Số người cùng cần để mở tìm", find_svc.DEFAULT_THRESHOLD,
                          group="Website", description="Đủ số người bấm «mình cũng cần» thì chị mở đề săn hàng.")  # fmt: skip
 for _key, _label in (("store.picker_name", "Tên người chọn (trang Về người chọn)"),
@@ -107,7 +110,9 @@ async def _process_image(ctx: control.ActionContext) -> control.HandlerResult:
     if img is None:
         raise NotFound("Ảnh đã bị xoá.")
     await product_svc.render_image(ctx.db, img, enhance=True)
-    ops = ", ".join(o["op"] for o in img.processing_ops if o.get("op") != "renditions")
+    labels = {"exif_transpose": "xoay đúng chiều", "autocontrast": "cân tương phản", "brightness": "cân sáng",
+              "clean_background": "làm sạch nền", "crop": "cắt vuông"}  # fmt: skip
+    ops = ", ".join(labels.get(o["op"], o["op"]) for o in img.processing_ops if o.get("op") != "renditions")
     return control.HandlerResult(
         result={"image_id": str(img.id)}, undo={"image_id": str(img.id)}, summary=f"Đã xử lý ảnh: {ops}",
         ref_type="product_images", ref_id=img.id,
@@ -184,7 +189,7 @@ async def _reject_review(ctx: control.ReturnContext) -> None:
         await review_svc.hide(ctx.db, r, ReviewStatus.REJECTED)
 
 
-# ---- nhờ chị tìm -------------------------------------------------------------------------------------------------
+# ---- nhờ tìm -----------------------------------------------------------------------------------------------------
 
 
 @control.handler("catalog.publish_find_request")

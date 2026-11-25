@@ -251,7 +251,8 @@ def fake_compose(inp: ComposeIn) -> ComposeOut:
 
 
 def _instruction_line(instruction: str) -> str:
-    text = instruction.strip().rstrip(".")
+    # lời dặn nội bộ («Chị trả lại với lời nhắn: …») là chỉ dẫn cho AI, không chép tiền tố vào bài khách đọc
+    text = re.sub(r"^chị trả lại với lời nhắn:\s*", "", instruction.strip(), flags=re.IGNORECASE).rstrip(".")
     return f"P.S. {text[:1].upper()}{text[1:]}."
 
 
@@ -301,7 +302,7 @@ STOP = set(
 
 
 def fake_learn_voice(inp: VoiceLearnIn) -> VoiceLearnOut:
-    text = "\n".join(inp.samples)
+    text = "\n".join([*inp.samples, *inp.spoken])
     low = text.lower()
     words = re.findall(r"[a-zà-ỹđ]+", low)
     pron = Counter(w for w in words if w in {"mình", "em", "chị", "tớ", "tui", "bạn", "cả", "mọi"})

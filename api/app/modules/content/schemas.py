@@ -408,6 +408,7 @@ class VoicePatch(BaseModel):
 class VoiceLearnBody(BaseModel):
     samples: list[str] = Field(default_factory=list, max_length=20)
     notes: str | None = Field(default=None, max_length=4000)
+    spoken: list[str] = Field(default_factory=list, max_length=10, description="Lời chị nói, chép từ giọng nói")
 
 
 class VoiceLearnResult(BaseModel):

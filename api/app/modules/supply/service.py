@@ -5,6 +5,7 @@ sự kiện: `price.approved`, `inbound.arrived`, `expense.recorded` (ARCHITECTU
 
 from __future__ import annotations
 
+import io
 import logging
 import secrets
 import statistics
@@ -21,6 +22,7 @@ from app.core import events
 from app.core.enums import Language
 from app.core.errors import BadRequest, Conflict, NotFound
 from app.core.money import format_vnd, margin_pct, to_vnd
+from app.core.storage import get_storage
 from app.core.timeutil import local_today, now_utc, to_local
 from app.integrations import get_driver
 from app.integrations.base import IntegrationError
@@ -32,6 +34,8 @@ from app.modules.sourcing.models import Candidate
 from app.modules.supply.ai_tasks import (
     ComposeOrderIn,
     ComposeOrderOut,
+    DocumentExtract,
+    DocumentReadIn,
     InquiryAIIn,
     InquiryAIOut,
     MarketSample,
@@ -252,20 +256,151 @@ async def save_cost_sheet(db: AsyncSession, data: dict[str, Any]) -> CostSheet:
     return sheet
 
 
-async def recalc_sheet(db: AsyncSession, s: CostSheet, params: CostParams | None = None) -> bool:
-    """Tính lại một bảng theo tham số hiện hành (chỉ bảng `auto_update`). Trả True nếu giá vốn đổi."""
+ACTION_RECALC = "supply.recalc_cost"
+SIGNIFICANT_COST_PCT = Decimal(2)  # giá vốn đổi từ 2% trở lên mới ghi nhật ký AI (đổi lặt vặt thì cập nhật lặng lẽ)
+_DECIMAL_FIELDS = {"fx_rate", "unit_price_amount", "agent_fee_pct", "import_tax_pct", "vat_pct", "loss_pct"}
+_COST_FIELDS = (
+    "currency", "fx_rate", "unit_price_amount", "unit_price_vnd", "domestic_shipping_vnd", "agent_fee_pct",
+    "agent_fee_vnd", "weight_grams", "intl_shipping_vnd_per_kg", "intl_shipping_vnd", "import_tax_pct", "vat_pct",
+    "tax_vnd", "packaging_vnd", "other_fees_vnd", "loss_pct", "loss_vnd", "landed_cost_vnd", "breakdown",
+)  # fmt: skip
+
+
+def _to_json(values: dict[str, Any]) -> dict[str, Any]:
+    return {k: (str(v) if isinstance(v, Decimal) else v) for k, v in values.items()}
+
+
+def _from_json(values: dict[str, Any]) -> dict[str, Any]:
+    return {k: (Decimal(v) if k in _DECIMAL_FIELDS and v is not None else v) for k, v in values.items()}
+
+
+def apply_cost_values(s: CostSheet, values: dict[str, Any], *, bump: bool) -> None:
+    for k, v in values.items():
+        setattr(s, k, v)
+    s.fx_rate_at = now_utc()
+    s.recalculated_at = now_utc()
+    if bump:
+        s.version += 1
+
+
+def significant_change(old: int, new: int) -> bool:
+    return old > 0 and abs(Decimal(new - old)) * PCT / Decimal(old) >= SIGNIFICANT_COST_PCT
+
+
+async def _sheet_title(db: AsyncSession, s: CostSheet) -> str:
+    if s.candidate_id:
+        t = await db.scalar(select(Candidate.title_vi).where(Candidate.id == s.candidate_id))
+        if t:
+            return t
+    if s.product_id:
+        t = await db.scalar(select(Product.name).where(Product.id == s.product_id))
+        if t:
+            return t
+    return "món chưa đặt tên"
+
+
+async def _selling_price(db: AsyncSession, s: CostSheet) -> int | None:
+    """Giá bán đang dùng để chị thấy biên lãi đổi thế nào: giá trên kệ, không thì giá đã duyệt / đang đề xuất."""
+    if s.candidate_id or s.product_id:
+        cond = Product.candidate_id == s.candidate_id if s.candidate_id else Product.id == s.product_id
+        price = await db.scalar(select(Product.price_vnd).where(cond))
+        if price:
+            return int(price)
+    if s.candidate_id:
+        p = await db.scalar(
+            select(PriceProposal)
+            .where(
+                PriceProposal.candidate_id == s.candidate_id,
+                PriceProposal.status.in_([ProposalStatus.APPROVED, ProposalStatus.PENDING_REVIEW]),
+            )
+            .order_by(PriceProposal.created_at.desc())
+            .limit(1)
+        )
+        if p is not None:
+            return int(p.approved_price_vnd or p.proposed_price_vnd)
+    return None
+
+
+def _changed_lines(before: list[Any], after: list[Any]) -> list[str]:
+    old = {ln.get("key"): ln for ln in before if isinstance(ln, dict)}
+    out = []
+    for ln in after:
+        o = old.get(ln.get("key"))
+        if o is None or o.get("amount_vnd") != ln.get("amount_vnd"):
+            was = _vnd(int(o["amount_vnd"])) if o else "0đ"
+            out.append(f"{ln['label']} {was} → {_vnd(int(ln['amount_vnd']))} ({ln['formula']})")
+    return out
+
+
+async def recalc_sheet(db: AsyncSession, s: CostSheet, params: CostParams | None = None, *, log: bool = False) -> bool:
+    """Tính lại một bảng theo tham số hiện hành (chỉ bảng `auto_update`). Trả True nếu giá vốn đổi.
+
+    `log=True` (AI tự tính lại: hằng ngày, khi tham số đổi): giá vốn đổi đáng kể thì đi qua `control.propose`
+    (`supply.recalc_cost`, mặc định AI tự làm → nhật ký AI, hoàn tác = khôi phục số cũ). Chị tự bấm tính lại thì
+    không ghi nhật ký."""
     if not s.auto_update:
         return False
     params = params or await cost_params(db)
     calc = compute_cost(_sheet_inputs(s, await supplier_country(db, s.supplier_id)), params, use_overrides=False)
-    changed = calc["landed_cost_vnd"] != s.landed_cost_vnd
-    for k, v in calc.items():
-        setattr(s, k, v)
-    s.fx_rate_at = now_utc()
-    s.recalculated_at = now_utc()
-    if changed:
-        s.version += 1
-    return changed
+    old, new = s.landed_cost_vnd, calc["landed_cost_vnd"]
+    changed = new != old
+    if not (log and changed and significant_change(old, new)):
+        apply_cost_values(s, calc, bump=changed)
+        return changed
+    title = await _sheet_title(db, s)
+    pct = (Decimal(new - old) * PCT / Decimal(old)).quantize(Decimal("0.1"))
+    price = await _selling_price(db, s)
+    margin = ""
+    if price:
+        before_m, after_m = (_fmt_num(round(margin_pct(price, c), 1)) for c in (old, new))
+        margin = f" Với giá bán {_vnd(price)}, biên lãi {before_m}% → {after_m}%."
+        if new >= price:
+            margin += " Giá vốn đã chạm giá bán!"
+    lines = _changed_lines(list(s.breakdown or []), calc["breakdown"])
+    summary = f"Giá vốn về tay {'tăng' if new > old else 'giảm'} {_fmt_num(abs(pct))}%.{margin}"
+    outcome = await control.propose(
+        ACTION_RECALC,
+        f"Giá vốn {title}: {_vnd(old)} → {_vnd(new)}",
+        {"sheet_id": str(s.id), "values": _to_json(calc), "summary": summary},
+        {"product": title, "before_vnd": old, "after_vnd": new, "change_pct": float(pct), "price_vnd": price,
+         "lines": lines},
+        db=db,
+        summary=summary,
+        rationale="Tính lại theo tham số giá vốn hiện hành: " + ("; ".join(lines) if lines else "tỷ giá, cước, thuế."),
+        ref_type="cost_sheets",
+        ref_id=s.id,
+        dedupe_key=f"cost:{s.id}",
+        ai_generated=False,
+    )  # fmt: skip
+    return outcome.status == "applied"
+
+
+async def apply_recalc(db: AsyncSession, payload: dict[str, Any]) -> control.HandlerResult:
+    s = await db.get(CostSheet, uuid.UUID(payload["sheet_id"]))
+    if s is None:
+        raise NotFound("Không tìm thấy bảng giá vốn.")
+    before = _to_json({**{k: getattr(s, k) for k in _COST_FIELDS}, "version": s.version})
+    values = _from_json(payload["values"])
+    apply_cost_values(s, values, bump=values["landed_cost_vnd"] != s.landed_cost_vnd)
+    await db.flush()
+    return control.HandlerResult(
+        result={"sheet_id": str(s.id), "landed_cost_vnd": s.landed_cost_vnd},
+        undo={"sheet_id": str(s.id), "before": before},
+        summary=payload.get("summary") or f"Giá vốn {_vnd(int(before['landed_cost_vnd']))} → {_vnd(s.landed_cost_vnd)}",
+        ref_type="cost_sheets",
+        ref_id=s.id,
+    )
+
+
+async def undo_recalc(db: AsyncSession, undo: dict[str, Any]) -> None:
+    s = await db.get(CostSheet, uuid.UUID(undo["sheet_id"]))
+    if s is None:
+        return
+    before = _from_json(dict(undo["before"]))
+    version = int(before.pop("version"))
+    apply_cost_values(s, before, bump=False)
+    s.version = version
+    await db.flush()
 
 
 async def recalc_all(db: AsyncSession) -> int:
@@ -274,8 +409,8 @@ async def recalc_all(db: AsyncSession) -> int:
         await db.execute(select(CostSheet).where(CostSheet.is_current.is_(True), CostSheet.auto_update.is_(True)))
     ).scalars()
     n = 0
-    for s in sheets:
-        if await recalc_sheet(db, s, params):
+    for s in list(sheets):
+        if await recalc_sheet(db, s, params, log=True):
             n += 1
     await db.flush()
     return n
@@ -293,12 +428,21 @@ ACTIVE_PO = (
 )  # fmt: skip
 
 
+ACTION_TRUST = "supply.update_trust"
+
+
+def trust_band(score: int | None) -> str | None:
+    if score is None:
+        return None
+    return "Tin được" if score >= 80 else "Tạm ổn" if score >= 60 else "Cần dè chừng"
+
+
 def trust_label(s: Supplier) -> tuple[str, str]:
     if s.is_blocked:
         return "Đã chặn", "Chị đã chặn nhà cung cấp này."
     if s.trust_score is None:
         return "Chưa có lịch sử", "Chưa có đơn nào nhận hàng xong để chấm."
-    label = "Tin được" if s.trust_score >= 80 else "Tạm ổn" if s.trust_score >= 60 else "Cần dè chừng"
+    label = trust_band(s.trust_score) or ""
     parts = [f"{s.order_count} đơn"]
     if s.on_time_rate is not None:
         parts.append(f"đúng hẹn {round(float(s.on_time_rate) * 100)}%")
@@ -335,14 +479,29 @@ async def recompute_supplier(db: AsyncSession, supplier_id: uuid.UUID) -> Suppli
     s.defect_rate = _d(round(defects / received, 4)) if received else None
     leads = [(p.received_at - p.sent_at).total_seconds() / 86400 for p in done if p.sent_at and p.received_at]
     s.avg_lead_days = _d(round(statistics.mean(leads), 1)) if leads else None
-    if not done:
-        s.trust_score = None
-    else:
+    score: int | None = None
+    if done:
         on_time = float(s.on_time_rate) if s.on_time_rate is not None else 0.7
         quality = max(0.0, 1 - float(s.defect_rate or 0) * 5)
         raw = 100 * (0.5 * on_time + 0.5 * quality)
         n = len(done)
-        s.trust_score = round((n * raw + 2 * 70) / (n + 2))
+        score = round((n * raw + 2 * 70) / (n + 2))
+    old_band, new_band = trust_band(s.trust_score), trust_band(score)
+    if old_band and new_band and old_band != new_band:
+        # điểm uy tín là số tính ra; chỉ khi NCC đổi bậc (Tin được / Tạm ổn / Cần dè chừng) mới đáng ghi nhật ký cho chị
+        await db.flush()
+        _, basis = trust_label(s)
+        await control.propose(
+            ACTION_TRUST,
+            f"{s.name}: {old_band} → {new_band}",
+            {"supplier_id": str(s.id), "trust_score": score},
+            {"supplier": s.name, "before": f"{old_band} ({s.trust_score})", "after": f"{new_band} ({score})"},
+            db=db, summary=f"Điểm uy tín {s.trust_score} → {score} theo lịch sử: {basis}.",
+            rationale="50% đúng hẹn + 50% ít hàng lỗi, tính trên các đơn đã nhận hàng.",
+            ref_type="suppliers", ref_id=s.id, dedupe_key=f"trust:{s.id}", ai_generated=False,
+        )  # fmt: skip
+    else:
+        s.trust_score = score
     await db.flush()
     return s
 
@@ -921,8 +1080,14 @@ async def add_milestone(
     return ship
 
 
-async def sync_tracking(db: AsyncSession, ship: InboundShipment) -> int:
-    """Cập nhật mốc từ tích hợp `shipping` (driver mặc định mock). Chỉ tiến lên, không lùi. Trả số mốc mới."""
+ACTION_TRACK = "supply.track_inbound"
+
+
+async def sync_tracking(db: AsyncSession, ship: InboundShipment, *, log: bool = False) -> int:
+    """Cập nhật mốc từ tích hợp `shipping` (driver mặc định mock). Chỉ tiến lên, không lùi. Trả số mốc mới.
+
+    `log=True` (AI tự dò mốc theo lịch): có mốc mới thì đi qua `control.propose` (`supply.track_inbound`) để ghi
+    nhật ký AI; không có mốc mới thì không ghi gì. Chị tự bấm «Cập nhật mốc» thì áp thẳng."""
     if not ship.tracking_code:
         raise BadRequest("Lô này chưa có mã vận đơn để theo dõi.", code="no_tracking")
     try:
@@ -931,17 +1096,78 @@ async def sync_tracking(db: AsyncSession, ship: InboundShipment) -> int:
         raise BadRequest(f"Chưa tra được vận đơn: {e}", code="tracking_failed") from e
     seen = {m.get("status") for m in ship.milestones}
     rank = {s: i for i, s in enumerate(INBOUND_ORDER)}
-    added = 0
+    current = ship.status
+    found: list[dict[str, Any]] = []
     for ev in info.events:
         target = TRACKING_MAP.get(ev.status.value)
         if target is None or target.value in seen:
             continue
-        if target != InboundStatus.PROBLEM and rank.get(target, 0) <= rank.get(ship.status, 0):
+        if target != InboundStatus.PROBLEM and rank.get(target, 0) <= rank.get(current, 0):
             continue
-        await add_milestone(db, ship, target, note=ev.description, at=ev.occurred_at, source="shipping")
+        found.append({"status": target.value, "at": ev.occurred_at.isoformat() if ev.occurred_at else None,
+                      "note": ev.description})  # fmt: skip
         seen.add(target.value)
-        added += 1
-    return added
+        current = target
+    if not found:
+        return 0
+    if not log:
+        await apply_tracking(db, ship, found)
+        return len(found)
+    po = await db.get(PurchaseOrder, ship.purchase_order_id) if ship.purchase_order_id else None
+    name = ship.code or (po.code if po else None) or ship.tracking_code
+    labels = [INBOUND_LABELS[InboundStatus(e["status"])] for e in found]
+    outcome = await control.propose(
+        ACTION_TRACK,
+        f"Lô {name}: {labels[-1]}",
+        {"inbound_shipment_id": str(ship.id), "events": found},
+        {"code": name, "tracking_code": ship.tracking_code, "items": labels},
+        db=db, summary="Mốc mới từ hãng vận chuyển: " + ", ".join(labels) + ".",
+        rationale=f"Tra vận đơn {ship.tracking_code}" + (f" ({ship.carrier})" if ship.carrier else "") + ".",
+        ref_type="inbound_shipments", ref_id=ship.id, dedupe_key=f"track:{ship.id}", ai_generated=False,
+    )  # fmt: skip
+    return len(found) if outcome.status == "applied" else 0
+
+
+async def apply_tracking(db: AsyncSession, ship: InboundShipment, found: list[dict[str, Any]]) -> dict[str, Any]:
+    """Thêm các mốc đã dò. Trả dữ liệu hoàn tác (None nếu lô đã báo về nhà: đơn và kho đã nhận tin)."""
+    before = {"status": ship.status.value, "milestones": list(ship.milestones), "problem_note": ship.problem_note}
+    seen = {m.get("status") for m in ship.milestones}
+    for e in found:
+        if e["status"] in seen:  # đã có (chị vừa cập nhật tay): bỏ qua
+            continue
+        at = datetime.fromisoformat(e["at"]) if e.get("at") else None
+        await add_milestone(db, ship, InboundStatus(e["status"]), note=e.get("note"), at=at, source="shipping")
+        seen.add(e["status"])
+    return before
+
+
+async def _get_ship(db: AsyncSession, inbound_id: uuid.UUID) -> InboundShipment:
+    s = await db.get(InboundShipment, inbound_id)
+    if s is None:
+        raise NotFound("Không tìm thấy lô hàng.")
+    return s
+
+
+async def apply_track_action(db: AsyncSession, payload: dict[str, Any]) -> control.HandlerResult:
+    ship = await _get_ship(db, uuid.UUID(payload["inbound_shipment_id"]))
+    before = await apply_tracking(db, ship, payload["events"])
+    arrived = any(e["status"] == InboundStatus.DELIVERED.value for e in payload["events"])
+    return control.HandlerResult(
+        result={"inbound_shipment_id": str(ship.id), "status": ship.status.value},
+        undo=None if arrived else {"inbound_shipment_id": str(ship.id), "before": before},
+        summary=None,  # dùng tóm tắt lúc đề xuất (các mốc mới)
+        ref_type="inbound_shipments",
+        ref_id=ship.id,
+    )
+
+
+async def undo_track_action(db: AsyncSession, undo: dict[str, Any]) -> None:
+    ship = await _get_ship(db, uuid.UUID(undo["inbound_shipment_id"]))
+    b = undo["before"]
+    ship.status = InboundStatus(b["status"])
+    ship.milestones = list(b["milestones"])
+    ship.problem_note = b.get("problem_note")
+    await db.flush()
 
 
 # ---- d4: chứng từ nguồn gốc ----------------------------------------------------------------------------------------
@@ -1145,3 +1371,185 @@ async def apply_reply(db: AsyncSession, payload: dict[str, Any]) -> SupplierMess
     msg.extracted = payload.get("extracted") or {}
     await db.flush()
     return msg
+
+
+# ---- d4: AI đọc chứng từ ------------------------------------------------------------------------------------------
+
+ACTION_READ_DOC = "supply.read_document"
+# trường AI trích và chị sửa được (lưu trong `provenance_documents.extracted`)
+EXTRACT_FIELDS = (
+    "product_name", "product_name_vi", "manufacturer", "origin_country", "lot_number", "production_date",
+    "expiry_date", "doc_number", "doc_date", "amount", "currency", "certifications", "summary",
+)  # fmt: skip
+MAX_DOC_IMAGES = 4
+_AI_IMAGE_SIDE = 1600
+
+
+def _jpeg(data: bytes) -> bytes | None:
+    """Ảnh gửi AI: xoay đúng chiều, thu về ≤ 1600 px, JPEG (bỏ EXIF). Không mở được → None."""
+    from PIL import Image, ImageOps, UnidentifiedImageError
+
+    try:
+        img = Image.open(io.BytesIO(data))
+        if img.width * img.height > 60_000_000:
+            return None
+        img = ImageOps.exif_transpose(img) or img
+        img = img.convert("RGB")
+        img.thumbnail((_AI_IMAGE_SIDE, _AI_IMAGE_SIDE))
+        buf = io.BytesIO()
+        img.save(buf, "JPEG", quality=85)
+        return buf.getvalue()
+    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
+        return None
+
+
+def document_inputs(data: bytes, content_type: str) -> tuple[str | None, list[ai.AIImage]]:
+    """Chứng từ → (chữ trong PDF, ảnh gửi AI). PDF: lấy chữ 5 trang đầu và ảnh nhúng (bản chụp/quét) 3 trang đầu."""
+    if content_type != "application/pdf":
+        jpg = _jpeg(data)
+        return None, ([ai.AIImage(data=jpg, media_type="image/jpeg")] if jpg else [])
+    from pypdf import PdfReader
+    from pypdf.errors import PyPdfError
+
+    text: list[str] = []
+    images: list[ai.AIImage] = []
+    try:
+        reader = PdfReader(io.BytesIO(data))
+        for i, page in enumerate(reader.pages[:5]):
+            text.append(page.extract_text() or "")
+            if i < 3 and len(images) < MAX_DOC_IMAGES:
+                for im in page.images[:2]:
+                    jpg = _jpeg(im.data)
+                    if jpg:
+                        images.append(ai.AIImage(data=jpg, media_type="image/jpeg"))
+    except (PyPdfError, ValueError, KeyError, OSError) as e:
+        log.info("PDF chứng từ không đọc được: %s", e)
+    joined = "\n".join(t.strip() for t in text if t.strip())[:12000]
+    return joined or None, images[:MAX_DOC_IMAGES]
+
+
+def _parse_date(v: Any) -> date | None:
+    try:
+        return date.fromisoformat(str(v)[:10]) if v else None
+    except ValueError:
+        return None
+
+
+async def read_document(db: AsyncSession, doc: ProvenanceDocument) -> ProvenanceDocument:
+    """AI đọc chứng từ (d4, AI tự làm): trích tên hàng, NSX, xuất xứ, số lô/ngày, chứng nhận → `extracted`.
+    Đi qua `control.propose` (`supply.read_document`, mặc định AI tự làm, hoàn tác được). Lỗi AI không chặn chị."""
+    data = await get_storage().get(doc.storage_key)
+    text, images = document_inputs(data, doc.content_type)
+    if not text and not images:
+        doc.extracted = {"status": "unreadable",
+                         "note": "Không lấy được chữ hay ảnh từ tệp này. Chị chụp ảnh chứng từ rồi tải lại, hoặc nhập tay."}  # fmt: skip
+        await db.flush()
+        return doc
+    po = await db.get(PurchaseOrder, doc.purchase_order_id) if doc.purchase_order_id else None
+    if po is None and doc.inbound_shipment_id:
+        ship = await db.get(InboundShipment, doc.inbound_shipment_id)
+        po = await db.get(PurchaseOrder, ship.purchase_order_id) if ship and ship.purchase_order_id else None
+    supplier_id = doc.supplier_id or (po.supplier_id if po else None)
+    supplier = await db.get(Supplier, supplier_id) if supplier_id else None
+    try:
+        res = await ai.run(
+            "supply.read_document",
+            DocumentReadIn(
+                kind=doc.kind.value, filename=doc.filename, pdf_text=text,
+                expected_items=[ln.description for ln in po.lines][:10] if po else [],
+                supplier_name=supplier.name if supplier else None,
+            ),
+            DocumentExtract,
+            images=images,
+        )  # fmt: skip
+    except ai.AIError as e:
+        log.warning("AI chưa đọc được chứng từ %s: %s", doc.id, e)
+        doc.extracted = {"status": "failed", "note": e.message}
+        await db.flush()
+        return doc
+    out = res.output
+    extracted = {
+        **{k: v for k, v in out.model_dump().items() if k in EXTRACT_FIELDS},
+        "readable": out.readable,
+        "status": "read",
+        "source": "pdf_text" if text and not images else "image",
+        "ai_run_id": str(res.run_id),
+    }
+    label = DOC_LABELS[doc.kind]
+    outcome = await control.propose(
+        ACTION_READ_DOC,
+        f"Đọc chứng từ: {label}" + (f" · {po.code}" if po else ""),
+        {"document_id": str(doc.id), "extracted": extracted},
+        {"kind": label, "summary": out.summary, "fields": {k: extracted[k] for k in EXTRACT_FIELDS if extracted.get(k)}},
+        db=db, summary=out.summary if out.readable else "Chứng từ mờ hoặc không đọc được, chị xem lại tệp.",
+        rationale="Đọc từ " + ("chữ trong PDF" if text else "ảnh chứng từ") + "; trường nào không thấy rõ thì để trống.",
+        ref_type="provenance_documents", ref_id=doc.id, ai_run_id=res.run_id, dedupe_key=f"doc:{doc.id}",
+    )  # fmt: skip
+    if outcome.status == "pending":
+        doc.extracted = {"status": "pending"}
+    elif outcome.status in ("blocked", "failed"):
+        doc.extracted = {"status": "off" if outcome.status == "blocked" else "failed"}
+    await db.flush()
+    return doc
+
+
+async def apply_document_read(db: AsyncSession, payload: dict[str, Any]) -> control.HandlerResult:
+    doc = await db.get(ProvenanceDocument, uuid.UUID(payload["document_id"]))
+    if doc is None:
+        raise NotFound("Chứng từ đã bị xoá.")
+    if (doc.extracted or {}).get("edited"):
+        raise Conflict("Chị đã sửa thông tin chứng từ này, AI không ghi đè.", code="document_edited")
+    before = {"extracted": dict(doc.extracted or {}), "doc_number": doc.doc_number,
+              "doc_date": doc.doc_date.isoformat() if doc.doc_date else None,
+              "amount": str(doc.amount) if doc.amount is not None else None, "currency": doc.currency}  # fmt: skip
+    ex = dict(payload["extracted"])
+    doc.extracted = ex
+    # chỉ điền các ô chị còn để trống
+    if not doc.doc_number and ex.get("doc_number"):
+        doc.doc_number = str(ex["doc_number"])[:100]
+    if doc.doc_date is None:
+        doc.doc_date = _parse_date(ex.get("doc_date"))
+    if doc.amount is None and ex.get("amount") is not None:
+        doc.amount = _d(ex["amount"])
+    if not doc.currency and ex.get("currency") and len(str(ex["currency"])) == 3:
+        doc.currency = str(ex["currency"]).upper()
+    await db.flush()
+    return control.HandlerResult(
+        result={"document_id": str(doc.id)}, undo={"document_id": str(doc.id), "before": before},
+        summary=ex.get("summary") or "Đã đọc chứng từ", ref_type="provenance_documents", ref_id=doc.id,
+    )  # fmt: skip
+
+
+async def undo_document_read(db: AsyncSession, undo: dict[str, Any]) -> None:
+    doc = await db.get(ProvenanceDocument, uuid.UUID(undo["document_id"]))
+    if doc is None:
+        return
+    b = undo["before"]
+    doc.extracted = b["extracted"]
+    doc.doc_number = b["doc_number"]
+    doc.doc_date = _parse_date(b["doc_date"])
+    doc.amount = _d(b["amount"]) if b["amount"] is not None else None
+    doc.currency = b["currency"]
+    await db.flush()
+
+
+async def edit_document(
+    db: AsyncSession, doc: ProvenanceDocument, data: dict[str, Any], user: User
+) -> ProvenanceDocument:
+    """Chị sửa thông tin chứng từ (cả phần AI đọc). Đã sửa thì AI đọc lại không ghi đè (trừ khi chị bấm đọc lại)."""
+    ex_in = data.pop("extracted", None)
+    for k, v in data.items():
+        setattr(doc, k, v.upper() if k == "currency" and v else v)
+    if ex_in is not None:
+        ex = dict(doc.extracted or {})
+        for k, v in ex_in.items():
+            if k in EXTRACT_FIELDS:
+                ex[k] = v
+        ex.update(edited=True, status="read", edited_at=now_utc().isoformat())
+        doc.extracted = ex
+    await control.audit(
+        db, "supply.document_edited", user=user, entity_type="provenance_documents", entity_id=doc.id,
+        summary=f"Sửa chứng từ {DOC_LABELS[doc.kind]}", data={"fields": sorted([*data, *(ex_in or {})])},
+    )  # fmt: skip
+    await db.flush()
+    return doc

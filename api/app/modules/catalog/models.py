@@ -1,5 +1,5 @@
 """catalog — website (e1–e3, e6, e8–e10): nhóm hàng, sản phẩm + phân loại + ảnh, đợt mở bán, tồn kho nhỏ,
-đánh giá của khách, trang Nhờ chị tìm."""
+đánh giá của khách, trang Nhờ tìm."""
 
 from __future__ import annotations
 
@@ -344,7 +344,7 @@ class Review(UUIDPk, Timestamps, Base):
 
 
 class FindRequest(UUIDPk, Timestamps, Base):
-    """Trang Nhờ chị tìm (e9): khách gửi nhu cầu, người khác bấm «cùng cần»; đủ người thì mở tìm."""
+    """Trang Nhờ tìm (e9): khách gửi nhu cầu, người khác bấm «cùng cần»; đủ người thì mở tìm."""
 
     __tablename__ = "find_requests"
 

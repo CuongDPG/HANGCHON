@@ -19,14 +19,14 @@ import { DeskSubnav } from "./desk-subnav";
 
 const SETTING = "catalog.find_request_threshold";
 
-/** Nhờ chị tìm (e9): duyệt lời nhờ trước khi hiện, theo dõi số người cùng cần, chuyển trạng thái. */
+/** Nhờ tìm (e9): duyệt lời nhờ trước khi hiện, theo dõi số người cùng cần, chuyển trạng thái. */
 export function FindsScreen() {
   const [tab, setTab] = useState<FindStatus>("pending_review");
   const { data, isPending, error } = useDeskFinds(tab);
   const rows = data?.items ?? [];
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Nhờ chị tìm" description="Khách gửi nhu cầu, người khác bấm «mình cũng cần». Đủ người, AI báo sang Săn hàng." />
+      <PageHeader title="Nhờ tìm" description="Khách gửi nhu cầu, người khác bấm «mình cũng cần». Đủ người, AI báo sang Săn hàng." />
       <DeskSubnav active="finds" />
       <ThresholdSetting />
       <Tabs

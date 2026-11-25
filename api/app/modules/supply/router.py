@@ -13,6 +13,7 @@ from sqlalchemy import func, or_, select
 from app.core.db import DbSession
 from app.core.deps import CurrentUser, OwnerUser
 from app.core.errors import BadRequest, Conflict, NotFound
+from app.core.jobs import enqueue
 from app.core.pagination import Page, Paginated, paginate
 from app.core.storage import get_storage, new_key
 from app.modules.selection.service import file_url
@@ -38,6 +39,7 @@ from app.modules.supply.schemas import (
     CostSheetIn,
     CostSheetOut,
     CostSheetView,
+    DocumentPatch,
     DocumentView,
     DocumentWarning,
     InboundIn,
@@ -577,17 +579,43 @@ async def upload_document(
         supplier_id=supplier_id, storage_key=stored.key, filename=(file.filename or f"chung-tu.{ext}")[:255],
         content_type=ctype, size_bytes=len(data), doc_number=doc_number, doc_date=doc_date, amount=amount,
         currency=currency.upper() if currency else None, notes=notes, uploaded_by_id=user.id,
+        extracted={"status": "reading"},
     )  # fmt: skip
     db.add(doc)
-    await db.flush()
+    await db.commit()
+    await enqueue("supply.read_document", document_id=str(doc.id))  # AI đọc chứng từ (d4), chạy nền
+    await db.refresh(doc)
     return document_view(doc)
+
+
+async def _get_document(db: DbSession, document_id: uuid.UUID) -> ProvenanceDocument:
+    d = await db.get(ProvenanceDocument, document_id)
+    if d is None:
+        raise NotFound("Không tìm thấy chứng từ.")
+    return d
+
+
+@router.patch("/documents/{document_id}", response_model=DocumentView, summary="Chị sửa chứng từ và phần AI đọc")
+async def edit_document(document_id: uuid.UUID, body: DocumentPatch, user: CurrentUser, db: DbSession) -> DocumentView:
+    data = body.model_dump(exclude_unset=True)
+    if "extracted" in data and data["extracted"] is not None:
+        data["extracted"] = body.extracted.model_dump(exclude_unset=True)  # type: ignore[union-attr]
+    return document_view(await service.edit_document(db, await _get_document(db, document_id), data, user))
+
+
+@router.post("/documents/{document_id}/read", response_model=DocumentView, summary="AI đọc lại chứng từ")
+async def reread_document(document_id: uuid.UUID, _: CurrentUser, db: DbSession) -> DocumentView:
+    d = await _get_document(db, document_id)
+    d.extracted = {"status": "reading"}
+    await db.commit()
+    await enqueue("supply.read_document", document_id=str(d.id))
+    await db.refresh(d)
+    return document_view(d)
 
 
 @router.delete("/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_document(document_id: uuid.UUID, _: OwnerUser, db: DbSession) -> None:
-    d = await db.get(ProvenanceDocument, document_id)
-    if d is None:
-        raise NotFound("Không tìm thấy chứng từ.")
+    d = await _get_document(db, document_id)
     key = d.storage_key
     await db.delete(d)
     await db.flush()

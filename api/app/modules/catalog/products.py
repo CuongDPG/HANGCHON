@@ -21,7 +21,7 @@ from app.modules.catalog import images as img_lib
 from app.modules.catalog.ai_tasks import FactIn, WritePageIn, WritePageOut
 from app.modules.catalog.dossier import Snapshot, build_snapshot, overclaims, spec_pairs, unsupported_numbers
 from app.modules.catalog.models import ImageStatus, Product, ProductImage, ProductStatus
-from app.modules.catalog.textutil import unique_slug
+from app.modules.catalog.textutil import seller_address_issues, unique_slug
 from app.modules.control.models import ApprovalItem, ApprovalStatus, User
 from app.modules.sourcing.models import Candidate
 
@@ -170,8 +170,9 @@ async def write_page(db: AsyncSession, product: Product, *, note: str | None = N
     if product.status == ProductStatus.DRAFT:
         product.status = ProductStatus.PENDING_REVIEW
     await db.flush()
+    checks["pronouns"] = [f"{i['field']}: «{i['quote']}» → gợi ý «{i['suggestion']}»" for i in voice_issues(product)]
     warnings = len(checks["dropped_specs"]) + len(checks["dropped_faq"]) + len(checks["unsupported_numbers"])
-    warnings += len(checks["overclaims"])
+    warnings += len(checks["overclaims"]) + len(checks["pronouns"])
     outcome = await control.propose(
         "catalog.publish_product",
         f"Đăng trang sản phẩm: {product.name}",
@@ -204,11 +205,48 @@ async def write_page(db: AsyncSession, product: Product, *, note: str | None = N
     return outcome
 
 
+_VOICE_FIELDS = (
+    ("name", "Tên"), ("subtitle", "Dòng phụ"), ("short_description", "Mô tả ngắn"), ("description", "Mô tả"),
+    ("reason_selected", "Lý do chọn"), ("not_satisfied", "Điều chưa ưng"), ("seo_title", "Tiêu đề tìm kiếm"),
+    ("seo_description", "Mô tả tìm kiếm"),
+)  # fmt: skip
+
+
+def voice_issues(product: Product) -> list[dict[str, str]]:
+    """Chỗ trên trang (khách đọc) còn gọi người bán là «chị»: `path` (trường), `field` (nhãn), `quote`, `suggestion`.
+    Lời trích trong ngoặc «…» (vd lời khách) và chữ như «chịu» không tính."""
+    texts: list[tuple[str, str, str | None]] = [(k, label, getattr(product, k)) for k, label in _VOICE_FIELDS]
+    for i, s in enumerate(product.specs or []):
+        texts += [
+            (f"specs.{i}.label", f"Thông số {i + 1}", s.get("label")),
+            (f"specs.{i}.value", f"Thông số {i + 1}", s.get("value")),
+        ]
+    for i, f in enumerate(product.faq or []):
+        texts += [
+            (f"faq.{i}.q", f"Hỏi đáp {i + 1} (câu hỏi)", f.get("q")),
+            (f"faq.{i}.a", f"Hỏi đáp {i + 1} (trả lời)", f.get("a")),
+        ]
+    out = []
+    for path, label, text in texts:
+        for hit in seller_address_issues(text if isinstance(text, str) else None):
+            out.append({"path": path, "field": label, **hit})
+    return out
+
+
 def check_publishable(product: Product) -> None:
     if not product.name.strip():
         raise BadRequest("Sản phẩm chưa có tên.")
     if product.price_vnd <= 0:
         raise BadRequest("Sản phẩm chưa có giá bán. Chị đặt giá trước khi đăng.", code="no_price")
+    issues = voice_issues(product)
+    if issues:
+        first = issues[0]
+        more = f" (và {len(issues) - 1} chỗ khác)" if len(issues) > 1 else ""
+        raise BadRequest(
+            f"Trang còn gọi người bán là «chị» ở {first['field'].lower()}: «{first['quote']}»{more}. Khách đọc trang "
+            f"này nên người bán xưng «mình», gọi khách «bạn» — gợi ý: «{first['suggestion']}».",
+            code="seller_address",
+        )
 
 
 async def publish(db: AsyncSession, product: Product, *, user: User | None = None) -> Product:
@@ -336,7 +374,7 @@ async def upload_image(db: AsyncSession, product: Product, data: bytes, *, alt: 
         {"image_id": str(img.id)},
         {"product": product.name},
         db=db,
-        summary="Xoay đúng chiều, cân sáng nhẹ, cắt vuông giữ món ở giữa, tạo các cỡ webp/jpg.",
+        summary="Xoay đúng chiều, cân sáng nhẹ, làm sạch nền sáng (nếu nền đơn giản), cắt vuông giữ món ở giữa.",
         ref_type="product_images",
         ref_id=img.id,
         ai_generated=False,
@@ -347,9 +385,13 @@ async def upload_image(db: AsyncSession, product: Product, data: bytes, *, alt: 
     return img
 
 
+CLEAN_BG_SETTING = "catalog.image_clean_background"
+
+
 async def render_image(db: AsyncSession, img: ProductImage, *, enhance: bool) -> ProductImage:
     data = await get_storage().get(img.original_key)
-    processed = img_lib.process_photo(data, enhance=enhance)
+    clean_bg = enhance and bool(await control.get_setting(db, CLEAN_BG_SETTING))
+    processed = img_lib.process_photo(data, enhance=enhance, clean_bg=clean_bg)
     files = await img_lib.store_renditions(f"public/products/{img.product_id}", processed)
     old = img_lib.rendition_files(img.processing_ops)
     img.processing_ops = [*processed.ops, {"op": "renditions", "files": files}]

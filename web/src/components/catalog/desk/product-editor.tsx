@@ -31,6 +31,7 @@ import {
 } from "@/lib/api/catalog";
 import { api } from "@/lib/api/client";
 import { ImageManager } from "./image-manager";
+import { sellerAddressIssues } from "./seller-voice";
 import { STATUS_TONE } from "./products-screen";
 import { RelatedLinks } from "@/components/desk/related-links";
 
@@ -124,7 +125,50 @@ type Checks = {
   dropped_faq?: string[];
   unsupported_numbers?: { field: string; numbers: string[] }[];
   overclaims?: string[];
+  pronouns?: string[];
 };
+
+type TextKey = "name" | "subtitle" | "short_description" | "description" | "reason_selected" | "not_satisfied" | "seo_title" | "seo_description";
+const VOICE_FIELDS: [TextKey, string][] = [
+  ["name", "Tên"],
+  ["subtitle", "Dòng phụ"],
+  ["short_description", "Mô tả ngắn"],
+  ["description", "Mô tả"],
+  ["reason_selected", "Vì sao mình chọn"],
+  ["not_satisfied", "Điều mình chưa ưng"],
+  ["seo_title", "Tiêu đề tìm kiếm"],
+  ["seo_description", "Mô tả tìm kiếm"],
+];
+
+type VoiceIssue = { key: string; field: string; quote: string; suggestion: string; apply: (d: Draft) => Draft };
+
+/** Chỗ trên bản nháp còn gọi người bán là «chị» (khách đọc trang này), kèm cách sửa theo gợi ý. */
+function draftVoiceIssues(d: Draft): VoiceIssue[] {
+  const out: VoiceIssue[] = [];
+  const swap = (text: string, q: string, s: string) => text.replace(q, s);
+  for (const [k, label] of VOICE_FIELDS) {
+    for (const h of sellerAddressIssues(d[k])) {
+      out.push({ key: `${k}:${h.quote}`, field: label, ...h, apply: (x) => ({ ...x, [k]: swap(x[k], h.quote, h.suggestion) }) });
+    }
+  }
+  d.specs.forEach((row, i) => {
+    for (const part of ["label", "value"] as const)
+      for (const h of sellerAddressIssues(row[part]))
+        out.push({
+          key: `spec${i}${part}:${h.quote}`, field: `Thông số ${i + 1}`, ...h,
+          apply: (x) => ({ ...x, specs: x.specs.map((r, j) => (j === i ? { ...r, [part]: swap(r[part], h.quote, h.suggestion) } : r)) }),
+        });
+  });
+  d.faq.forEach((row, i) => {
+    for (const part of ["q", "a"] as const)
+      for (const h of sellerAddressIssues(row[part]))
+        out.push({
+          key: `faq${i}${part}:${h.quote}`, field: `Hỏi đáp ${i + 1} (${part === "q" ? "câu hỏi" : "trả lời"})`, ...h,
+          apply: (x) => ({ ...x, faq: x.faq.map((r, j) => (j === i ? { ...r, [part]: swap(r[part], h.quote, h.suggestion) } : r)) }),
+        });
+  });
+  return out;
+}
 
 const FIELD_LABELS: Record<string, string> = { name: "tên", subtitle: "dòng phụ", short_description: "mô tả ngắn", description: "mô tả" };
 
@@ -174,8 +218,10 @@ export function ProductEditor({ id }: { id: string }) {
         ...(c.dropped_faq ?? []).map((x) => `Bỏ câu hỏi không có căn cứ: ${x}`),
         ...(c.unsupported_numbers ?? []).map((x) => `Số liệu lạ ở ${FIELD_LABELS[x.field] ?? x.field}: ${x.numbers.join(", ")}`),
         ...(c.overclaims?.length ? [`Có từ nói quá: ${c.overclaims.join(", ")}`] : []),
+        // «chị» đã hiện riêng ở thẻ «Xưng hô với khách» (tính theo bản nháp đang sửa)
       ]
     : [];
+  const voice = draftVoiceIssues(draft);
   const funnel = p.dossier?.funnel;
 
   return (
@@ -194,6 +240,29 @@ export function ProductEditor({ id }: { id: string }) {
         ]}
       />
 
+      {voice.length ? (
+        <Card tone="danger" aria-label="Xưng hô với khách">
+          <p className="flex items-center gap-1.5 text-[15px] font-semibold">
+            <CircleAlert className="size-4 text-seal" aria-hidden /> Trang còn gọi người bán là «chị» ở {voice.length} chỗ
+          </p>
+          <p className="mt-0.5 text-[13.5px] text-ink-2">Khách đọc trang này: người bán xưng «mình», gọi khách «bạn». Sửa xong mới đăng được.</p>
+          <ul className="mt-2 flex flex-col gap-2">
+            {voice.map((v) => (
+              <li key={v.key} className="flex flex-col gap-1.5 rounded-md bg-surface px-3 py-2 sm:flex-row sm:items-center sm:gap-3">
+                <div className="min-w-0 flex-1 text-[14px]">
+                  <p className="text-[12.5px] font-semibold text-ink-2">{v.field}</p>
+                  <p className="text-ink-2 line-through decoration-seal/60">{v.quote}</p>
+                  <p>{v.suggestion}</p>
+                </div>
+                <Button size="sm" variant="secondary" className="self-start sm:self-center" onClick={() => setDraft(v.apply(draft))}>
+                  Sửa theo gợi ý
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
+
       {warnings.length ? (
         <Card tone="danger">
           <p className="flex items-center gap-1.5 text-[15px] font-semibold">
@@ -209,7 +278,7 @@ export function ProductEditor({ id }: { id: string }) {
 
       <div className="flex flex-wrap gap-2">
         {isOwner && p.status !== "published" ? (
-          <Button icon={<Send className="size-4" />} loading={publish.isPending} onClick={() => publish.mutate(dirty ? toPatch(draft) : null, { onSuccess: () => notifySuccess("Đã đăng lên kệ") })}>
+          <Button icon={<Send className="size-4" />} loading={publish.isPending} disabled={voice.length > 0} onClick={() => publish.mutate(dirty ? toPatch(draft) : null, { onSuccess: () => notifySuccess("Đã đăng lên kệ") })}>
             {dirty ? "Lưu và đăng lên kệ" : "Đăng lên kệ"}
           </Button>
         ) : null}
