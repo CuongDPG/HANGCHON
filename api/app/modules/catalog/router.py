@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import control
+from app.core import ratelimit
 from app.core.config import settings
 from app.core.db import DbSession
 from app.core.deps import CurrentUser, OwnerUser
@@ -21,6 +22,7 @@ from app.modules.catalog import finds as find_svc
 from app.modules.catalog import products as product_svc
 from app.modules.catalog import public
 from app.modules.catalog import reviews as review_svc
+from app.modules.catalog.images import MAX_UPLOAD_BYTES
 from app.modules.catalog.models import (
     Category,
     Drop,
@@ -98,8 +100,7 @@ def device_key(request: Request, response: Response) -> str:
 
 
 def client_ip(request: Request) -> str:
-    fwd = request.headers.get("x-forwarded-for")
-    return (fwd.split(",")[0].strip() if fwd else None) or (request.client.host if request.client else "?")
+    return ratelimit.client_ip(request)
 
 
 # ==== khách =======================================================================================================
@@ -255,7 +256,13 @@ async def submit_review(
 ) -> Any:
     await limit(f"review:{client_ip(request)}", 10, 600)
     r = await review_svc.get_by_token(db, token)
-    blobs = [await f.read() for f in (photos or []) if f.filename]
+    files = [f for f in (photos or []) if f.filename]
+    # kiểm số lượng và cỡ TRƯỚC khi đọc vào bộ nhớ (route công khai: tệp khổng lồ không được làm sập máy chủ)
+    if len(files) > review_svc.MAX_PHOTOS:
+        raise BadRequest(f"Tối đa {review_svc.MAX_PHOTOS} ảnh.")
+    if any((f.size or 0) > MAX_UPLOAD_BYTES for f in files):
+        raise BadRequest("Ảnh lớn quá 15 MB, bạn chọn ảnh nhỏ hơn nhé.", code="image_too_large")
+    blobs = [await f.read() for f in files]
     await review_svc.submit(db, r, rating=rating, body=body, display_name=display_name, photos=blobs)
     return await _invite(db, r)
 

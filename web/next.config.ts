@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+import { SECURITY_HEADERS, SECURITY_HEADERS_SOURCE } from "./src/lib/security-headers";
+
 // Web gọi API qua cùng origin: /api/* được chuyển tiếp sang FastAPI (cookie httpOnly đi kèm).
 // Lưu ý: rewrites được tính lúc `next build`, nên API_ORIGIN phải có sẵn khi build bản chạy thật.
 const API_ORIGIN = (process.env.API_ORIGIN ?? "http://localhost:8010").replace(/\/$/, "");
@@ -12,6 +14,9 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   poweredByHeader: false,
+  async headers() {
+    return [{ source: SECURITY_HEADERS_SOURCE, headers: SECURITY_HEADERS }];
+  },
   async rewrites() {
     return [{ source: "/api/:path*", destination: `${API_ORIGIN}/api/:path*` }];
   },

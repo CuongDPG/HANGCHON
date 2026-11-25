@@ -31,11 +31,17 @@ def verify_password(password: str, password_hash: str) -> bool:
         return False
 
 
-def create_access_token(user_id: uuid.UUID, role: str, *, minutes: int | None = None) -> str:
+def password_stamp(password_hash: str) -> str:
+    """Dấu của mật khẩu hiện tại, ghi vào phiên: đổi mật khẩu (tự đổi hay chị cấp lại) = mọi phiên cũ hết hiệu lực."""
+    return hmac_sha256(settings.jwt_secret, f"pw:{password_hash}".encode())[:16]
+
+
+def create_access_token(user_id: uuid.UUID, role: str, password_hash: str, *, minutes: int | None = None) -> str:
     now = now_utc()
     payload: dict[str, Any] = {
         "sub": str(user_id),
         "role": role,
+        "pws": password_stamp(password_hash),
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=minutes or settings.jwt_expire_minutes)).timestamp()),
     }

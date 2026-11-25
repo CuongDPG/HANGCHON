@@ -9,6 +9,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Query, Request, Response, status
 from sqlalchemy import select
 
+from app.core import ratelimit
 from app.core.config import settings
 from app.core.db import DbSession
 from app.core.deps import CurrentUser, OwnerUser
@@ -63,6 +64,12 @@ from app.modules.control.schemas import (
 
 auth_router = APIRouter(prefix="/api/desk/auth", tags=["auth"])
 
+LOGIN_WINDOW = 15 * 60
+LOGIN_MAX_PER_ACCOUNT = 10
+LOGIN_MAX_PER_IP = 30
+LOGIN_LOCKED = "Đăng nhập sai nhiều lần, chị đợi 15 phút rồi thử lại."
+_DUMMY_HASH = hash_password("khong-phai-mat-khau-cua-ai")
+
 
 def _set_cookie(response: Response, token: str) -> None:
     response.set_cookie(
@@ -79,13 +86,26 @@ def _set_cookie(response: Response, token: str) -> None:
 
 @auth_router.post("/login", response_model=UserOut)
 async def login(body: LoginIn, response: Response, request: Request, db: DbSession) -> User:
+    # chống dò mật khẩu: theo tài khoản (đổi IP không thoát) và theo IP (dò nhiều tài khoản).
+    # Chỉ đếm lần SAI; vượt ngưỡng thì khoá cả lần đúng cho tới hết cửa sổ.
+    keys = (
+        (f"login:email:{body.email}", LOGIN_MAX_PER_ACCOUNT),
+        (f"login:ip:{ratelimit.client_ip(request)}", LOGIN_MAX_PER_IP),
+    )
+    for key, cap in keys:
+        if not await ratelimit.hit(key, cap, LOGIN_WINDOW, record=False):
+            raise ratelimit.RateLimited(LOGIN_LOCKED, code="login_locked")
     user = (await db.execute(select(User).where(User.email == body.email))).scalar_one_or_none()
-    if user is None or not verify_password(body.password, user.password_hash):
+    # email không có vẫn băm thử một lần: thời gian trả lời không lộ email nào có tài khoản
+    ok = verify_password(body.password, user.password_hash if user else _DUMMY_HASH)
+    if user is None or not ok:
+        for key, cap in keys:
+            await ratelimit.hit(key, cap, LOGIN_WINDOW)
         raise Unauthorized("Email hoặc mật khẩu chưa đúng.", code="invalid_credentials")
     if not user.is_active:
         raise Unauthorized("Tài khoản đã bị khoá.", code="inactive")
     user.last_login_at = now_utc()
-    _set_cookie(response, create_access_token(user.id, user.role.value))
+    _set_cookie(response, create_access_token(user.id, user.role.value, user.password_hash))
     await service.audit(db, "auth.login", user=user, entity_type="user", entity_id=user.id,
                         ip=request.client.host if request.client else None)  # fmt: skip
     return user
@@ -104,11 +124,15 @@ async def me(user: CurrentUser) -> User:
 
 
 @auth_router.post("/password", status_code=status.HTTP_204_NO_CONTENT)
-async def change_password(body: PasswordChange, user: CurrentUser, db: DbSession) -> None:
+async def change_password(body: PasswordChange, user: CurrentUser, response: Response, db: DbSession) -> Response:
     if not verify_password(body.current_password, user.password_hash):
         raise BadRequest("Mật khẩu hiện tại chưa đúng.", code="invalid_credentials")
     user.password_hash = hash_password(body.new_password)
+    # phiên khác (máy khác, cookie bị lấy) hết hiệu lực theo dấu mật khẩu; phiên đang dùng nhận cookie mới
+    _set_cookie(response, create_access_token(user.id, user.role.value, user.password_hash))
+    response.status_code = status.HTTP_204_NO_CONTENT
     await service.audit(db, "auth.password_changed", user=user, entity_type="user", entity_id=user.id)
+    return response
 
 
 # ---- người dùng (k4) ---------------------------------------------------------------------------------------------

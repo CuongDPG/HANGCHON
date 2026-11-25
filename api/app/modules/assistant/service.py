@@ -32,6 +32,8 @@ log = logging.getLogger("app.assistant")
 
 PER_MINUTE = 6
 PER_DAY = 40
+# Bỏ cookie là có phiên mới → thêm trần theo IP mỗi ngày để một máy không đốt hết trần chi phí AI của chị.
+PER_DAY_IP = 120
 MAX_QUESTION = 500
 HANDOFF_TEXT = (
     "Câu này mình chưa có thông tin chắc chắn trong hồ sơ nên đã chuyển cho chị. "
@@ -197,6 +199,8 @@ async def ask(
     await _check_burst(f"s:{session_key}")
     if ip_hash:
         await _check_burst(f"ip:{ip_hash}")
+        if not await ratelimit.hit(f"assistant:day:{ip_hash}", PER_DAY_IP, 86400):
+            raise RateLimited("Hôm nay bạn đã hỏi nhiều rồi. Bạn nhắn thẳng cho chị qua Zalo giúp mình nhé.")
     if await _day_count(db, session_key) >= PER_DAY:
         raise RateLimited("Hôm nay bạn đã hỏi nhiều rồi. Bạn nhắn thẳng cho chị qua Zalo giúp mình nhé.")
 

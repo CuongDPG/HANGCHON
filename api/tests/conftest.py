@@ -91,7 +91,10 @@ async def _schema() -> AsyncIterator[None]:
 
 @pytest.fixture(autouse=True)
 async def _clean() -> AsyncIterator[None]:
+    from app.core import ratelimit
+
     reset_drivers()
+    ratelimit.reset()  # bộ đếm giới hạn tần suất trong tiến trình (test) không mang sang test sau
     yield
     tables = ", ".join(f'"{t.name}"' for t in Base.metadata.sorted_tables)
     async with engine.begin() as conn:
