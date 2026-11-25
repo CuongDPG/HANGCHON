@@ -17,16 +17,24 @@ async function login(request: APIRequestContext) {
 
 type Card = { id: string; title: string };
 
-// Hai bài đầu ghi dữ liệu trên cùng cột «Ứng viên» → chạy lần lượt, mỗi bài trả món về chỗ cũ khi xong.
+/**
+ * Món riêng của từng bài trong cột «Ứng viên» của dữ liệu mẫu. Không lấy «món đầu cột»: các bài khác chạy song song
+ * cũng ghi vào cột này (săn hàng, vòng đời thêm ứng viên mới; Hôm nay duyệt gợi ý mua mẫu «Cốc giữ nhiệt…»).
+ */
+async function seedCard(request: APIRequestContext, title: string): Promise<Card | undefined> {
+  const board = await (await request.get("/api/desk/selection/board")).json();
+  return (board.columns.candidate as Card[]).find((c) => c.title === title);
+}
+
+// Hai bài đầu ghi dữ liệu trên cột «Ứng viên» → chạy lần lượt, mỗi bài trả món về chỗ cũ khi xong.
 test.describe.configure({ mode: "serial" });
 
 test("chọn một món: thử → ghi chú → đóng dấu → chốt lời", async ({ page }, info) => {
   test.skip(info.project.name !== "mobile", "Một luồng ghi dữ liệu, chạy ở khung điện thoại");
   test.skip(!(await login(page.request)), "API chưa chạy hoặc chưa có dữ liệu mẫu");
 
-  const board = await (await page.request.get("/api/desk/selection/board")).json();
-  const card: Card | undefined = board.columns.candidate[0];
-  test.skip(!card, "Không còn ứng viên trong cột Ứng viên");
+  const card = await seedCard(page.request, "Giá phơi giày ban công");
+  expect(card, "dữ liệu mẫu có «Giá phơi giày ban công» ở cột Ứng viên").toBeTruthy();
   await page.request.post(`/api/desk/selection/candidates/${card!.id}/stage`, { data: { to: "trial" } });
 
   try {
@@ -58,9 +66,8 @@ test("chọn một món: thử → ghi chú → đóng dấu → chốt lời", 
 test("loại một món phải ghi lý do", async ({ page }, info) => {
   test.skip(info.project.name !== "mobile", "Một luồng ghi dữ liệu, chạy ở khung điện thoại");
   test.skip(!(await login(page.request)), "API chưa chạy hoặc chưa có dữ liệu mẫu");
-  const board = await (await page.request.get("/api/desk/selection/board")).json();
-  const card: Card | undefined = board.columns.candidate[0];
-  test.skip(!card, "Không còn ứng viên trong cột Ứng viên");
+  const card = await seedCard(page.request, "Cây phơi đứng 3 tầng");
+  expect(card, "dữ liệu mẫu có «Cây phơi đứng 3 tầng» ở cột Ứng viên").toBeTruthy();
   try {
     await page.goto(`/desk/ban-chon/${card!.id}`);
     await page.getByRole("button", { name: "Loại, ghi lý do" }).click();

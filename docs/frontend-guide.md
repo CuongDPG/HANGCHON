@@ -67,7 +67,8 @@ export function ApprovalsScreen() {
 
 - Mỗi trang đúng một `PageHeader` (một `<h1>`). Nút quay lại chỉ là mũi tên (`backHref`).
 - Trang gốc bọc nội dung trong `<div className="flex flex-col gap-4">` (hoặc `gap-6`); khung đã lo lề và khoảng chừa cho thanh điều hướng.
-- Thiết kế ở **390px trước**, rồi nới bằng `md:` (768px) — đây cũng là mốc điều hướng chuyển từ thanh dưới sang cột trái/hàng menu trên.
+- Website cho khách: thiết kế ở **390px trước**, rồi nới bằng `md:` (768px). Bàn làm việc: **máy tính trước** (1280/1440/1920, 1024 vẫn phải dùng được); điện thoại chỉ giữ thanh tab dưới như hiện có.
+  `md:` cũng là mốc điều hướng chuyển từ thanh dưới sang hàng menu trên (`DeskTopBar`: mục chính + «Thêm» lấy từ `desk-nav.ts`, mục không đủ chỗ tự dồn vào «Thêm»).
 - Chỉ dùng token màu (mục 4). Bảng màu mặc định của Tailwind đã tắt: `bg-red-500` sẽ không có tác dụng.
 - Không dùng `alert/confirm/prompt` và không dùng `<select>` thuần: dùng `useConfirm()`, `notifySuccess/notifyError`, `InlineSelect`.
 - Tiền luôn qua `<Money>`/`formatVnd` (số nguyên VND). Ngày giờ qua `<DateTime>`/`format*` (giờ Việt Nam).
@@ -186,7 +187,7 @@ Tiện ích (`src/lib`): `format.ts` (`formatVnd`, `formatVndCompact`, `formatNu
 `formatDateTime`, `formatWeekday`, `formatRelative`), `text.ts` (`normalizeVi`, `matchesVi`, `slugifyVi`), `cn.ts` (ghép className, lớp sau thắng).
 
 Khung: `components/layout/brand.tsx` (`Brand`, `BrandMark`), `components/store/*` (đầu trang, thanh dưới, chân trang, `StorePlaceholder`),
-`components/desk/*` (`DeskShell`, `MoreSheet`, `CommandButton`, `DeskPlaceholder`).
+`components/desk/*` (`DeskShell`, `DeskTopBar`, `MoreSheet`, `CommandButton`, `DeskPlaceholder`).
 
 ## 6. Bản đồ route
 

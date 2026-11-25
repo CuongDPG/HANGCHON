@@ -55,7 +55,8 @@ export function ContentHome() {
             }
           />
         ) : (
-          <ul className="grid gap-2 md:grid-cols-2">
+          // grid-cols-1 (= minmax(0,1fr)): cột ngầm định `auto` giãn theo tên món dài (truncate là nowrap) → tràn ngang ở 390px
+          <ul className="grid grid-cols-1 gap-2 md:grid-cols-2">
             {shown.map((it) => (
               <li key={`${it.kind}-${it.id}`}>
                 <StudioRow item={it} />

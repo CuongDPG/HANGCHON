@@ -25,12 +25,11 @@ test("Hôm nay → sửa rồi duyệt, trả lại, đổi mức tự chủ, ho
 
   // i1 + i2: mở việc chờ từ «Hôm nay», sửa rồi duyệt
   await expect(main(page).getByRole("heading", { level: 2, name: /việc chờ chị/ })).toBeVisible();
-  // việc an toàn để duyệt trong dữ liệu mẫu: gợi ý mua mẫu (đơn nháp từ tin nhắn còn thiếu địa chỉ thì duyệt sẽ lỗi)
-  const all = main(page).getByRole("button", { name: /Duyệt →/ });
-  const safe = all.filter({ hasText: "Mua mẫu «" });
-  const rows = (await safe.count()) ? safe : all;
-  if (await rows.count()) {
-    await rows.first().click();
+  // Bài chạy song song trên CÙNG dữ liệu mẫu → chỉ đụng việc chờ dành riêng cho bài này, không lấy «việc đầu tiên»:
+  // gợi ý mua mẫu món «Cốc giữ nhiệt…» (Bàn chọn dùng món khác; vòng đời, săn hàng tạo món mới của riêng chúng).
+  const row = main(page).getByRole("button", { name: /Duyệt →/ }).filter({ hasText: "Mua mẫu «Cốc giữ nhiệt văn phòng có nắp»" });
+  {
+    await row.click();
     const sheet = page.getByRole("dialog");
     if (await sheet.getByRole("button", { name: "Sửa" }).count()) {
       await sheet.getByRole("button", { name: "Sửa" }).click();
@@ -47,10 +46,12 @@ test("Hôm nay → sửa rồi duyệt, trả lại, đổi mức tự chủ, ho
   // i2: trả lại kèm lời nhắn ở hàng chờ
   await page.goto("/desk/duyet");
   await expect(page.getByRole("heading", { level: 1, name: "Chờ duyệt" })).toBeVisible();
-  await page.waitForLoadState("networkidle");
-  const pending = main(page).getByRole("button", { name: /Duyệt →|Xử lý →/ });
-  if (await pending.count()) {
-    await pending.first().click();
+  // trả lại một việc dành riêng cho bài này (lấy «việc đầu tiên» có thể trúng bài đăng mà bài Nội dung đang duyệt)
+  const queue = (await (await page.request.get("/api/desk/control/approvals?status=pending&size=100")).json()) as { items: { id: string; title: string }[] };
+  const broadcast = queue.items.find((i) => i.title === "Báo khách quen: Đồ phơi và đồ tắm cho bé");
+  expect(broadcast, "dữ liệu mẫu có việc chờ «Báo khách quen: Đồ phơi và đồ tắm cho bé»").toBeTruthy();
+  await page.goto(`/desk/duyet?id=${broadcast!.id}`);
+  {
     const sheet = page.getByRole("dialog");
     await sheet.getByRole("button", { name: "Trả lại" }).click();
     await sheet.getByLabel("Lời nhắn cho AI").fill("Viết ngắn lại, bỏ câu nói quá");

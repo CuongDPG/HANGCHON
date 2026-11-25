@@ -51,16 +51,18 @@ test("xưởng: viết lại, duyệt, xếp lịch", async ({ page }, info) => 
   await expect(main.getByLabel("Kịch bản theo cảnh")).toBeVisible();
   await shot(page, "xuong-tiktok", info.project.name);
 
-  await main.getByRole("tab", { name: /Threads/ }).click();
+  // hai khổ màn hình chạy song song trên cùng dữ liệu mẫu: mỗi bên viết lại + duyệt một kênh riêng của món này,
+  // không thì bên này thay mất bản nháp bên kia đang mở
+  const channel = info.project.name === "mobile" ? "Threads" : "Zalo";
+  await main.getByRole("tab", { name: new RegExp(channel) }).click();
   await main.getByRole("button", { name: "Ngắn hơn" }).click();
   await expect(page.getByText(/Đã viết lại/)).toBeVisible();
-  await page.waitForLoadState("networkidle");
   await main.getByRole("button", { name: "Duyệt, xếp lịch" }).click();
   const sheet = page.getByRole("dialog");
   await expect(sheet.getByLabel("Đăng lúc")).toBeVisible();
   await shot(page, "xuong-duyet", info.project.name);
   await sheet.getByRole("button", { name: "Duyệt, xếp lịch" }).click();
-  await expect(main.getByRole("tab", { name: "Threads ✓" })).toBeVisible();
+  await expect(main.getByRole("tab", { name: `${channel} ✓` })).toBeVisible();
   await noOverflow(page);
 });
 
