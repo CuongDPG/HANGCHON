@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import uuid
+from typing import Literal
 
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from unidecode import unidecode
 
 from app import control
 from app.core.config import settings
@@ -205,3 +208,60 @@ async def _stats(db: AsyncSession) -> list[control.Stat]:
         control.Stat(key="orders.waiting_payment", label="Đơn chờ chuyển khoản", value=int(waiting or 0), href="/desk/don-hang?nhom=cho_thanh_toan", order=13),
         control.Stat(key="orders.to_ship", label="Đơn chờ giao", value=int(to_ship or 0), href="/desk/don-hang?nhom=cho_giao", order=14),
     ]  # fmt: skip
+
+
+# ---- lệnh bằng lời (i6) --------------------------------------------------------------------------------------------
+
+
+class OrdersSummaryParams(BaseModel):
+    scope: Literal["today", "to_ship", "waiting_payment"] | None = Field(
+        default=None,
+        description="today = đơn mới hôm nay · to_ship = đơn chờ giao · waiting_payment = đơn chờ chuyển khoản",
+    )
+
+
+_SCOPES = {
+    "today": ("Đơn mới hôm nay", "/desk/don-hang?nhom=tat_ca"),
+    "to_ship": ("Đơn chờ giao", "/desk/don-hang?nhom=cho_giao"),
+    "waiting_payment": ("Đơn chờ chuyển khoản", "/desk/don-hang?nhom=cho_thanh_toan"),
+}
+
+
+def _scope_from_text(text: str) -> str:
+    t = unidecode(text).lower()
+    if "giao" in t or "gui di" in t or "ship" in t:
+        return "to_ship"
+    if "chuyen khoan" in t or "chua tra" in t or "thanh toan" in t:
+        return "waiting_payment"
+    return "today"
+
+
+@control.intent(
+    "orders.summary",
+    "Tóm tắt đơn hàng",
+    "Đọc nhanh đơn mới hôm nay, đơn chờ giao hoặc đơn chờ chuyển khoản: số đơn, tổng tiền, vài đơn đầu.",
+    params=OrdersSummaryParams,
+    examples=["tóm tắt đơn hôm nay", "còn bao nhiêu đơn chờ giao", "đơn nào chưa chuyển khoản"],
+)
+async def _orders_summary(ctx: control.CommandContext, params: OrdersSummaryParams | None) -> control.CommandResult:
+    scope = (params.scope if params else None) or _scope_from_text(ctx.text)
+    q = select(Order).where(Order.status.not_in((OrderStatus.DRAFT, OrderStatus.CANCELLED)))
+    if scope == "today":
+        start, end = local_day_bounds_utc()
+        q = q.where(Order.placed_at >= start, Order.placed_at < end)
+    elif scope == "to_ship":
+        q = q.where(Order.status == OrderStatus.READY_TO_SHIP)
+    else:
+        q = q.where(Order.status == OrderStatus.PENDING_PAYMENT)
+    rows = list((await ctx.db.execute(q.order_by(Order.placed_at.desc()))).scalars())
+    label, href = _SCOPES[scope]
+    if not rows:
+        return control.CommandResult(message=f"{label}: chưa có đơn nào.", href=href, data={"scope": scope, "count": 0})
+    total = sum(o.total_vnd for o in rows)
+    head = "; ".join(f"{o.code} {o.recipient_name} {notify.vnd(o.total_vnd)}" for o in rows[:5])
+    more = f" và {len(rows) - 5} đơn nữa" if len(rows) > 5 else ""
+    return control.CommandResult(
+        message=f"{label}: {len(rows)} đơn, tổng {notify.vnd(total)}. {head}{more}.",
+        href=href,
+        data={"scope": scope, "count": len(rows), "total_vnd": total, "codes": [o.code for o in rows[:5]]},
+    )

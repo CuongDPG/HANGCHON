@@ -11,6 +11,7 @@ async def _publish(ctx: control.ActionContext) -> control.HandlerResult: ...
 outcome = await control.propose("content.publish_post", "Đăng bài: Bình giữ nhiệt", payload, preview, db=db)
 """
 
+from app.modules.control.matching import match_names
 from app.modules.control.models import ApprovalStatus, AutonomyLevel
 from app.modules.control.registry import (
     ACTIONS,
@@ -68,6 +69,7 @@ __all__ = [
     "get_setting",
     "handler",
     "intent",
+    "match_names",
     "on_returned",
     "propose",
     "register_action",

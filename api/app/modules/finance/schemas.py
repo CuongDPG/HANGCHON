@@ -142,6 +142,13 @@ class BackupOut(ORM):
     error: str | None
     triggered_by_id: uuid.UUID | None
     created_at: datetime
+    offsite_driver: str | None = None
+    offsite_key: str | None = None
+    offsite_at: datetime | None = None
+    offsite_error: str | None = None
+    verified_at: datetime | None = None
+    verify_ok: bool | None = None
+    verify_note: str | None = None
 
 
 # ---- schema tạo / sửa / tổng hợp (k1, k4, k5, i5) ------------------------------------------------------------------
@@ -228,3 +235,10 @@ class BackupConfigOut(BaseModel):
     keep: int
     schedule: str
     last_success_at: datetime | None
+    last_success_id: uuid.UUID | None = None
+    last_error: str | None = Field(default=None, description="Lỗi của lần hỏng gần nhất, nếu sau lần thành công cuối")
+    last_error_at: datetime | None = None
+    storage_driver: str = "local"
+    offsite_driver: str | None = Field(default=None, description="Kho ngoài máy chủ; None = chưa cấu hình")
+    last_offsite_at: datetime | None = None
+    offsite_error: str | None = None

@@ -19,6 +19,7 @@ import hashlib
 import io
 import logging
 import os
+import re
 import shutil
 import uuid
 from datetime import date, datetime, time, timedelta
@@ -437,6 +438,18 @@ async def latest_approvals(db: AsyncSession, invoice_ids: list[uuid.UUID]) -> di
     return {r.ref_id: r for r in rows if r.ref_id}  # bản mới nhất ghi đè
 
 
+EINVOICE_MOCK_IN_PROD = (
+    "Hoá đơn điện tử đang chạy giả lập (chưa nối nhà cung cấp hoá đơn) nên không phát hành ở bản chạy thật: "
+    "số hoá đơn giả không có giá trị với khách và cơ quan thuế. Chị nhờ người cài máy chủ nối nhà cung cấp hoá đơn "
+    "(đặt EINVOICE_DRIVER) rồi phát hành lại."
+)
+
+
+def _refuse_mock_einvoice_in_prod(driver: str) -> None:
+    if settings.app_env == "prod" and driver == "mock":
+        raise BadRequest(EINVOICE_MOCK_IN_PROD, code="einvoice_mock_in_prod")
+
+
 async def prepare_invoice(
     db: AsyncSession,
     order_id: uuid.UUID,
@@ -455,6 +468,7 @@ async def prepare_invoice(
         OrderStatus.DRAFT,
     ):
         raise BadRequest("Chỉ phát hành hoá đơn cho đơn đã thanh toán.", code="order_not_paid")
+    _refuse_mock_einvoice_in_prod(settings.einvoice_driver)
     inv = (await db.execute(select(Invoice).where(Invoice.reference == order.code))).scalar_one_or_none()
     if inv is not None and inv.status in (InvoiceStatus.ISSUED, InvoiceStatus.ISSUING):
         raise Conflict("Đơn này đã có hoá đơn.", code="invoice_exists")
@@ -526,6 +540,7 @@ async def issue_invoice(db: AsyncSession, invoice_id: uuid.UUID, payload: dict[s
         if f in payload:
             setattr(inv, f, (payload[f] or None) if f != "buyer_name" else (payload[f] or inv.buyer_name))
     driver = get_driver("einvoice")
+    _refuse_mock_einvoice_in_prod(driver.name)
     issued = await driver.issue(
         InvoiceRequest(
             reference=inv.reference,
@@ -932,17 +947,211 @@ async def run_backup(db: AsyncSession, trigger: BackupTrigger, user: User | None
     data = gzip.compress(out, compresslevel=6)
     ts = to_local(started)
     key = f"private/backups/{ts:%Y/%m}/hangchon-{ts:%Y%m%d-%H%M%S}-{b.id.hex[:6]}.sql.gz"
-    await get_storage().put(key, data, "application/gzip")
+    try:
+        await get_storage().put(key, data, "application/gzip")
+    except Exception as e:
+        return await _backup_failed(db, b, f"Đã dump CSDL nhưng không lưu được tệp sao lưu: {e}")
     b.storage_key = key
     b.size_bytes = len(data)
     b.checksum = "sha256:" + hashlib.sha256(data).hexdigest()
     b.status = BackupStatus.SUCCEEDED
     b.finished_at = now_utc()
+    offsite = await _copy_offsite(key, data)
     await db.flush()
     await prune_backups(db)
-    await control.audit(db, "finance.backup_created", user=user, entity_type="backup", entity_id=b.id,
-                        summary=f"Sao lưu CSDL ({len(data) // 1024} KB)")  # fmt: skip
+    where = " · đã chép ra ngoài máy chủ" if offsite.get("offsite_at") else ""
+    await control.audit(db, BACKUP_CREATED, user=user, entity_type="backup", entity_id=b.id,
+                        summary=f"Sao lưu CSDL ({len(data) // 1024} KB){where}", data=offsite)  # fmt: skip
     return b
+
+
+# Thông tin thêm của từng bản sao lưu (bản ngoài máy chủ, kết quả kiểm khôi phục) nằm trong lưu vết `audit_log`
+# (entity_type="backup") thay vì cột mới của `backups`, để không phải thêm migration.
+BACKUP_CREATED = "finance.backup_created"
+BACKUP_VERIFIED = "finance.backup_verified"
+EMPTY_META: dict[str, Any] = {
+    "offsite_driver": None, "offsite_key": None, "offsite_at": None, "offsite_error": None,
+    "verified_at": None, "verify_ok": None, "verify_note": None,
+}  # fmt: skip
+
+
+def offsite_driver_name() -> str | None:
+    """Kho ngoài máy chủ cho bản sao lưu: BACKUP_OFFSITE_DRIVER → STORAGE_DRIVER nếu không phải `local` → `s3` nếu đã
+    điền đủ S3_BUCKET/S3_ACCESS_KEY/S3_SECRET_KEY (ảnh vẫn lưu trên máy chủ, chỉ bản sao lưu chép lên S3/R2).
+    `local` không bao giờ được tính là ngoài máy chủ."""
+    s3_ready = bool(settings.s3_bucket and settings.s3_access_key and settings.s3_secret_key)
+    name = (
+        settings.backup_offsite_driver
+        or (settings.storage_driver if settings.storage_driver != "local" else None)
+        or ("s3" if s3_ready else None)
+    )
+    return name if name and name != "local" else None
+
+
+async def _copy_offsite(key: str, data: bytes) -> dict[str, Any]:
+    """Chép bản vừa sao lưu ra kho ngoài máy chủ (cùng khoá tệp). Kho chính đã là kho đó (STORAGE_DRIVER=s3) thì không
+    chép lại. Lỗi chép không làm hỏng bản sao lưu trên máy chủ: trả `offsite_error` để chị thấy."""
+    from app.integrations import get_driver
+
+    name = offsite_driver_name()
+    if name is None:
+        return {}
+    if name == get_storage().name:
+        return {"offsite_driver": name, "offsite_key": key, "offsite_at": now_utc().isoformat()}
+    try:
+        await get_driver("storage", name).put(key, data, "application/gzip")
+    except Exception as e:
+        err = f"Không chép được ra ngoài máy chủ ({name}): {getattr(e, 'message', None) or e}"[:2000]
+        log.warning("Sao lưu: %s", err)
+        return {"offsite_driver": name, "offsite_error": err}
+    return {"offsite_driver": name, "offsite_key": key, "offsite_at": now_utc().isoformat()}
+
+
+async def backup_meta(db: AsyncSession, ids: list[uuid.UUID]) -> dict[uuid.UUID, dict[str, Any]]:
+    """Bản ngoài máy chủ + lần kiểm khôi phục gần nhất của từng bản sao lưu (đọc từ lưu vết)."""
+    from app.modules.control.models import AuditLog
+
+    out = {i: dict(EMPTY_META) for i in ids}
+    if not ids:
+        return out
+    rows = (
+        await db.execute(
+            select(AuditLog.entity_id, AuditLog.action, AuditLog.data, AuditLog.created_at)
+            .where(
+                AuditLog.entity_type == "backup",
+                AuditLog.action.in_((BACKUP_CREATED, BACKUP_VERIFIED)),
+                AuditLog.entity_id.in_([str(i) for i in ids]),
+            )
+            .order_by(AuditLog.created_at)
+        )
+    ).all()
+    for entity_id, action, data, at in rows:  # bản sau ghi đè bản trước
+        m = out[uuid.UUID(entity_id)]
+        data = data or {}
+        if action == BACKUP_CREATED:
+            for k in ("offsite_driver", "offsite_key", "offsite_error"):
+                m[k] = data.get(k)
+            m["offsite_at"] = datetime.fromisoformat(data["offsite_at"]) if data.get("offsite_at") else None
+        else:
+            m.update(verified_at=at, verify_ok=bool(data.get("ok")), verify_note=data.get("note"))
+    return out
+
+
+async def with_meta(db: AsyncSession, backups: list[Backup]) -> list[dict[str, Any]]:
+    """Bản ghi `backups` + thông tin thêm, để trả về cho màn Sao lưu."""
+    from app.modules.finance.schemas import BackupOut
+
+    meta = await backup_meta(db, [b.id for b in backups])
+    return [{**BackupOut.model_validate(b).model_dump(), **meta[b.id]} for b in backups]
+
+
+# Bảng cốt lõi phải có trong bản dump (thiếu = bản sao lưu hỏng hoặc dump nhầm CSDL).
+CORE_TABLES = ("users", "approval_items", "orders", "products", "ledger_entries")
+
+
+def inspect_dump(sql: str) -> tuple[bool, str]:
+    """Đọc cấu trúc bản dump dạng SQL thuần (tương đương `pg_restore --list` cho bản `--format=plain`)."""
+    tables = set(re.findall(r"^CREATE TABLE (?:[\w\"]+\.)?\"?(\w+)\"?\s*\(", sql, flags=re.M))
+    copies = len(re.findall(r"^COPY ", sql, flags=re.M))
+    problems = []
+    if "PostgreSQL database dump" not in sql[:2000]:
+        problems.append("không có đầu tệp của pg_dump")
+    if "PostgreSQL database dump complete" not in sql[-2000:]:
+        problems.append("tệp bị cắt dở (thiếu dòng kết thúc của pg_dump)")
+    missing = [t for t in CORE_TABLES if t not in tables]
+    if missing:
+        problems.append("thiếu bảng " + ", ".join(missing))
+    summary = f"{len(tables)} bảng, {copies} khối dữ liệu"
+    return (not problems, summary if not problems else f"{summary}; " + "; ".join(problems))
+
+
+async def verify_backup(db: AsyncSession, backup_id: uuid.UUID, user: User | None = None) -> Backup:
+    """«Kiểm khôi phục»: tải lại tệp, so checksum, giải nén trọn, đọc cấu trúc bản dump; có bản ngoài máy chủ thì so
+    checksum bản đó. Chỉ đọc — KHÔNG khôi phục đè dữ liệu. Kết quả ghi vào lưu vết (`finance.backup_verified`)."""
+    from app.integrations import get_driver
+
+    b = await db.get(Backup, backup_id)
+    if b is None or b.status != BackupStatus.SUCCEEDED or not b.storage_key:
+        raise NotFound("Không có bản sao lưu thành công này.")
+    meta = (await backup_meta(db, [b.id]))[b.id]
+    notes: list[str] = []
+    ok = True
+    try:
+        data: bytes | None = await get_storage().get(b.storage_key)
+    except Exception as e:
+        data, ok = None, False
+        notes.append(f"không đọc được tệp trên máy chủ ({e})")
+    if data is not None:
+        digest = "sha256:" + hashlib.sha256(data).hexdigest()
+        if b.checksum and digest != b.checksum:
+            ok = False
+            notes.append("checksum KHÔNG khớp (tệp đã bị đổi hoặc hỏng)")
+        else:
+            notes.append("checksum khớp")
+        try:
+            sql = gzip.decompress(data).decode("utf-8", "replace")
+        except (OSError, EOFError) as e:
+            ok = False
+            notes.append(f"không giải nén được ({e})")
+        else:
+            notes.append(f"giải nén được {len(sql.encode()) // 1024} KB")
+            good, summary = inspect_dump(sql)
+            ok = ok and good
+            notes.append(summary)
+    off_driver, off_key = meta["offsite_driver"], meta["offsite_key"]
+    if off_key and off_driver and off_driver != get_storage().name:
+        try:
+            remote = await get_driver("storage", off_driver).get(off_key)
+            same = "sha256:" + hashlib.sha256(remote).hexdigest() == b.checksum
+            ok = ok and same
+            notes.append("bản ngoài máy chủ khớp" if same else "bản ngoài máy chủ KHÔNG khớp checksum")
+        except Exception as e:
+            ok = False
+            notes.append(f"không đọc được bản ngoài máy chủ ({getattr(e, 'message', None) or e})")
+    note = ("Dùng được: " if ok else "Có vấn đề: ") + "; ".join(notes)
+    await control.audit(db, BACKUP_VERIFIED, user=user, entity_type="backup", entity_id=b.id,
+                        summary=note[:300], data={"ok": ok, "note": note})  # fmt: skip
+    return b
+
+
+async def backup_status(db: AsyncSession) -> dict[str, Any]:
+    """Tóm tắt cho màn Sao lưu: lần thành công gần nhất, lỗi gần nhất, bản ngoài máy chủ gần nhất."""
+    from app.modules.control.models import AuditLog
+
+    last_ok = await db.scalar(
+        select(Backup).where(Backup.status == BackupStatus.SUCCEEDED).order_by(Backup.started_at.desc()).limit(1)
+    )
+    last_fail = await db.scalar(
+        select(Backup).where(Backup.status == BackupStatus.FAILED).order_by(Backup.started_at.desc()).limit(1)
+    )
+    created = (
+        await db.execute(
+            select(AuditLog.data, AuditLog.created_at)
+            .where(AuditLog.action == BACKUP_CREATED, AuditLog.entity_type == "backup")
+            .order_by(AuditLog.created_at.desc())
+            .limit(50)
+        )
+    ).all()
+    last_offsite_at, offsite_error = None, None
+    for data, _at in created:  # mới nhất trước: lỗi chép chỉ còn ý nghĩa nếu sau lần chép được gần nhất
+        data = data or {}
+        if data.get("offsite_at"):
+            last_offsite_at = datetime.fromisoformat(data["offsite_at"])
+            break
+        if data.get("offsite_error") and offsite_error is None:
+            offsite_error = data["offsite_error"]
+    # lỗi sao lưu chỉ còn ý nghĩa nếu xảy ra sau lần thành công gần nhất
+    fail = last_fail if last_fail and (not last_ok or last_fail.started_at > last_ok.started_at) else None
+    return {
+        "last_success_at": last_ok.finished_at if last_ok else None,
+        "last_success_id": last_ok.id if last_ok else None,
+        "last_error": fail.error if fail else None,
+        "last_error_at": fail.started_at if fail else None,
+        "storage_driver": get_storage().name,
+        "offsite_driver": offsite_driver_name(),
+        "last_offsite_at": last_offsite_at,
+        "offsite_error": offsite_error,
+    }
 
 
 async def _backup_failed(db: AsyncSession, b: Backup, message: str) -> Backup:
@@ -973,13 +1182,22 @@ async def prune_backups(db: AsyncSession) -> int:
             )
         ).scalars()
     )
+    from app.integrations import get_driver
+
     storage = get_storage()
+    meta = await backup_meta(db, [b.id for b in old])
     for b in old:
         if b.storage_key:
             try:
                 await storage.delete(b.storage_key)
             except Exception:
                 log.warning("Không xoá được bản sao lưu cũ %s", b.storage_key)
+        m = meta[b.id]
+        if m["offsite_key"] and m["offsite_driver"] and m["offsite_driver"] != storage.name:
+            try:
+                await get_driver("storage", m["offsite_driver"]).delete(m["offsite_key"])
+            except Exception:
+                log.warning("Không xoá được bản sao lưu cũ ngoài máy chủ %s", m["offsite_key"])
         await db.delete(b)
     await db.flush()
     return len(old)

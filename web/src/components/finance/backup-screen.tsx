@@ -1,12 +1,11 @@
 "use client";
 
-import { DatabaseBackup, Download, TriangleAlert } from "lucide-react";
-import { useState } from "react";
+import { CloudUpload, DatabaseBackup, Download, ShieldCheck, TriangleAlert } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import {
   Badge,
   Button,
   Card,
-  DataList,
   DateTime,
   EmptyState,
   Input,
@@ -19,7 +18,8 @@ import {
 } from "@/components/ui";
 import { isOwner, useSession } from "@/lib/api/auth";
 import { useSaveSettings } from "@/lib/api/control";
-import { backupDownloadUrl, useBackupConfig, useBackups, useRunBackup, type Backup } from "@/lib/api/finance";
+import { backupDownloadUrl, useBackupConfig, useBackups, useRunBackup, useVerifyBackup, type Backup, type BackupConfig } from "@/lib/api/finance";
+import { cn } from "@/lib/cn";
 
 function size(bytes: number | null): string {
   if (!bytes) return "—";
@@ -27,13 +27,16 @@ function size(bytes: number | null): string {
   return `${(bytes / 1024 / 1024).toFixed(1).replace(".", ",")} MB`;
 }
 
-/** Sao lưu CSDL (k4): lịch hằng ngày, giữ N bản, sao lưu ngay, tải về. Chỉ chị. */
+const STORAGE_LABELS: Record<string, string> = { local: "ổ đĩa máy chủ", s3: "kho đám mây (S3/R2)" };
+
+/** Sao lưu CSDL (k4): lịch hằng ngày, giữ N bản, chép ra ngoài máy chủ, kiểm khôi phục, tải về. Chỉ chị. */
 export function BackupScreen() {
   const { user } = useSession();
   const owner = isOwner(user);
   const cfg = useBackupConfig(owner);
   const list = useBackups(owner);
   const run = useRunBackup();
+  const verify = useVerifyBackup();
 
   if (user && !owner) {
     return (
@@ -46,13 +49,29 @@ export function BackupScreen() {
 
   async function backupNow() {
     const b = await run.mutateAsync();
-    if (b.status === "succeeded") notifySuccess(`Đã sao lưu (${size(b.size_bytes)})`);
-    else notifyError(b.error ?? "Sao lưu lỗi.");
+    if (b.status !== "succeeded") notifyError(b.error ?? "Sao lưu lỗi.");
+    else if (b.offsite_error) notifyError(`Đã sao lưu trên máy chủ nhưng chưa chép ra ngoài: ${b.offsite_error}`);
+    else notifySuccess(`Đã sao lưu (${size(b.size_bytes)})${b.offsite_at ? ", đã chép ra ngoài máy chủ" : ""}`);
+  }
+
+  async function check(id: string) {
+    const b = await verify.mutateAsync(id);
+    if (b.verify_ok) notifySuccess("Bản sao lưu dùng được");
+    else notifyError(b.verify_note ?? "Bản sao lưu có vấn đề.");
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader backHref="/desk/cai-dat" title="Sao lưu" description="Sao lưu toàn bộ dữ liệu cửa hàng. Bản sao nén lưu trong kho tệp riêng tư." />
+      <PageHeader
+        backHref="/desk/cai-dat"
+        title="Sao lưu"
+        description="Sao lưu toàn bộ dữ liệu cửa hàng mỗi đêm. «Kiểm khôi phục» chỉ mở bản sao ra đọc thử, không ghi đè dữ liệu đang dùng."
+        actions={
+          <Button icon={<DatabaseBackup className="size-4" />} loading={run.isPending} onClick={backupNow}>
+            Sao lưu ngay
+          </Button>
+        }
+      />
 
       {cfg.data && !cfg.data.pg_dump ? (
         <Card tone="danger" className="flex items-start gap-3">
@@ -67,20 +86,12 @@ export function BackupScreen() {
         </Card>
       ) : null}
 
-      <Card flush className="px-4 py-2">
-        <DataList
-          items={[
-            { label: "Lịch", value: cfg.data?.schedule ?? "…" },
-            { label: "Giữ lại", value: cfg.data ? `${cfg.data.keep} bản gần nhất` : "…" },
-            { label: "Lần thành công gần nhất", value: cfg.data?.last_success_at ? <DateTime value={cfg.data.last_success_at} format="relative" /> : "Chưa có" },
-          ]}
-        />
-      </Card>
+      {cfg.isPending ? <SkeletonList rows={1} /> : cfg.error ? <EmptyState tone="error" title="Chưa tải được" description={cfg.error.message} /> : <StatusCards cfg={cfg.data} />}
 
-      <div className="flex flex-wrap items-end gap-3">
-        <Button icon={<DatabaseBackup className="size-4" />} loading={run.isPending} onClick={backupNow}>
-          Sao lưu ngay
-        </Button>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <p className="text-[14px] text-ink-2">
+          {cfg.data ? `${cfg.data.schedule} · giữ ${cfg.data.keep} bản gần nhất · lưu trên ${STORAGE_LABELS[cfg.data.storage_driver] ?? cfg.data.storage_driver}` : "…"}
+        </p>
         {cfg.data ? <KeepForm key={cfg.data.keep} keep={cfg.data.keep} /> : null}
       </div>
 
@@ -94,7 +105,7 @@ export function BackupScreen() {
       ) : (
         <ul className="flex flex-col divide-y divide-line rounded-md border border-line bg-surface">
           {list.data.items.map((b) => (
-            <BackupRow key={b.id} b={b} />
+            <BackupRow key={b.id} b={b} checking={verify.isPending && verify.variables === b.id} onCheck={() => check(b.id)} />
           ))}
         </ul>
       )}
@@ -102,28 +113,89 @@ export function BackupScreen() {
   );
 }
 
-function BackupRow({ b }: { b: Backup }) {
+function StatusCards({ cfg }: { cfg: BackupConfig }) {
+  const offsiteOk = Boolean(cfg.offsite_driver && cfg.last_offsite_at && !cfg.offsite_error);
+  return (
+    <div className="grid gap-3 md:grid-cols-3">
+      <StatusCard
+        icon={<ShieldCheck className={cn("size-5", cfg.last_success_at ? "text-auto" : "text-review")} aria-hidden />}
+        label="Lần thành công gần nhất"
+        value={cfg.last_success_at ? <DateTime value={cfg.last_success_at} format="dateTime" /> : "Chưa có"}
+        note={cfg.last_success_at ? <DateTime value={cfg.last_success_at} format="relative" /> : "Bấm «Sao lưu ngay» để có bản đầu tiên."}
+        tone={cfg.last_success_at ? "ok" : "warn"}
+      />
+      <StatusCard
+        icon={<CloudUpload className={cn("size-5", offsiteOk ? "text-auto" : cfg.offsite_error ? "text-seal" : "text-review")} aria-hidden />}
+        label="Bản ngoài máy chủ"
+        value={!cfg.offsite_driver ? "Chưa bật" : cfg.last_offsite_at ? <DateTime value={cfg.last_offsite_at} format="dateTime" /> : "Chưa có bản nào"}
+        note={
+          cfg.offsite_error
+            ? cfg.offsite_error
+            : !cfg.offsite_driver
+              ? "Bản sao chỉ nằm trên máy chủ, hỏng máy là mất cả bản sao. Nhờ người cài máy chủ điền kho S3/R2 (S3_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY)."
+              : `Chép sang ${STORAGE_LABELS[cfg.offsite_driver] ?? cfg.offsite_driver} sau mỗi lần sao lưu.`
+        }
+        tone={cfg.offsite_error ? "error" : offsiteOk ? "ok" : "warn"}
+      />
+      <StatusCard
+        icon={<TriangleAlert className={cn("size-5", cfg.last_error ? "text-seal" : "text-ink-3")} aria-hidden />}
+        label="Lỗi gần nhất"
+        value={cfg.last_error_at ? <DateTime value={cfg.last_error_at} format="dateTime" /> : "Không có"}
+        note={cfg.last_error ?? "Từ lần thành công gần nhất chưa có lần nào lỗi."}
+        tone={cfg.last_error ? "error" : "ok"}
+      />
+    </div>
+  );
+}
+
+function StatusCard({ icon, label, value, note, tone }: { icon: ReactNode; label: string; value: ReactNode; note: ReactNode; tone: "ok" | "warn" | "error" }) {
+  return (
+    <Card tone={tone === "error" ? "danger" : tone === "warn" ? "accent" : "default"} className="flex min-w-0 flex-col gap-1">
+      <p className="flex items-center gap-2 text-[13px] font-medium text-ink-2">
+        {icon}
+        {label}
+      </p>
+      <p className="text-[17px] font-semibold">{value}</p>
+      <p className={cn("text-[13px] [overflow-wrap:anywhere]", tone === "error" ? "text-seal" : "text-ink-2")}>{note}</p>
+    </Card>
+  );
+}
+
+function BackupRow({ b, checking, onCheck }: { b: Backup; checking: boolean; onCheck: () => void }) {
   const ok = b.status === "succeeded";
   return (
-    <li className="flex flex-col gap-1 p-3.5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+    <li className="flex flex-col gap-2 p-3.5 md:flex-row md:items-start md:justify-between md:gap-6">
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
           <p className="text-[15px] font-semibold">
             <DateTime value={b.started_at} format="dateTime" />
           </p>
-          <p className="text-[13px] text-ink-2">
-            {b.trigger === "manual" ? "Chị bấm sao lưu" : "Theo lịch"} · {size(b.size_bytes)}
-          </p>
+          <Badge tone={ok ? "success" : b.status === "failed" ? "danger" : "warning"}>{ok ? "Xong" : b.status === "failed" ? "Lỗi" : "Đang chạy"}</Badge>
+          {ok && b.offsite_at ? <Badge tone="outline">Có bản ngoài máy chủ</Badge> : null}
+          {ok && b.verified_at ? <Badge tone={b.verify_ok ? "success" : "danger"}>{b.verify_ok ? "Đã kiểm: dùng được" : "Đã kiểm: có vấn đề"}</Badge> : null}
         </div>
-        <Badge tone={ok ? "success" : b.status === "failed" ? "danger" : "warning"}>
-          {ok ? "Xong" : b.status === "failed" ? "Lỗi" : "Đang chạy"}
-        </Badge>
+        <p className="text-[13px] text-ink-2">
+          {b.trigger === "manual" ? "Chị bấm sao lưu" : "Theo lịch"} · {size(b.size_bytes)}
+          {b.verified_at ? (
+            <>
+              {" "}
+              · kiểm lúc <DateTime value={b.verified_at} format="dateTime" />
+            </>
+          ) : null}
+        </p>
+        {b.error ? <p className="text-[13px] text-seal [overflow-wrap:anywhere]">{b.error}</p> : null}
+        {b.offsite_error ? <p className="text-[13px] text-seal [overflow-wrap:anywhere]">{b.offsite_error}</p> : null}
+        {b.verify_note ? <p className={cn("text-[13px] [overflow-wrap:anywhere]", b.verify_ok ? "text-ink-2" : "text-seal")}>{b.verify_note}</p> : null}
       </div>
-      {b.error ? <p className="text-[13px] text-seal [overflow-wrap:anywhere]">{b.error}</p> : null}
       {ok ? (
-        <a href={backupDownloadUrl(b.id)} download className={buttonClasses({ variant: "ghost", size: "sm", className: "-ml-3 self-start" })}>
-          <Download className="size-4" aria-hidden /> Tải về (.sql.gz)
-        </a>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <Button variant="secondary" size="sm" icon={<ShieldCheck className="size-4" />} loading={checking} onClick={onCheck}>
+            Kiểm khôi phục
+          </Button>
+          <a href={backupDownloadUrl(b.id)} download className={buttonClasses({ variant: "ghost", size: "sm" })}>
+            <Download className="size-4" aria-hidden /> Tải về (.sql.gz)
+          </a>
+        </div>
       ) : null}
     </li>
   );

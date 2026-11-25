@@ -771,11 +771,12 @@ async def run_command(db: AsyncSession, user: User, text: str, context: dict[str
         return {**base, "status": "failed", "intent": spec.key, "label": spec.label, "message": e.message}
     await audit(
         db, "control.command", user=user, entity_type="intent", entity_id=spec.key, summary=text,
-        data={"status": "done", "params": params.model_dump(mode="json") if params else None, "ai_run_id": str(res.run_id)},
+        data={"status": result.status, "params": params.model_dump(mode="json") if params else None,
+              "ai_run_id": str(res.run_id)},
     )  # fmt: skip
     return {
         **base,
-        "status": "done",
+        "status": result.status,
         "intent": spec.key,
         "label": spec.label,
         "message": result.message,

@@ -8,9 +8,19 @@ from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import control
+from app.core.errors import Forbidden
 from app.core.timeutil import local_today
+from app.modules.control.models import UserRole
 from app.modules.finance import service
-from app.modules.finance.models import Invoice, InvoiceStatus, LedgerEntry, LedgerKind, WeeklyReport
+from app.modules.finance.models import (
+    Backup,
+    BackupStatus,
+    Invoice,
+    InvoiceStatus,
+    LedgerEntry,
+    LedgerKind,
+    WeeklyReport,
+)
 
 # ---- k5: hoá đơn điện tử -----------------------------------------------------------------------------------------
 
@@ -106,3 +116,28 @@ async def _stats(db: AsyncSession) -> list[control.Stat]:
             order=40,
         )
     ]  # fmt: skip
+
+
+# ---- lệnh bằng lời (i6) ------------------------------------------------------------------------------------------
+
+
+@control.intent(
+    "finance.verify_backup",
+    "Kiểm khôi phục bản sao lưu gần nhất",
+    "Giải nén bản sao lưu thành công gần nhất, so checksum, đọc cấu trúc. Chỉ kiểm, không khôi phục đè dữ liệu.",
+    examples=["kiểm bản sao lưu gần nhất", "bản sao lưu có dùng được không"],
+)
+async def _verify_backup_cmd(ctx: control.CommandContext, _: None) -> control.CommandResult:
+    if ctx.user is None or ctx.user.role != UserRole.OWNER:  # cùng quyền với màn Sao lưu
+        raise Forbidden("Chỉ chị (chủ cửa hàng) xem được phần sao lưu.")
+    last = await ctx.db.scalar(
+        select(Backup).where(Backup.status == BackupStatus.SUCCEEDED).order_by(Backup.started_at.desc()).limit(1)
+    )
+    if last is None:
+        return control.CommandResult(
+            message="Chưa có bản sao lưu thành công nào để kiểm.", href="/desk/cai-dat/sao-luu"
+        )
+    b = (await service.with_meta(ctx.db, [await service.verify_backup(ctx.db, last.id, ctx.user)]))[0]
+    return control.CommandResult(
+        message=b["verify_note"] or "", href="/desk/cai-dat/sao-luu", data={"ok": b["verify_ok"]}
+    )

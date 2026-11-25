@@ -1,11 +1,19 @@
 "use client";
 
-import { CircleAlert, CircleCheck, CircleHelp, Mic, Send, Sparkles, Square } from "lucide-react";
+import { CircleAlert, CircleCheck, CircleHelp, Hourglass, Mic, Send, Sparkles, Square } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Button, ButtonLink, Chip, IconButton, Sheet, Textarea } from "@/components/ui";
 import { useCommand, useIntents, type CommandResult } from "@/lib/api/control";
 import { cn } from "@/lib/cn";
+
+const RESULT_TITLES: Record<CommandResult["status"], (label: string | null) => string> = {
+  done: (label) => `Đã giao: ${label ?? "việc của chị"}`,
+  pending: (label) => `Chờ chị duyệt: ${label ?? "việc vừa giao"}`,
+  needs_clarification: () => "Em cần chị nói rõ hơn",
+  unknown: () => "Em cần chị nói rõ hơn",
+  failed: () => "Chưa làm được",
+};
 
 const FALLBACK_EXAMPLES = ["Có việc gì chờ chị duyệt không?", "Tìm giá phơi đồ gấp gọn dưới 300k, ưu tiên hàng Nhật", "Soạn bài Facebook cho Đợt 12"];
 
@@ -82,7 +90,7 @@ export function CommandSheet({ open, onClose }: { open: boolean; onClose: () => 
   const intents = useIntents(open);
   const command = useCommand();
 
-  const examples = (intents.data ?? []).flatMap((i) => i.examples.slice(0, 1)).slice(0, 4);
+  const examples = (intents.data ?? []).flatMap((i) => i.examples.slice(0, 1)).slice(0, 6);
 
   // Đóng sheet hoặc rời trang thì dừng ghi âm
   useEffect(() => {
@@ -129,7 +137,7 @@ export function CommandSheet({ open, onClose }: { open: boolean; onClose: () => 
     try {
       const res = await command.mutateAsync({ text: t, context: { path: pathname } });
       setResult(res);
-      if (res.status === "done") setText("");
+      if (res.status === "done" || res.status === "pending") setText("");
     } catch (err) {
       setFailure(err instanceof Error ? err.message : "Chưa gửi được. Thử lại nhé.");
     }
@@ -183,13 +191,15 @@ export function CommandSheet({ open, onClose }: { open: boolean; onClose: () => 
           icon={
             result.status === "done" ? (
               <CircleCheck className="size-5 text-auto" aria-hidden />
+            ) : result.status === "pending" ? (
+              <Hourglass className="size-5 text-review" aria-hidden />
             ) : result.status === "failed" ? (
               <CircleAlert className="size-5 text-seal" aria-hidden />
             ) : (
               <CircleHelp className="size-5 text-review" aria-hidden />
             )
           }
-          title={result.status === "done" ? `Đã giao: ${result.label}` : result.status === "failed" ? "Chưa làm được" : "Em cần chị nói rõ hơn"}
+          title={RESULT_TITLES[result.status](result.label)}
           message={result.message}
           href={result.href}
           onNavigate={onClose}

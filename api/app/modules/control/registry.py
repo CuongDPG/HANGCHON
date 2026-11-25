@@ -204,9 +204,31 @@ class CommandContext:
 
 
 class CommandResult(BaseModel):
+    """`done` = đã làm xong / đã trả lời; `pending` = đã đưa vào hàng chờ, chờ chị duyệt (lệnh đổi dữ liệu đi qua
+    control.propose theo mức tự chủ); `needs_clarification` = chưa rõ đối tượng (không thấy hoặc nhiều lựa chọn)."""
+
     message: str
+    status: Literal["done", "pending", "needs_clarification"] = "done"
     href: str | None = None
     data: dict[str, Any] | None = None
+
+    @classmethod
+    def from_outcome(cls, outcome: Any, *, done: str, pending: str, href: str | None = None,
+                     data: dict[str, Any] | None = None) -> CommandResult:  # fmt: skip
+        """Kết quả lệnh theo `ProposeOutcome`: applied → done, pending → pending; blocked/failed → lỗi (lệnh «chưa làm
+        được» kèm lý do, mọi thay đổi trong lệnh được huỷ)."""
+        extra = {**(data or {}), "outcome": outcome.status}
+        if outcome.item_id:
+            extra["approval_item_id"] = str(outcome.item_id)
+        if outcome.status == "applied":
+            return cls(message=done, href=href, data=extra)
+        if outcome.status == "pending":
+            return cls(message=pending, status="pending", href=href, data=extra)
+        from app.core.errors import AppError
+
+        if outcome.status == "blocked":
+            raise AppError("Việc này đang tắt trong bảng mức tự chủ nên em không làm.", code="command_blocked")
+        raise AppError(outcome.error or "Em làm chưa được, chị thử lại sau.", code="command_failed")
 
 
 IntentFn = Callable[[CommandContext, Any], Awaitable[CommandResult]]

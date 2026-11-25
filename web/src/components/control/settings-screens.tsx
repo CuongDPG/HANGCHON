@@ -10,6 +10,7 @@ import {
   Badge,
   Button,
   Card,
+  CardLink,
   DataList,
   EmptyState,
   Input,
@@ -22,7 +23,15 @@ import {
   useConfirm,
 } from "@/components/ui";
 import { authApi, isOwner, useSession, type SessionUser } from "@/lib/api/auth";
-import { useCreateUser, useIntegrations, useSaveSettings, useSettings, useUpdateUser, useUsers } from "@/lib/api/control";
+import {
+  useCreateUser,
+  useIntegrations,
+  useSaveSettings,
+  useSettings,
+  useUpdateUser,
+  useUsers,
+  type Integration,
+} from "@/lib/api/control";
 import { formatNumber } from "@/lib/format";
 import { useMutation } from "@tanstack/react-query";
 
@@ -42,6 +51,7 @@ export function SettingsIndex() {
   return (
     <div className="flex flex-col gap-4">
       <PageHeader title="Cài đặt" description="Cửa hàng, tài khoản, người phụ giúp, sao lưu, AI, tích hợp." />
+      <IntegrationStatusCard />
       <ul className="flex flex-col divide-y divide-line rounded-md border border-line bg-surface">
         {SECTIONS.filter((s) => !s.owner || isOwner(user)).map((s) => (
           <li key={s.href}>
@@ -409,6 +419,55 @@ const DRIVER_LABELS: Record<string, string> = {
   anthropic: "Claude",
 };
 
+function integrationLine(i: Integration): string {
+  const real = i.drivers.filter((d) => d !== "mock").map((d) => DRIVER_LABELS[d] ?? d);
+  if (i.is_mock) return "Đang chạy thử, chưa nối tài khoản thật";
+  if (i.partly_mock) return `Đã nối: ${real.join(", ")} · kênh khác còn giả lập`;
+  return `Đang nối: ${real.join(", ") || (DRIVER_LABELS[i.driver] ?? i.driver)}`;
+}
+
+function integrationTone(i: Integration): "danger" | "warning" | "success" {
+  if (i.blocked_in_prod) return "danger";
+  return i.is_mock || i.partly_mock ? "warning" : "success";
+}
+
+/** Thẻ tóm tắt: bao nhiêu tích hợp chạy thật, bao nhiêu còn giả lập (khách không nhận được gì từ phần giả lập). */
+export function IntegrationSummary({ items, href }: { items: Integration[]; href?: string }) {
+  const mock = items.filter((i) => i.is_mock || i.partly_mock);
+  const real = items.length - mock.length;
+  const blocked = items.some((i) => i.blocked_in_prod);
+  const body = (
+    <>
+      <span className="flex items-center gap-2">
+        <Plug className={mock.length ? "size-5 shrink-0 text-review" : "size-5 shrink-0 text-auto"} aria-hidden />
+        <span className="text-[15px] font-semibold">
+          {mock.length ? `${real} tích hợp chạy thật · ${mock.length} còn giả lập` : "Mọi tích hợp đều chạy thật"}
+        </span>
+        {href ? <ChevronRight className="ml-auto size-4 shrink-0 text-ink-3" aria-hidden /> : null}
+      </span>
+      {mock.length ? (
+        <span className="mt-1 block text-[13px] text-ink-2">
+          Còn giả lập: {mock.map((i) => i.label).join(", ")}. Phần giả lập không gửi gì tới khách hay đối tác thật.
+          {blocked ? " Hoá đơn điện tử bị chặn phát hành ở bản chạy thật." : ""}
+        </span>
+      ) : null}
+    </>
+  );
+  const tone = blocked ? "danger" : mock.length ? "accent" : "default";
+  return href ? (
+    <CardLink href={href} tone={tone} aria-label="Xem trạng thái tích hợp">
+      {body}
+    </CardLink>
+  ) : (
+    <Card tone={tone}>{body}</Card>
+  );
+}
+
+function IntegrationStatusCard() {
+  const { data } = useIntegrations();
+  return data ? <IntegrationSummary items={data} href="/desk/cai-dat/tich-hop" /> : null;
+}
+
 export function IntegrationsScreen() {
   const { data, isPending, error } = useIntegrations();
   const { user } = useSession();
@@ -420,19 +479,22 @@ export function IntegrationsScreen() {
       ) : error ? (
         <EmptyState tone="error" title="Chưa tải được" description={error.message} />
       ) : (
-        <ul className="flex flex-col divide-y divide-line rounded-md border border-line bg-surface">
-          {data.map((i) => (
-            <li key={i.kind} className="flex items-start justify-between gap-3 p-3.5">
-              <div className="min-w-0">
-                <p className="text-[15px] font-semibold">{i.label}</p>
-                <p className="text-[13px] text-ink-2">
-                  {i.is_mock ? "Đang chạy thử, chưa nối tài khoản thật" : `Đang nối: ${DRIVER_LABELS[i.driver] ?? i.driver}`}
-                </p>
-              </div>
-              <Badge tone={i.is_mock ? "warning" : "success"}>{i.is_mock ? "Giả lập" : "Thật"}</Badge>
-            </li>
-          ))}
-        </ul>
+        <>
+          <IntegrationSummary items={data} />
+          <ul className="flex flex-col divide-y divide-line rounded-md border border-line bg-surface">
+            {data.map((i) => (
+              <li key={i.kind} className="flex items-start justify-between gap-3 p-3.5">
+                <div className="min-w-0">
+                  <p className="text-[15px] font-semibold">{i.label}</p>
+                  <p className="text-[13px] text-ink-2">{integrationLine(i)}</p>
+                  {i.mock_effect ? <p className="text-[13px] text-ink-2">{i.mock_effect}</p> : null}
+                  {i.blocked_in_prod ? <p className="text-[13px] font-medium text-seal">Bản chạy thật đang chặn phát hành cho tới khi nối nhà cung cấp.</p> : null}
+                </div>
+                <Badge tone={integrationTone(i)}>{i.is_mock ? "Giả lập" : i.partly_mock ? "Một phần" : "Thật"}</Badge>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
       {isOwner(user) ? (
         <Link href="/desk/cai-dat/ai" className="flex items-center gap-3 rounded-md border border-line bg-surface p-3.5 transition-colors hover:bg-soft-2">

@@ -14,7 +14,7 @@ from app.core.config import settings
 from app.core.db import SessionLocal
 from app.core.errors import Forbidden
 from app.core.money import format_vnd
-from app.core.timeutil import local_day_bounds_utc
+from app.core.timeutil import local_day_bounds_utc, month_key
 from app.modules.control import service
 from app.modules.control.models import AIActivity, ApprovalItem, ApprovalStatus, AutonomyLevel, UserRole
 from app.modules.control.registry import (
@@ -122,7 +122,7 @@ async def _control_stats(db: AsyncSession) -> list[Stat]:
     "control.pending_summary",
     "Xem việc đang chờ duyệt",
     "Cho chị biết có bao nhiêu việc đang chờ duyệt và mấy việc đầu tiên.",
-    examples=["có việc gì chờ chị duyệt không", "xem hàng chờ duyệt", "việc đang chờ"],
+    examples=["có việc gì chờ chị duyệt không", "xem hàng chờ duyệt", "việc đang chờ", "nhắc chị việc còn chờ"],
 )
 async def _pending_summary(ctx: CommandContext, _: None) -> CommandResult:
     rows = list(
@@ -169,4 +169,22 @@ async def _set_autonomy(ctx: CommandContext, params: SetAutonomyParams) -> Comma
     words = {"auto": "AI tự làm", "ask": "hỏi chị trước", "off": "tắt"}
     return CommandResult(
         message=f"Đã đặt «{spec.label}»: {words[level.value]}.", data={"action": spec.key, "level": level.value}
+    )
+
+
+@intent(
+    "control.ai_cost",
+    "Báo chi phí AI tháng này",
+    "Cho chị biết tháng này AI đã tốn bao nhiêu tiền, còn bao nhiêu so với trần, việc nào tốn nhất.",
+    examples=["tháng này AI tốn bao nhiêu tiền", "chi phí AI tháng này", "còn bao nhiêu tiền AI"],
+)
+async def _ai_cost(ctx: CommandContext, _: None) -> CommandResult:
+    c = await service.ai_costs(ctx.db, month_key())
+    budget = f" / trần {format_vnd(c['budget_vnd'])} ({c['used_pct']}%)" if c["budget_vnd"] > 0 else " (không đặt trần)"
+    top = c["by_task"][:3]
+    most = "; tốn nhất: " + ", ".join(f"{t['label']} {format_vnd(t['cost_vnd'])}" for t in top) if top else ""
+    return CommandResult(
+        message=f"Tháng {c['month']} AI đã dùng {format_vnd(c['spent_vnd'])}{budget}, {c['run_count']} lần gọi{most}.",
+        href="/desk/tu-chu/chi-phi-ai",
+        data={"spent_vnd": c["spent_vnd"], "budget_vnd": c["budget_vnd"], "month": c["month"]},
     )

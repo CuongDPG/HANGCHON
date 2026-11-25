@@ -432,7 +432,11 @@ class IntegrationOut(BaseModel):
     kind: str
     label: str
     driver: str
-    is_mock: bool
+    is_mock: bool = Field(description="Mọi kênh của tích hợp này đều đang chạy giả lập")
+    partly_mock: bool = Field(default=False, description="Có kênh thật, có kênh còn giả lập")
+    drivers: list[str] = Field(default_factory=list, description="Các driver đang dùng (gồm driver theo kênh)")
+    mock_effect: str | None = Field(default=None, description="Giả lập nghĩa là gì với chị (vd tin không tới khách)")
+    blocked_in_prod: bool = Field(default=False, description="Bản chạy thật từ chối dùng driver giả này")
     available: list[str]
 
 
@@ -446,7 +450,7 @@ class CommandIn(BaseModel):
 
 class CommandOut(BaseModel):
     text: str
-    status: Literal["done", "needs_clarification", "unknown", "failed"]
+    status: Literal["done", "pending", "needs_clarification", "unknown", "failed"]
     intent: str | None
     label: str | None
     message: str
