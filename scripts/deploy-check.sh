@@ -85,6 +85,7 @@ CONTAINER_PREFIX=$PREFIX
 SITE_URL=http://localhost:$WEB_PORT
 POSTGRES_PASSWORD=$(openssl rand -hex 16)
 JWT_SECRET=$(openssl rand -hex 32)
+SECRETS_ENCRYPTION_KEY=$(openssl rand -base64 32 | tr '+/' '-_')
 HOOKS_MOCK_SECRET=$(openssl rand -hex 16)
 OWNER_EMAIL=$OWNER_EMAIL
 OWNER_PASSWORD=$OWNER_PASSWORD

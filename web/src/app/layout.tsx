@@ -26,7 +26,13 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="vi" className={`${beVietnam.variable} ${bricolage.variable} antialiased`} suppressHydrationWarning>
+    <html
+      lang="vi"
+      className={`${beVietnam.variable} ${bricolage.variable} antialiased`}
+      // luôn chừa chỗ thanh cuộn: trang dài (có thanh cuộn) và trang ngắn không lệch nhau khi chuyển mục
+      style={{ scrollbarGutter: "stable" }}
+      suppressHydrationWarning
+    >
       <head>
         {/* Đặt giao diện sáng/tối đã chọn trước khi vẽ trang, tránh nháy màu */}
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />

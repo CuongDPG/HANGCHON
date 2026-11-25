@@ -59,14 +59,16 @@ Sinh chuỗi ngẫu nhiên: `openssl rand -hex 32`. Không ghi giá trị thật
 | `SITE_URL` | Địa chỉ công khai, vd `https://hangchon.vn` (không có `/` cuối). Dùng làm `WEB_BASE_URL`, `CORS_ORIGINS`, đường dẫn tệp công khai, sitemap. |
 | `POSTGRES_PASSWORD` | Mật khẩu Postgres. **Chỉ dùng chữ và số** (nó nằm trong `DATABASE_URL`, ký tự `@ : / ?` sẽ làm hỏng URL). `openssl rand -hex 24`. |
 | `JWT_SECRET` | Khoá ký phiên đăng nhập (đóng vai `SECRET_KEY`), ≥ 32 ký tự ngẫu nhiên. Đổi khoá = mọi phiên đang mở bị đăng xuất. |
+| `SECRETS_ENCRYPTION_KEY` | Khoá mã hoá (Fernet) cho bí mật lưu trong CSDL — khoá API chị nhập ở *Cài đặt → AI và khoá API*. **Riêng**, không dùng lại `JWT_SECRET`. Sinh: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` (hoặc `openssl rand -base64 32 \| tr '+/' '-_'`). Thiếu biến này (hay còn là khoá dev) thì API không khởi động. **Mất hoặc đổi khoá = khoá API đã lưu không giải mã được** (AI báo lỗi rõ, chị nhập lại khoá); muốn xoay khoá thì đặt `khoa_moi,khoa_cu`. Giữ một bản ở nơi an toàn ngoài máy chủ (bản sao lưu CSDL không có khoá này). |
 | `OWNER_EMAIL`, `OWNER_PASSWORD` | Tài khoản chị, tạo **một lần** khi API khởi động lần đầu. Sau đó đổi mật khẩu trong bàn làm việc; đổi biến này không đổi mật khẩu tài khoản đã có (nên thay bằng chuỗi ngẫu nhiên để khỏi lộ mật khẩu đầu). |
 
 ### Nên đặt
 
 | Biến | Mặc định | Ý nghĩa |
 |---|---|---|
-| `AI_PROVIDER` | `fake` | `anthropic` để dùng Claude thật (cần `ANTHROPIC_API_KEY`). `fake` = AI giả, chỉ để chạy thử. |
-| `ANTHROPIC_API_KEY` | trống | Khoá Claude API. |
+| `AI_PROVIDER` | `fake` | `anthropic` (Claude, cần `ANTHROPIC_API_KEY`), `openrouter` (cần `OPENROUTER_API_KEY`) hoặc `fake` (AI giả, chỉ để chạy thử). Chị đổi được ở *Cài đặt → AI và khoá API*; cấu hình đã lưu ở đó **ghi đè** các biến AI ở đây (xem mục 6). |
+| `ANTHROPIC_API_KEY` | trống | Khoá Claude API. Nên nhập ở *Cài đặt → AI và khoá API* (mã hoá trong CSDL) thay vì để trong env. |
+| `OPENROUTER_API_KEY`, `OPENROUTER_BASE_URL` | trống, `https://openrouter.ai/api/v1` | Khoá và địa chỉ OpenRouter (API tương thích OpenAI). |
 | `AI_MONTHLY_BUDGET_VND` | `1500000` | Trần chi phí AI mỗi tháng (VND); chạm trần thì mọi tác vụ AI dừng và tạo việc chờ chị. Chị đổi được trên giao diện (*Tự chủ → Chi phí AI*), giá trị trên giao diện ghi đè biến này. `0` = không giới hạn. |
 | `AI_MODEL_SMART` / `AI_MODEL_FAST` | `claude-opus-5-5` / `claude-haiku-5-5` | Model cho tác vụ khó / nhanh. |
 | `COOKIE_SECURE` | `true` | Cookie phiên chỉ gửi qua HTTPS. Chỉ đặt `false` khi chạy thử bằng HTTP. |
@@ -127,7 +129,7 @@ Các driver thật đều **viết theo tài liệu công khai, chưa thử vớ
 
 | Tích hợp | Biến bật | Khoá cần đặt |
 |---|---|---|
-| AI | `AI_PROVIDER=anthropic` | `ANTHROPIC_API_KEY` |
+| AI | *Cài đặt → AI và khoá API* (không cần Redeploy), hoặc `AI_PROVIDER=anthropic` / `openrouter` | `ANTHROPIC_API_KEY` / `OPENROUTER_API_KEY` (hoặc nhập ở Cài đặt) |
 | Nguồn hàng | `SOURCES_DRIVER=web` (Claude + web search, cần AI thật) hoặc `onebound` (1688/Taobao) | `ONEBOUND_API_KEY`, `ONEBOUND_API_SECRET` |
 | Thanh toán | `PAYMENTS_DRIVER=sepay` | `SEPAY_WEBHOOK_SECRET`, `SEPAY_API_KEY`, `BANK_CODE` (mã BIN hoặc VCB/MB…), `BANK_ACCOUNT_NO`, `BANK_ACCOUNT_NAME`, `PAYMENT_CODE_PREFIX` (khớp «Cấu hình mã thanh toán» trên SePay) |
 | Vận chuyển | `SHIPPING_DRIVER=ghn` hoặc `ghtk` (hoặc bật hãng trong cài đặt «Hãng giao đang bật») | GHN: `GHN_TOKEN`, `GHN_SHOP_ID`. GHTK: `GHTK_TOKEN`, `GHTK_PICK_NAME`, `GHTK_PICK_TEL`, `GHTK_PICK_ADDRESS`, `GHTK_PICK_DISTRICT`, `GHTK_PICK_WARD`. Chung: `SHIPPING_FROM_PROVINCE`. Môi trường thử của hãng: `GHN_ENV=dev` / `GHTK_ENV=dev` |
@@ -137,6 +139,14 @@ Các driver thật đều **viết theo tài liệu công khai, chưa thử vớ
 | Lưu tệp | `STORAGE_DRIVER=s3` (S3, R2, MinIO; chưa kiểm chứng) | `S3_ENDPOINT_URL`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_REGION` |
 | Báo tin cho khách (g5) | `NOTIFY_CHANNEL_DRIVERS=zalo_oa=zalo_zns,email=email` (kênh không khai dùng `NOTIFY_DRIVER`, mặc định `mock`). Kênh chính / dự phòng chị chọn trong *Cài đặt* (`orders.notify_channel`, `orders.notify_fallback_channels`, vd `["email"]`); màn *Đơn hàng → Vận hành → Mẫu tin* hiện kênh nào đang bật và tin nào gửi lỗi | Zalo ZNS (ZBS Template Message): `ZALO_APP_ID`, `ZALO_APP_SECRET` (khoá bí mật **ứng dụng**), `ZALO_OA_ACCESS_TOKEN`, `ZALO_OA_REFRESH_TOKEN`, `ZALO_ZNS_TEMPLATES` (JSON loại tin → `template_id` + `params`, xem `api/.env.example`), `ZALO_ZNS_DEVELOPMENT=true` để gửi thử tới quản trị viên. Email: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_TLS` (`starttls`/`ssl`/`none`), `SMTP_TIMEOUT_SECONDS` |
 | Hoá đơn điện tử (`EINVOICE_DRIVER`) | — | Hiện chỉ có `mock` (chưa chọn nhà cung cấp, xem [status.md](status.md)). |
+
+**AI đổi ngay trên giao diện.** Chị vào *Cài đặt → AI và khoá API*: chọn nhà cung cấp, dán khoá (lưu mã hoá bằng
+`SECRETS_ENCRYPTION_KEY`, chỉ hiện dạng che `sk-ant-…8AAA`), chọn model và độ kỹ cho «Việc khó»/«Việc nhanh», trần tháng,
+bấm *Kiểm tra kết nối* (gửi một câu rất ngắn tới từng model, có tốn một ít tiền) rồi *Lưu*. Có hiệu lực ngay ở API, worker
+thấy sau tối đa 5 giây; không cần Redeploy. Thứ tự ưu tiên: **Cài đặt > biến môi trường > mặc định** — trường nào để trống ở
+Cài đặt thì lấy biến môi trường. Đang chạy bằng biến môi trường mà muốn chuyển sang Cài đặt: chạy một lần
+`docker exec hangchon-api python -m app.ai.import_env_config` (máy dev: `cd api && uv run python -m app.ai.import_env_config`) (chép `AI_PROVIDER`, khoá, model, effort vào CSDL đã mã
+hoá; chạy lại không sinh trùng, không in khoá), rồi có thể xoá khoá khỏi env của Dokploy. Chỉ chị (owner) xem/sửa được màn này.
 
 Token Meta, sàn hết hạn theo thời gian; làm mới token là việc của người vận hành (đổi biến rồi Redeploy).
 Riêng access token Zalo OA (25 giờ): driver báo tin `zalo_zns` tự làm mới bằng `ZALO_OA_REFRESH_TOKEN` và lưu token mới ở
@@ -187,7 +197,8 @@ Thử khôi phục định kỳ trên máy khác (hoặc bằng `KEEP=1 scripts/
 - [ ] `JWT_SECRET`, `POSTGRES_PASSWORD` là chuỗi ngẫu nhiên riêng, không lấy từ ví dụ hay `.env.example`.
 - [ ] `COOKIE_SECURE=true` (mặc định), `COOKIE_DOMAIN` trống.
 - [ ] **Tắt cờ demo:** `HC_DEMO_ACTIONS` trống; không dựng dữ liệu mẫu trên prod — `python -m app.seed --demo` ở `APP_ENV=prod` tự từ chối (chỉ chạy khi thêm `--allow-prod`, dành cho bản thử; nếu đã chạy thì xoá dữ liệu mẫu trước khi mở bán).
-- [ ] `AI_PROVIDER=anthropic` + `ANTHROPIC_API_KEY`; đặt **trần chi phí AI** (`AI_MONTHLY_BUDGET_VND` hoặc trên *Tự chủ → Chi phí AI*) và kiểm một tác vụ AI chạy được.
+- [ ] `SECRETS_ENCRYPTION_KEY` đặt riêng (khoá Fernet) và đã cất một bản ngoài máy chủ.
+- [ ] AI thật: chọn nhà cung cấp + khoá ở *Cài đặt → AI và khoá API* (hoặc `AI_PROVIDER` + khoá trong env), bấm *Kiểm tra kết nối* thấy cả hai tầng «Được»; đặt **trần chi phí AI** (`AI_MONTHLY_BUDGET_VND` hoặc trên *Tự chủ → Chi phí AI*) và kiểm một tác vụ AI chạy được.
 - [ ] Mức tự chủ AI vẫn «thận trọng»: mọi thứ khách nhìn thấy đều chờ chị duyệt (*Tự chủ*).
 - [ ] **Không mở bán khi `PAYMENTS_DRIVER=mock`**: ở prod webhook mock 404 nên chuyển khoản không bao giờ tự khớp. Bật `sepay`, chuyển khoản thử một đơn nhỏ, thấy đơn tự chuyển «đã trả».
 - [ ] Báo tin cho khách: màn *Vận hành → Mẫu tin* không còn kênh nào ghi «driver giả» / «chưa cấu hình»; gửi thử một mốc (ZNS: `ZALO_ZNS_DEVELOPMENT=true` tới số quản trị viên) rồi tắt cờ đó.

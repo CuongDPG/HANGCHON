@@ -38,7 +38,7 @@ export function TesterResponse({ token }: { token: string }) {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-prose flex-col gap-5">
+    <div className="flex w-full flex-col gap-5">
       <PageHeader eyebrow={`Chào ${data.first_name}`} title="Thử hàng cùng mình" />
       <Card className="flex items-start gap-3">
         <ImageBox src={data.image_url} alt={data.product_title} ratio="1/1" className="w-20 shrink-0" placeholder="Ảnh" />

@@ -192,3 +192,27 @@ class AuditLog(UUIDPk, CreatedAt, Base):
     summary: Mapped[str | None] = mapped_column(Text)
     data: Mapped[dict[str, Any]] = mapped_column(default=dict, server_default=text("'{}'::jsonb"))
     ip: Mapped[str | None] = mapped_column(String(64))
+
+
+class AIProviderConfig(Base):
+    """Cấu hình nhà cung cấp AI chị đặt ở Cài đặt (ghi đè biến môi trường). Mỗi provider một dòng; dòng `is_active`
+    là provider đang dùng (nhiều nhất một). Khoá API chỉ lưu dạng mã hoá (`app.core.secrets`), kèm dạng che để hiện."""
+
+    __tablename__ = "ai_provider_configs"
+    __table_args__ = (
+        Index("uq_ai_provider_configs_active", "is_active", unique=True, postgresql_where=text("is_active")),
+    )
+
+    provider: Mapped[str] = mapped_column(String(30), primary_key=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
+    api_key_encrypted: Mapped[str | None] = mapped_column(Text, comment="Fernet; không bao giờ trả ra API")
+    api_key_hint: Mapped[str | None] = mapped_column(String(40), comment="Dạng che, vd sk-ant-…8AAA")
+    key_updated_at: Mapped[datetime | None]
+    key_updated_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    base_url: Mapped[str | None] = mapped_column(String(300))
+    model_smart: Mapped[str | None] = mapped_column(String(120))
+    model_fast: Mapped[str | None] = mapped_column(String(120))
+    effort_smart: Mapped[str | None] = mapped_column(String(20))
+    effort_fast: Mapped[str | None] = mapped_column(String(20))
+    updated_at: Mapped[datetime] = mapped_column(server_default=text("now()"))
+    updated_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))

@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from app.ai.errors import AIOutputInvalid, AIRefused
 from app.ai.fakegen import fake_output
+from app.ai.providers import BaseProvider, Connection, register
 from app.ai.registry import FAKES
 from app.ai.types import AIRequest, ProviderResponse, Usage
 
@@ -17,10 +18,13 @@ class FakeRefusal(Exception):
         self.category = category
 
 
-class FakeProvider:
+@register
+class FakeProvider(BaseProvider):
     name = "fake"
+    label = "AI giả (chạy thử, không gọi ra ngoài)"
+    needs_key = False
 
-    async def complete(self, req: AIRequest) -> ProviderResponse:
+    async def complete(self, req: AIRequest, conn: Connection | None = None) -> ProviderResponse:
         fn = FAKES.get(req.task)
         if fn is None:
             output: BaseModel = fake_output(req.output)

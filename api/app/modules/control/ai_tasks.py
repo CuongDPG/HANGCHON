@@ -1,4 +1,4 @@
-"""Tác vụ AI của control: phân loại câu lệnh bằng lời (i6)."""
+"""Tác vụ AI của control: phân loại câu lệnh bằng lời (i6), kiểm tra kết nối AI (Cài đặt → AI và khoá API)."""
 
 from __future__ import annotations
 
@@ -71,3 +71,30 @@ def _fake_classify(inp: ClassifyCommandIn) -> ClassifyCommandOut:
     return ClassifyCommandOut(
         intent=best.key, params_json=json.dumps(params, ensure_ascii=False), confidence=0.9, clarification=None
     )
+
+
+# ---- kiểm tra kết nối (Cài đặt → AI và khoá API) -----------------------------------------------------------------
+
+PING_TASK = "control.ai_ping"
+
+
+class PingIn(BaseModel):
+    check: str = "kiểm tra kết nối"
+
+
+class PingOut(BaseModel):
+    reply: str = Field(description='Luôn là "được"')
+
+
+ai.task(
+    PING_TASK,
+    system='Đây là lượt kiểm tra kết nối. Trả về reply = "được", không viết gì thêm.',
+    tier="fast",
+    max_tokens=1024,
+    description="Kiểm tra kết nối AI",
+)
+
+
+@ai.fake(PING_TASK)
+def _fake_ping(inp: PingIn) -> PingOut:
+    return PingOut(reply="được")

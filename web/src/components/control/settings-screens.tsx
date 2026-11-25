@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ChevronRight, DatabaseBackup, KeyRound, Plug, RotateCw, Store, UserPlus, UsersRound } from "lucide-react";
+import { Bot, ChevronRight, DatabaseBackup, KeyRound, Plug, RotateCw, Store, UserPlus, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -33,6 +33,7 @@ const SECTIONS = [
   { href: "/desk/cai-dat/tai-khoan", icon: KeyRound, title: "Tài khoản của chị", description: "Đổi mật khẩu đăng nhập" },
   { href: "/desk/cai-dat/nguoi-phu-giup", icon: UsersRound, title: "Người phụ giúp", description: "Tạo, khoá, đặt lại mật khẩu tài khoản phụ", owner: true },
   { href: "/desk/cai-dat/sao-luu", icon: DatabaseBackup, title: "Sao lưu", description: "Sao lưu dữ liệu hằng ngày, tải bản sao về máy", owner: true },
+  { href: "/desk/cai-dat/ai", icon: Bot, title: "AI và khoá API", description: "Nhà cung cấp AI, khoá API, model, trần chi phí tháng", owner: true },
   { href: "/desk/cai-dat/tich-hop", icon: Plug, title: "Tích hợp", description: "Mạng xã hội, thanh toán, vận chuyển… đang chạy giả lập hay thật" },
 ];
 
@@ -40,7 +41,7 @@ export function SettingsIndex() {
   const { user } = useSession();
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Cài đặt" description="Cửa hàng, tài khoản, người phụ giúp, sao lưu, tích hợp." />
+      <PageHeader title="Cài đặt" description="Cửa hàng, tài khoản, người phụ giúp, sao lưu, AI, tích hợp." />
       <ul className="flex flex-col divide-y divide-line rounded-md border border-line bg-surface">
         {SECTIONS.filter((s) => !s.owner || isOwner(user)).map((s) => (
           <li key={s.href}>
@@ -59,7 +60,7 @@ export function SettingsIndex() {
   );
 }
 
-function OwnerOnly({ title }: { title: string }) {
+export function OwnerOnly({ title }: { title: string }) {
   return (
     <div className="flex flex-col gap-4">
       <PageHeader backHref="/desk/cai-dat" title={title} />
@@ -405,6 +406,7 @@ const DRIVER_LABELS: Record<string, string> = {
 
 export function IntegrationsScreen() {
   const { data, isPending, error } = useIntegrations();
+  const { user } = useSession();
   return (
     <div className="flex flex-col gap-4">
       <PageHeader backHref="/desk/cai-dat" title="Tích hợp" description="Các dịch vụ bên ngoài cửa hàng nối tới. «Giả lập» nghĩa là chưa nối tài khoản thật, không gửi gì ra ngoài." />
@@ -427,6 +429,16 @@ export function IntegrationsScreen() {
           ))}
         </ul>
       )}
+      {isOwner(user) ? (
+        <Link href="/desk/cai-dat/ai" className="flex items-center gap-3 rounded-md border border-line bg-surface p-3.5 transition-colors hover:bg-soft-2">
+          <Bot className="size-5 shrink-0 text-accent" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-semibold">AI và khoá API</span>
+            <span className="block text-[13px] text-ink-2">Chị tự đổi nhà cung cấp AI, khoá và model ở đây.</span>
+          </span>
+          <ChevronRight className="size-4 shrink-0 text-ink-3" aria-hidden />
+        </Link>
+      ) : null}
       <p className="text-[13px] text-ink-2">
         Muốn nối tài khoản thật (ngân hàng, hãng giao, Facebook, Zalo…), chị gửi thông tin tài khoản cho người cài máy chủ; họ bật theo tài liệu triển khai.
       </p>

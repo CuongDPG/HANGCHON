@@ -164,6 +164,66 @@ export type AuditEntry = {
 
 export type Integration = { kind: string; label: string; driver: string; is_mock: boolean; available: string[] };
 
+/** Nguồn cấu hình AI: `settings` = chị lưu ở Cài đặt, `env` = biến môi trường / mặc định của máy chủ. */
+export type AIConfigSource = "settings" | "env";
+export type AIEffort = "low" | "medium" | "high" | "max";
+
+export type AIProviderInfo = {
+  name: string;
+  label: string;
+  needs_key: boolean;
+  supports_web: boolean;
+  needs_base_url: boolean;
+  default_base_url: string | null;
+  model_suggestions: string[];
+  key_placeholder: string;
+  saved: boolean;
+  has_key: boolean;
+  /** Dạng che (vd `sk-ant-…8AAA`) — API không bao giờ trả khoá thật. */
+  key_hint: string | null;
+  key_source: AIConfigSource | null;
+  key_updated_at: string | null;
+  key_updated_by: string | null;
+  base_url: string | null;
+  model_smart: string;
+  model_fast: string;
+  effort_smart: string | null;
+  effort_fast: string | null;
+};
+
+export type AIConfig = {
+  provider: string;
+  source: AIConfigSource;
+  providers: AIProviderInfo[];
+  efforts: AIEffort[];
+  monthly_budget_vnd: number;
+  budget_source: AIConfigSource;
+};
+
+export type AIConfigInput = {
+  provider: string;
+  /** Để trống = giữ khoá đã lưu. */
+  api_key?: string | null;
+  base_url?: string | null;
+  model_smart?: string | null;
+  model_fast?: string | null;
+  effort_smart?: AIEffort | null;
+  effort_fast?: AIEffort | null;
+  monthly_budget_vnd?: number | null;
+  /** Lưu xong chuyển sang dùng provider này (mặc định có). */
+  activate?: boolean;
+};
+
+export type AITestResult = {
+  tier: "fast" | "smart";
+  ok: boolean;
+  model: string;
+  latency_ms: number;
+  cost_vnd: number;
+  error: string | null;
+  code: string | null;
+};
+
 export type Intent = { key: string; label: string; description: string; examples: string[] };
 
 export type CommandResult = {
@@ -194,6 +254,7 @@ export const controlKeys = {
   settings: () => ["control", "settings"] as const,
   audit: (q: object) => ["control", "audit", q] as const,
   integrations: () => ["control", "integrations"] as const,
+  aiConfig: () => ["control", "ai-config"] as const,
   intents: () => ["control", "intents"] as const,
   users: () => ["control", "users"] as const,
 };
@@ -351,6 +412,40 @@ export function useAudit(query: { actions?: string[]; page?: number }, enabled =
 
 export function useIntegrations() {
   return useQuery({ queryKey: controlKeys.integrations(), queryFn: () => api.get<Integration[]>(`${BASE}/integrations`) });
+}
+
+/* ---------- cấu hình AI: nhà cung cấp, khoá API, model (chỉ chị) ---------- */
+
+export function useAIConfig(enabled: boolean) {
+  return useQuery({ queryKey: controlKeys.aiConfig(), queryFn: () => api.get<AIConfig>(`${BASE}/ai/config`), enabled });
+}
+
+export function useSaveAIConfig() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: AIConfigInput) => api.patch<AIConfig>(`${BASE}/ai/config`, input),
+    onSuccess: (cfg) => {
+      qc.setQueryData(controlKeys.aiConfig(), cfg);
+      qc.invalidateQueries({ queryKey: ["control", "ai-costs"] });
+    },
+  });
+}
+
+/** Gửi một lệnh rất ngắn tới từng tầng bằng cấu hình đang nhập (chưa lưu). Gọi thật, tính phí như lượt thường. */
+export function useTestAIConfig() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: AIConfigInput) => api.post<{ provider: string; results: AITestResult[] }>(`${BASE}/ai/config/test`, input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["control", "ai-costs"] }),
+  });
+}
+
+export function useClearAIKey() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (provider: string) => api.delete<void>(`${BASE}/ai/config/${encodeURIComponent(provider)}/key`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: controlKeys.aiConfig() }),
+  });
 }
 
 /* ---------- lệnh bằng lời (i6) ---------- */
