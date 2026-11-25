@@ -136,11 +136,16 @@ export type ReferralUse = {
   order_id: string | null;
   status: "pending" | "qualified" | "rewarded" | "void";
   rewarded_at: string | null;
+  /** h7: phần giảm bạn được giới thiệu nhận ngay ở đơn đầu. */
+  referred_discount_vnd: number;
+  /** h7: phần giảm AI tặng người giới thiệu cho đơn kế tiếp (0 = chưa tặng / chị tặng tay). */
+  referrer_credit_vnd: number;
   created_at: string;
   code: string;
   referrer_name: string | null;
   referred_name: string | null;
   order_code: string | null;
+  credit_order_code: string | null;
 };
 
 export type ReferralStats = {

@@ -27,6 +27,7 @@ from app.core import events
 from app.core.config import settings
 from app.core.enums import Actor, Channel
 from app.core.errors import BadRequest, Conflict, NotFound
+from app.core.money import format_vnd
 from app.core.security import random_token
 from app.core.timeutil import local_today, now_utc, to_local
 from app.integrations import IntegrationError
@@ -34,7 +35,7 @@ from app.integrations import notify as notify_api
 from app.integrations.notify import OutboundNotification
 from app.modules.catalog.models import Category, Drop, DropItem, Product, ProductStatus
 from app.modules.content.models import VoiceProfile
-from app.modules.control.models import ApprovalItem, ApprovalStatus, User
+from app.modules.control.models import AIActivity, ApprovalItem, ApprovalStatus, User
 from app.modules.crm.ai_tasks import (
     DropAnnouncementIn,
     DropAnnouncementOut,
@@ -77,6 +78,7 @@ REGULAR_TAG = "khach-quen"
 REGULAR_MIN_KEY = "crm.regular_min_orders"
 REORDER_CYCLES_KEY = "crm.reorder_cycles"
 REFERRAL_REWARD_KEY = "crm.referral_reward_vnd"
+ACTION_REFERRAL_REWARD = "crm.reward_referral"
 
 ACTION_PROFILE = "crm.update_profile"
 ACTION_BROADCAST = "crm.send_broadcast"
@@ -996,8 +998,21 @@ async def record_referral(db: AsyncSession, order_id: uuid.UUID) -> ReferralUse 
     buyer = await _resolve(db, order.customer_id)
     if buyer == ref.referrer_customer_id:
         return None  # tự giới thiệu chính mình
-    if await db.scalar(select(ReferralUse.id).where(ReferralUse.referred_customer_id == buyer)):
-        return None  # mỗi người chỉ được giới thiệu một lần
+    existing = (
+        await db.execute(select(ReferralUse).where(ReferralUse.referred_customer_id == buyer))
+    ).scalar_one_or_none()
+    if existing is not None:
+        # mỗi người chỉ được giới thiệu một lần; lượt cũ mà đơn đã huỷ (chưa nhận quà) → chuyển sang đơn mới
+        old = await db.get(Order, existing.order_id) if existing.order_id else None
+        if (
+            existing.order_id == order.id
+            or existing.status != ReferralUseStatus.PENDING
+            or (old is not None and old.status not in DEAD_ORDER)
+        ):
+            return None
+        existing.order_id = order.id
+        await db.flush()
+        return existing
     if not await _first_order(db, order):
         return None
     use = ReferralUse(referral_id=ref.id, referred_customer_id=buyer, order_id=order.id)
@@ -1005,6 +1020,34 @@ async def record_referral(db: AsyncSession, order_id: uuid.UUID) -> ReferralUse 
     ref.uses_count += 1
     await db.flush()
     return use
+
+
+async def credit_granted(db: AsyncSession, use_id: uuid.UUID) -> bool:
+    """Phần quà của người giới thiệu do AI tặng (dòng Nhật ký AI `crm.reward_referral` chưa hoàn tác).
+    Chị ghi quà tay thì không có phần giảm tự áp."""
+    return bool(
+        await db.scalar(
+            select(AIActivity.id).where(
+                AIActivity.action == ACTION_REFERRAL_REWARD,
+                AIActivity.ref_id == use_id,
+                AIActivity.undone_at.is_(None),
+            )
+        )
+    )
+
+
+async def credit_order(db: AsyncSession, use_id: uuid.UUID) -> Order | None:
+    """Đơn còn sống của người giới thiệu đã trừ phần quà (orders ghi `raw.referral_gifts.credit_use_id`)."""
+    return (
+        await db.execute(
+            select(Order)
+            .where(
+                Order.raw["referral_gifts"]["credit_use_id"].astext == str(use_id),
+                Order.status.not_in(DEAD_ORDER),
+            )
+            .limit(1)
+        )
+    ).scalar_one_or_none()
 
 
 async def manual_referral(
@@ -1028,18 +1071,106 @@ async def manual_referral(
 
 
 async def qualify_referral(db: AsyncSession, order_id: uuid.UUID) -> int:
-    """Nghe `order.delivered`: đơn đầu của người được giới thiệu đã giao → đủ điều kiện nhận quà."""
-    rows = (
-        await db.execute(
-            select(ReferralUse).where(ReferralUse.order_id == order_id, ReferralUse.status == ReferralUseStatus.PENDING)
-        )
-    ).scalars()
+    """Nghe `order.delivered`: đơn đầu của người được giới thiệu đã giao → đủ điều kiện nhận quà; đơn đã trả tiền thì
+    tặng phần quà cho người giới thiệu (`crm.reward_referral`, mặc định AI tự làm)."""
+    rows = list(
+        (
+            await db.execute(
+                select(ReferralUse).where(
+                    ReferralUse.order_id == order_id, ReferralUse.status == ReferralUseStatus.PENDING
+                )
+            )
+        ).scalars()
+    )
+    order = await db.get(Order, order_id)
     n = 0
     for u in rows:
         u.status = ReferralUseStatus.QUALIFIED
         n += 1
     await db.flush()
+    if order is not None and order.paid_at is not None:
+        for u in rows:
+            await propose_reward(db, u, order)
     return n
+
+
+async def propose_reward(db: AsyncSession, use: ReferralUse, order: Order) -> Any:
+    ref = await db.get(Referral, use.referral_id)
+    if ref is None or ref.reward_referrer_vnd <= 0:
+        return None
+    names = dict(
+        (
+            await db.execute(
+                select(Customer.id, Customer.name).where(
+                    Customer.id.in_([ref.referrer_customer_id, use.referred_customer_id])
+                )
+            )
+        ).all()
+    )
+    referrer, friend = names.get(ref.referrer_customer_id) or "Khách", names.get(use.referred_customer_id) or "bạn mới"
+    return await control.propose(
+        ACTION_REFERRAL_REWARD, f"Quà giới thiệu: {referrer} giới thiệu {friend}",
+        {"referral_use_id": str(use.id)},
+        {"referrer": referrer, "friend": friend, "code": ref.code, "order_code": order.code,
+         "reward_vnd": ref.reward_referrer_vnd},
+        db=db, rationale=f"Đơn đầu {order.code} của {friend} đã trả tiền và đã giao.",
+        ref_type="referral_uses", ref_id=use.id, dedupe_key=f"referral:{use.id}", ai_generated=False,
+    )  # fmt: skip
+
+
+async def grant_reward(db: AsyncSession, use_id: uuid.UUID) -> control.HandlerResult:
+    """Handler của crm.reward_referral: tặng người giới thiệu phần giảm cho đơn kế tiếp (orders tự trừ khi chốt đơn)."""
+    use = await db.get(ReferralUse, use_id, with_for_update=True)
+    if use is None:
+        raise NotFound("Không tìm thấy lượt giới thiệu.")
+    if use.status != ReferralUseStatus.QUALIFIED:
+        raise Conflict("Lượt này chưa đủ điều kiện hoặc đã tặng quà rồi.", code="not_qualified")
+    order = await db.get(Order, use.order_id) if use.order_id else None
+    if order is None or order.paid_at is None or order.status in DEAD_ORDER:
+        raise Conflict("Đơn đầu của bạn được giới thiệu chưa trả tiền.", code="not_paid")
+    ref = await db.get(Referral, use.referral_id)
+    if ref is None or use.referred_customer_id == ref.referrer_customer_id:
+        raise Conflict("Lượt giới thiệu không hợp lệ.")
+    use.status = ReferralUseStatus.REWARDED
+    use.rewarded_at = now_utc()
+    ref.rewarded_count += 1
+    db.add(
+        CustomerNote(
+            customer_id=ref.referrer_customer_id, kind=NoteKind.NOTE, source=NoteSource.AI,
+            body=f"Quà giới thiệu bạn ({ref.code}): giảm {format_vnd(ref.reward_referrer_vnd)}đ cho đơn kế tiếp, tự trừ khi đặt.",
+            ref_type="referral_uses", ref_id=use.id,
+        )
+    )  # fmt: skip
+    await db.flush()
+    return control.HandlerResult(
+        result={"referral_use_id": str(use.id), "credit_vnd": ref.reward_referrer_vnd},
+        undo={"referral_use_id": str(use.id)},
+        summary=f"Tặng {format_vnd(ref.reward_referrer_vnd)}đ cho đơn kế tiếp của người giới thiệu (mã {ref.code})",
+        ref_type="referral_uses", ref_id=use.id,
+    )  # fmt: skip
+
+
+async def revoke_reward(db: AsyncSession, use_id: uuid.UUID) -> None:
+    """Hoàn tác tặng quà: chỉ khi người giới thiệu chưa dùng phần giảm."""
+    use = await db.get(ReferralUse, use_id, with_for_update=True)
+    if use is None:
+        raise NotFound("Không tìm thấy lượt giới thiệu.")
+    if await credit_order(db, use.id) is not None:
+        raise Conflict("Người giới thiệu đã dùng phần quà cho một đơn, không thu hồi được.", code="credit_used")
+    if use.status != ReferralUseStatus.REWARDED:
+        return
+    ref = await db.get(Referral, use.referral_id)
+    use.status = ReferralUseStatus.QUALIFIED
+    use.rewarded_at = None
+    if ref is not None:
+        ref.rewarded_count = max(0, ref.rewarded_count - 1)
+        db.add(
+            CustomerNote(
+                customer_id=ref.referrer_customer_id, kind=NoteKind.NOTE, source=NoteSource.OWNER,
+                body=f"Thu hồi quà giới thiệu bạn ({ref.code}).", ref_type="referral_uses", ref_id=use.id,
+            )
+        )  # fmt: skip
+    await db.flush()
 
 
 async def reward_referral(db: AsyncSession, use_id: uuid.UUID, note: str, user: User) -> ReferralUse:

@@ -1,8 +1,9 @@
 """TikTok Shop Partner API (bản 202309) — **khung driver**, viết theo tài liệu công khai
 (partner.tiktokshop.com/docv2), CHƯA thử thật.
 
-Đã có: ký yêu cầu, kéo đơn (orders/search), cập nhật tồn theo SKU. Chưa làm: tạo sản phẩm mới (ngành hàng, ảnh,
-thuộc tính bắt buộc), giao hàng, làm mới access token. Khoá: `TIKTOK_SHOP_APP_KEY`, `TIKTOK_SHOP_APP_SECRET`
+Đã có: ký yêu cầu, kéo đơn (orders/search), cập nhật tồn theo SKU, báo đã gửi hàng (người bán tự giao, kèm mã vận
+đơn — xem `update_order_status`). Chưa làm: tạo sản phẩm mới (ngành hàng, ảnh, thuộc tính bắt buộc), làm mới access
+token. Khoá: `TIKTOK_SHOP_APP_KEY`, `TIKTOK_SHOP_APP_SECRET`
 (config chung); `TIKTOK_SHOP_ACCESS_TOKEN`, `TIKTOK_SHOP_CIPHER` đọc từ biến môi trường hệ thống.
 `external_id` của món = `<product_id>:<sku_id>` trên TikTok Shop.
 """
@@ -12,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import os
 import time
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -142,5 +144,23 @@ class Driver(MarketplacesDriver):
     async def update_order_status(
         self, marketplace: Channel, external_id: str, status: str, tracking_code: str | None = None
     ) -> None:
+        """Người bán tự giao (hãng mình gọi): «Mark Package As Shipped» bản 202309 —
+        `POST /fulfillment/202309/orders/{order_id}/packages` với `tracking_number` + `shipping_provider_id`
+        (mã hãng giao trên TikTok Shop, lấy từ «Get Shipping Providers»; đặt ở `TIKTOK_SHOP_SHIPPING_PROVIDER_ID`).
+        CHƯA thử thật; tên tài liệu đã đối chiếu trên Partner Center, đường dẫn và các ô body chưa đối chiếu được toàn
+        văn — kiểm lại trên tài liệu trước khi bật. «delivered»: bỏ qua, TikTok Shop tự cập nhật theo mã vận đơn."""
         self._check(marketplace)
-        raise IntegrationNotConfigured("Giao đơn TikTok Shop chưa làm (khung driver).")
+        if status == "delivered":
+            return
+        if status != "shipped":
+            raise IntegrationError(f"Trạng thái «{status}» không hỗ trợ.")
+        if not tracking_code:
+            raise IntegrationError("Thiếu mã vận đơn để báo TikTok Shop.")
+        provider = os.environ.get("TIKTOK_SHOP_SHIPPING_PROVIDER_ID", "").strip()
+        if not provider:
+            raise IntegrationNotConfigured("Chưa đặt TIKTOK_SHOP_SHIPPING_PROVIDER_ID (mã hãng giao trên TikTok Shop).")
+        await self._call(
+            "POST",
+            f"/fulfillment/202309/orders/{external_id}/packages",
+            body={"tracking_number": tracking_code, "shipping_provider_id": provider},
+        )

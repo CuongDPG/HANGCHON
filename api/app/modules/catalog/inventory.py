@@ -180,3 +180,50 @@ async def receive_inbound(db: AsyncSession, inbound_id: uuid.UUID) -> int:
                 drop.actual_arrival_date = (lot.received_at or lot.updated_at).date()
                 await db.flush()
     return added
+
+
+async def apply_request(db: AsyncSession, payload: dict) -> InventoryItem | None:
+    """Nghe `inventory.adjust_requested` (g8, chị nhập/điều chỉnh tồn ở màn vận hành của orders).
+
+    `set_on_hand` = đặt đúng số (tồn đầu kỳ, đếm lại, điều chỉnh) → một dòng `inventory_movements` có lý do và người làm;
+    `low_stock_threshold` có trong payload = đặt ngưỡng theo món (None = dùng ngưỡng chung).
+    Idempotent theo `request_id` (vết ghi `ref_type="inventory_requests"`)."""
+    from app.core.timeutil import now_utc
+
+    request_id = uuid.UUID(str(payload["request_id"]))
+    product_id = uuid.UUID(str(payload["product_id"]))
+    variant_id = uuid.UUID(str(payload["variant_id"])) if payload.get("variant_id") else None
+    if await db.scalar(
+        select(InventoryMovement.id).where(
+            InventoryMovement.ref_type == "inventory_requests", InventoryMovement.ref_id == request_id
+        )
+    ):
+        return None
+    q = select(InventoryItem).where(
+        InventoryItem.product_id == product_id,
+        InventoryItem.variant_id.is_(None) if variant_id is None else InventoryItem.variant_id == variant_id,
+    )
+    inv = (await db.execute(q.with_for_update())).scalar_one_or_none()
+    if inv is None:
+        inv = InventoryItem(product_id=product_id, variant_id=variant_id, on_hand=0, reserved=0)
+        db.add(inv)
+        await db.flush()
+    if "low_stock_threshold" in payload:
+        t = payload["low_stock_threshold"]
+        inv.low_stock_threshold = int(t) if t is not None else None
+    target = payload.get("set_on_hand")
+    if target is not None:
+        delta = max(0, int(target)) - inv.on_hand
+        inv.on_hand += delta
+        if payload.get("kind") in ("opening", "count"):  # đếm thật (tồn đầu kỳ / đếm lại)
+            inv.last_counted_at = now_utc()
+        db.add(
+            InventoryMovement(
+                inventory_item_id=inv.id, delta_on_hand=delta,
+                reason=MovementReason.DAMAGED if payload.get("kind") == "damaged" else MovementReason.ADJUSTMENT,
+                ref_type="inventory_requests", ref_id=request_id, note=(payload.get("note") or None),
+                created_by_id=uuid.UUID(str(payload["user_id"])) if payload.get("user_id") else None,
+            )
+        )  # fmt: skip
+    await db.flush()
+    return inv

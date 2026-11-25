@@ -540,7 +540,13 @@ async def finalize(
         opt = await ship_svc.checkout_fee(db, order_address(order), order_weight(resolved), order.subtotal_vnd)
         shipping_fee_vnd = opt.fee_vnd if opt else 0
     order.shipping_fee_vnd = shipping_fee_vnd
-    order.discount_vnd = min(discount_vnd, order.subtotal_vnd + shipping_fee_vnd)
+    # h7: quà giới thiệu bạn tự áp (bạn mới có mã / người giới thiệu còn phần quà chưa dùng)
+    from app.modules.orders import referrals
+
+    gifts = await referrals.gifts_for(db, order, phone, order.subtotal_vnd + shipping_fee_vnd - discount_vnd)
+    if gifts.total or gifts.note:
+        order.raw = {**order.raw, "referral_gifts": {**gifts.raw(), "note": gifts.note}}
+    order.discount_vnd = min(discount_vnd + gifts.total, order.subtotal_vnd + shipping_fee_vnd)
     order.total_vnd = order.subtotal_vnd + order.shipping_fee_vnd - order.discount_vnd
     order.deposit_required_vnd = deposit_for(drop, order.total_vnd, order.payment_method)
     order.placed_at = now_utc()

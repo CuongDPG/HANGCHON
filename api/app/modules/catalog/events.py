@@ -84,8 +84,9 @@ async def on_order_paid(db: AsyncSession, payload: dict[str, Any]) -> None:
 
 @events.on("order.cancelled")
 @events.on("order.refunded")
+@events.on("order.unpaid")
 async def on_order_released(db: AsyncSession, payload: dict[str, Any]) -> None:
-    """Đơn huỷ / hoàn tiền → trả suất và phần tồn đang giữ (tính lại từ đơn nên không trả hai lần)."""
+    """Đơn huỷ / hoàn tiền / bỏ khớp tiền (orders.unpaid) → trả suất và phần tồn đang giữ (tính lại từ đơn nên không trả hai lần)."""
     oid = _id(payload, "order_id")
     if oid is not None:
         await inventory.sync_order(db, oid)
@@ -105,3 +106,9 @@ async def on_inbound_arrived(db: AsyncSession, payload: dict[str, Any]) -> None:
     iid = _id(payload, "inbound_shipment_id")
     if iid is not None:
         await inventory.receive_inbound(db, iid)
+
+
+@events.on("inventory.adjust_requested")
+async def on_inventory_adjust(db: AsyncSession, payload: dict[str, Any]) -> None:
+    """g8: chị nhập tồn đầu kỳ / điều chỉnh tay / đặt ngưỡng ở màn vận hành (orders) → catalog ghi tồn + vết."""
+    await inventory.apply_request(db, payload)

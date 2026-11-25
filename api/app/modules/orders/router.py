@@ -30,10 +30,12 @@ from app.modules.orders import (
     notify,
     payments,
     public,
+    referrals,
     refs,
     returns,
     service,
     shipping,
+    stock,
     views,
 )
 from app.modules.orders.models import (
@@ -54,7 +56,11 @@ from app.modules.orders.schemas import (
     DeskReturnIn,
     DraftConfirmIn,
     DropOverview,
+    InventoryAdjustIn,
+    InventoryCreateIn,
+    InventoryMovementRow,
     InventoryRow,
+    InventoryThresholdIn,
     LabelOut,
     ListingRow,
     LookupIn,
@@ -87,6 +93,7 @@ from app.modules.orders.schemas import (
     SimulateMarketplaceOrderIn,
     SimulateTransferIn,
     StatusGroup,
+    StockCandidate,
     TemplatesIn,
     TemplatesOut,
     WebhookAck,
@@ -150,11 +157,13 @@ async def quote(body: QuoteIn, request: Request, db: DbSession) -> QuoteOut:
             hint += "."
     elif resolved and not problems:
         hint = "Hàng có sẵn, mình gửi trong 1–2 ngày."
+    ref_vnd, ref_note = await referrals.quote_hint(db, body.referral_code)
     return QuoteOut(
         lines=[service.quote_line(r) for r in resolved], subtotal_vnd=subtotal, shipping_fee_vnd=fee,
         shipping_estimated=estimated, total_vnd=total, deposit_required_vnd=service.deposit_for(drop, total, method),
         drops=[d for d in [refs.drop_brief(x) for x in drops_map.values()] if d], delivery_hint=hint,
         problems=problems, ok=not problems and bool(resolved),
+        referral_discount_vnd=min(ref_vnd, total), referral_note=ref_note,
     )  # fmt: skip
 
 
@@ -488,6 +497,46 @@ async def ignore_payment(payment_id: uuid.UUID, user: OwnerUser, db: DbSession) 
 async def inventory(_: CurrentUser, db: DbSession) -> list[InventoryRow]:
     """g8: tồn món giữ sẵn (đọc từ catalog) trừ phần đơn chưa thanh toán đang giữ."""
     return await drops.inventory_rows(db)
+
+
+@desk.get("/inventory/candidates", response_model=list[StockCandidate])
+async def inventory_candidates(_: CurrentUser, db: DbSession) -> list[StockCandidate]:
+    """g8: món chưa có dòng tồn kho (để thêm món giữ sẵn với tồn đầu kỳ)."""
+    return await stock.candidates(db)
+
+
+@desk.post("/inventory", response_model=InventoryRow, status_code=status.HTTP_201_CREATED)
+async def inventory_create(body: InventoryCreateIn, user: OwnerUser, db: DbSession) -> InventoryRow:
+    """g8: thêm món giữ sẵn + số tồn đầu kỳ (+ ngưỡng riêng nếu có)."""
+    return await stock.create(
+        db, user, product_id=body.product_id, variant_id=body.variant_id, on_hand=body.on_hand,
+        threshold=body.low_stock_threshold, note=body.note,
+    )  # fmt: skip
+
+
+@desk.post("/inventory/{inventory_item_id}/adjust", response_model=InventoryRow)
+async def inventory_adjust(
+    inventory_item_id: uuid.UUID, body: InventoryAdjustIn, user: OwnerUser, db: DbSession
+) -> InventoryRow:
+    """g8: điều chỉnh tồn tay (đếm lại / nhập thêm / hỏng), bắt buộc ghi lý do; lưu vết ở inventory_movements."""
+    return await stock.adjust(
+        db, user, inventory_item_id, mode=body.mode, quantity=body.quantity, kind=body.kind, reason=body.reason
+    )
+
+
+@desk.patch("/inventory/{inventory_item_id}", response_model=InventoryRow)
+async def inventory_threshold(
+    inventory_item_id: uuid.UUID, body: InventoryThresholdIn, user: OwnerUser, db: DbSession
+) -> InventoryRow:
+    """g8: ngưỡng báo sắp hết theo món (null = dùng ngưỡng chung)."""
+    return await stock.set_threshold(db, user, inventory_item_id, body.low_stock_threshold)
+
+
+@desk.get("/inventory/{inventory_item_id}/movements", response_model=list[InventoryMovementRow])
+async def inventory_movements(
+    inventory_item_id: uuid.UUID, _: CurrentUser, db: DbSession
+) -> list[InventoryMovementRow]:
+    return await stock.movements(db, inventory_item_id)
 
 
 @desk.get("/returns", response_model=Paginated[ReturnRowOut])

@@ -10,6 +10,7 @@ import {
   DateTime,
   EmptyState,
   Input,
+  LevelTag,
   Money,
   PageHeader,
   SectionLabel,
@@ -40,7 +41,8 @@ const USE_STATUS: Record<ReferralUse["status"], { label: string; tone: "warning"
   void: { label: "Đã huỷ", tone: "neutral" },
 };
 
-/** Giới thiệu bạn (h7): mỗi khách một mã, đơn đầu của người được giới thiệu ghi về mã, chị xác nhận quà cho cả hai. */
+/** Giới thiệu bạn (h7): mỗi khách một mã. Quà tự áp: bạn mới giảm ngay ở đơn đầu; đơn đó trả tiền và giao xong thì
+ *  AI tặng người giới thiệu phần giảm cho đơn kế tiếp (ghi Nhật ký AI, hoàn tác được). Chị vẫn ghi quà tay được. */
 export function ReferralsScreen() {
   const stats = useReferralStats();
   const s = stats.data;
@@ -56,6 +58,13 @@ export function ReferralsScreen() {
         actions={<Button size="sm" variant="secondary" icon={<Plus className="size-4" />} onClick={() => setPickOpen(true)}>Tạo mã</Button>}
       />
       <KhachNav active="referral" />
+      <Card tone="soft" className="flex items-start gap-2 text-[14px]">
+        <LevelTag level="auto" size="sm">AI tự làm</LevelTag>
+        <span className="[text-wrap:pretty]">
+          Quà cho cả hai tự áp: bạn mới giảm ngay ở đơn đầu; đơn đó trả tiền và giao xong thì người giới thiệu được giảm ở đơn kế tiếp.
+          Mỗi khách mới một lần, không áp khi tự giới thiệu mình. Mức quà đổi ở Cài đặt (nhóm Khách).
+        </span>
+      </Card>
       {stats.error ? (
         <EmptyState tone="error" title="Chưa tải được số liệu" description={stats.error.message} />
       ) : (
@@ -132,6 +141,22 @@ function UseCard({ u }: { u: ReferralUse }) {
         Mã {u.code}
         {u.order_code ? ` · đơn ${u.order_code}` : " · ghi nhận tay"} · <DateTime value={u.created_at} format="date" />
       </p>
+      {u.referred_discount_vnd || u.referrer_credit_vnd ? (
+        <p className="text-[13px]">
+          {u.referred_discount_vnd ? (
+            <>
+              {u.referred_name} được giảm <Money value={u.referred_discount_vnd} /> ở đơn đầu
+            </>
+          ) : null}
+          {u.referred_discount_vnd && u.referrer_credit_vnd ? " · " : null}
+          {u.referrer_credit_vnd ? (
+            <>
+              {u.referrer_name} được giảm <Money value={u.referrer_credit_vnd} />{" "}
+              {u.credit_order_code ? `(đã dùng ở đơn ${u.credit_order_code})` : "cho đơn kế tiếp, chưa dùng"}
+            </>
+          ) : null}
+        </p>
+      ) : null}
       {u.status === "pending" || u.status === "qualified" ? (
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant={u.status === "qualified" ? "primary" : "secondary"} icon={<Gift className="size-4" />} onClick={() => setOpen(true)}>

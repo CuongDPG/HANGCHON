@@ -482,7 +482,18 @@ async def referral_uses(_: CurrentUser, db: DbSession) -> list[ReferralUseView]:
     names = (
         dict((await db.execute(select(Customer.id, Customer.name).where(Customer.id.in_(cids)))).all()) if cids else {}
     )
-    codes = dict((await db.execute(select(Order.id, Order.code).where(Order.id.in_(oids)))).all()) if oids else {}
+    orders = {o.id: o for o in (await db.execute(select(Order).where(Order.id.in_(oids)))).scalars()} if oids else {}
+    codes = {k: o.code for k, o in orders.items()}
+    extra: dict[uuid.UUID, dict] = {}
+    for u, r in rows:  # h7: quà tự áp — suy từ đơn (raw.referral_gifts) và Nhật ký AI, không thêm cột
+        o = orders.get(u.order_id) if u.order_id else None
+        gifts = ((o.raw or {}).get("referral_gifts") or {}) if o else {}
+        used = await service.credit_order(db, u.id)
+        extra[u.id] = {
+            "referred_discount_vnd": int(gifts.get("friend_vnd") or 0),
+            "referrer_credit_vnd": r.reward_referrer_vnd if await service.credit_granted(db, u.id) else 0,
+            "credit_order_code": used.code if used else None,
+        }
     return [
         ReferralUseView(
             **ReferralUseOut.model_validate(u).model_dump(),
@@ -490,6 +501,7 @@ async def referral_uses(_: CurrentUser, db: DbSession) -> list[ReferralUseView]:
             referrer_name=names.get(r.referrer_customer_id),
             referred_name=names.get(u.referred_customer_id),
             order_code=codes.get(u.order_id) if u.order_id else None,
+            **extra[u.id],
         )
         for u, r in rows
     ]

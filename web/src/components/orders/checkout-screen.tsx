@@ -2,7 +2,7 @@
 
 import { attributionFields } from "@/lib/attribution";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CircleAlert, Hourglass, ShoppingBag } from "lucide-react";
+import { CircleAlert, Gift, Hourglass, ShoppingBag } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
@@ -62,7 +62,8 @@ export function CheckoutScreen() {
   const address = useDebounced({ address_line: watched.address_line || null, province: watched.province || null, ward: watched.ward || null, district: watched.district || null }, 500);
   const method = (watched.payment_method ?? "bank_transfer") as "bank_transfer" | "cod";
   const lines = useMemo(() => items.map((i) => ({ product_id: i.productId, variant_id: i.variantId ?? null, drop_id: i.dropId ?? null, quantity: i.quantity })), [items]);
-  const quote = useQuote({ items: lines, payment_method: method, ...address });
+  const referralCode = isClient ? attributionFields().referral_code : undefined;
+  const quote = useQuote({ items: lines, payment_method: method, ...address, ...(referralCode ? { referral_code: referralCode } : {}) });
   const q = quote.data;
 
   const onSubmit = handleSubmit(async (v) => {
@@ -164,9 +165,11 @@ export function CheckoutScreen() {
             items={[
               { label: "Tạm tính", value: q ? <Money value={q.subtotal_vnd} /> : "…" },
               { label: q?.shipping_estimated ? "Phí giao (ước tính)" : "Phí giao", value: q ? <Money value={q.shipping_fee_vnd} /> : "…" },
-              { label: "Tổng", value: q ? <Money value={q.total_vnd} /> : "…", strong: true },
+              ...(q?.referral_discount_vnd ? [{ label: "Quà giới thiệu (đơn đầu)", value: <Money value={-q.referral_discount_vnd} /> }] : []),
+              { label: q?.referral_discount_vnd ? "Tổng (chưa trừ quà)" : "Tổng", value: q ? <Money value={q.total_vnd} /> : "…", strong: true },
             ]}
           />
+          {q?.referral_note ? <p className="mt-2 flex items-start gap-1.5 text-[13px] text-ink-2"><Gift className="mt-0.5 size-3.5 shrink-0 text-auto" aria-hidden />{q.referral_note}</p> : null}
         </Card>
         {q && !q.ok && q.problems.length ? (
           <p role="alert" className="flex items-start gap-2 rounded-md bg-seal-wash px-3 py-2.5 text-[14px] text-seal">

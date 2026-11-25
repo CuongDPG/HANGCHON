@@ -1,8 +1,8 @@
 """Shopee Open Platform v2 — **khung driver**, viết theo tài liệu công khai (open.shopee.com), CHƯA thử thật.
 
-Đã có: ký yêu cầu, kéo đơn (get_order_list + get_order_detail), cập nhật tồn, sửa tên/giá sản phẩm đã có.
-Chưa làm: tạo sản phẩm mới (cần mã ngành hàng, ảnh tải lên media_space, cài đặt vận chuyển), giao hàng qua
-logistics/ship_order, làm mới access token (OAuth). Khoá: `SHOPEE_PARTNER_ID`, `SHOPEE_PARTNER_KEY` (config chung);
+Đã có: ký yêu cầu, kéo đơn (get_order_list + get_order_detail), cập nhật tồn, sửa tên/giá sản phẩm đã có,
+báo đã gửi hàng (logistics/get_shipping_parameter + ship_order, kèm mã vận đơn). Chưa làm: tạo sản phẩm mới (cần mã
+ngành hàng, ảnh tải lên media_space, cài đặt vận chuyển), làm mới access token (OAuth). Khoá: `SHOPEE_PARTNER_ID`, `SHOPEE_PARTNER_KEY` (config chung);
 `SHOPEE_SHOP_ID`, `SHOPEE_ACCESS_TOKEN` đọc từ biến môi trường hệ thống (người tích hợp nên chuyển vào Settings).
 Bật: `MARKETPLACES_DRIVER=shopee` (orders dùng driver thật theo từng sàn khi driver khác `mock`).
 """
@@ -159,5 +159,51 @@ class Driver(MarketplacesDriver):
     async def update_order_status(
         self, marketplace: Channel, external_id: str, status: str, tracking_code: str | None = None
     ) -> None:
+        """Theo tài liệu v2.logistics.get_shipping_parameter + v2.logistics.ship_order (open.shopee.com), CHƯA thử thật.
+
+        «shipped»: hỏi `get_shipping_parameter` xem đơn cần cách giao nào (`info_needed`), rồi `ship_order` kèm mã vận
+        đơn của hãng mình tự gọi: ưu tiên `non_integrated` (kênh giao ngoài Shopee), không thì `pickup` (địa chỉ lấy hàng
+        + khung giờ Shopee gợi ý), cuối cùng `dropoff`. «delivered»: Shopee chỉ mở API cập nhật giao xong
+        (`v2.logistics.update_tracking_status`) cho người bán Brazil, nên ở Việt Nam bỏ qua — Shopee tự chốt theo mã
+        vận đơn / người mua xác nhận."""
         self._check(marketplace)
-        raise IntegrationNotConfigured("Giao đơn Shopee qua logistics/ship_order chưa làm (khung driver).")
+        if status == "delivered":
+            return
+        if status != "shipped":
+            raise IntegrationError(f"Trạng thái «{status}» không hỗ trợ.")
+        param = await self._call("GET", "/api/v2/logistics/get_shipping_parameter", params={"order_sn": external_id})
+        await self._call(
+            "POST", "/api/v2/logistics/ship_order", body=ship_order_body(external_id, param, tracking_code)
+        )
+
+
+def ship_order_body(order_sn: str, param: dict[str, Any], tracking_code: str | None) -> dict[str, Any]:
+    """Dựng body `ship_order` từ kết quả `get_shipping_parameter`: chọn một cách giao có trong `info_needed`, điền các ô
+    mà `info_needed` đòi (theo tài liệu: khoá có mặt thì vẫn phải gửi object, kể cả rỗng)."""
+    need = param.get("info_needed") or {}
+    tracking = tracking_code or ""
+    body: dict[str, Any] = {"order_sn": order_sn}
+    if "non_integrated" in need:
+        body["non_integrated"] = {"tracking_number": tracking} if tracking else {}
+    elif "pickup" in need and ((param.get("pickup") or {}).get("address_list")):
+        addrs = ((param.get("pickup") or {}).get("address_list")) or []
+        addr = next((a for a in addrs if "pickup_address" in (a.get("address_flag") or [])), addrs[0])
+        pick: dict[str, Any] = {"address_id": addr["address_id"]}
+        slots = addr.get("time_slot_list") or []
+        slot = next((t for t in slots if "recommended" in (t.get("flags") or [])), slots[0] if slots else None)
+        if slot and slot.get("pickup_time_id"):
+            pick["pickup_time_id"] = slot["pickup_time_id"]
+        if tracking and "tracking_number" in (need.get("pickup") or []):
+            pick["tracking_number"] = tracking
+        body["pickup"] = pick
+    elif "dropoff" in need:
+        drop: dict[str, Any] = {}
+        branches = ((param.get("dropoff") or {}).get("branch_list")) or []
+        if "branch_id" in (need.get("dropoff") or []) and branches:
+            drop["branch_id"] = branches[0]["branch_id"]
+        if tracking and {"tracking_no", "tracking_number"} & set(need.get("dropoff") or []):
+            drop["tracking_number"] = tracking
+        body["dropoff"] = drop
+    else:
+        raise IntegrationError("Shopee không cho giao đơn này lúc này (kiểm trạng thái đơn trên Shopee).")
+    return body
