@@ -71,26 +71,28 @@ export function OwnerOnly({ title }: { title: string }) {
 
 /* ---------- cửa hàng ---------- */
 
-const STORE_KEYS = [
-  "store.name",
-  "store.tagline",
-  "store.picker_name",
-  "store.picker_intro",
-  "store.bank_code",
-  "store.bank_account_no",
-  "store.bank_account_name",
-  "store.default_shipping_fee_vnd",
+// Tên ô trong form KHÔNG có dấu chấm: react-hook-form hiểu «store.name» là đường dẫn lồng nhau
+// (ghi vào values.store.name) còn zod lọc mất → bấm Lưu gửi lại giá trị cũ. Lưu thì ghép «store.» vào.
+const STORE_FIELDS = [
+  "name",
+  "tagline",
+  "picker_name",
+  "picker_intro",
+  "bank_code",
+  "bank_account_no",
+  "bank_account_name",
+  "default_shipping_fee_vnd",
 ] as const;
 
 const storeSchema = z.object({
-  "store.name": z.string().trim().min(1, "Cửa hàng cần có tên").max(80),
-  "store.tagline": z.string().max(160),
-  "store.picker_name": z.string().max(80),
-  "store.picker_intro": z.string().max(1500),
-  "store.bank_code": z.string().max(20),
-  "store.bank_account_no": z.string().regex(/^\d{0,20}$/, "Số tài khoản chỉ gồm chữ số"),
-  "store.bank_account_name": z.string().max(80),
-  "store.default_shipping_fee_vnd": z.string().regex(/^[\d.]*$/, "Nhập số tiền"),
+  name: z.string().trim().min(1, "Cửa hàng cần có tên").max(80),
+  tagline: z.string().max(160, "Tối đa 160 ký tự"),
+  picker_name: z.string().max(80, "Tối đa 80 ký tự"),
+  picker_intro: z.string().max(1500, "Tối đa 1.500 ký tự"),
+  bank_code: z.string().max(20, "Tối đa 20 ký tự"),
+  bank_account_no: z.string().regex(/^\d{0,20}$/, "Số tài khoản chỉ gồm chữ số"),
+  bank_account_name: z.string().max(80, "Tối đa 80 ký tự"),
+  default_shipping_fee_vnd: z.string().regex(/^[\d.]*$/, "Nhập số tiền"),
 });
 type StoreValues = z.infer<typeof storeSchema>;
 
@@ -124,16 +126,19 @@ function StoreForm({ values }: { values: Record<string, unknown> }) {
   const owner = isOwner(user);
   const save = useSaveSettings();
   const defaults = Object.fromEntries(
-    STORE_KEYS.map((k) => [k, k === "store.default_shipping_fee_vnd" ? formatNumber(Number(values[k] ?? 0)) : String(values[k] ?? "")]),
+    STORE_FIELDS.map((f) => {
+      const v = values[`store.${f}`];
+      return [f, f === "default_shipping_fee_vnd" ? formatNumber(Number(v ?? 0)) : String(v ?? "")];
+    }),
   ) as StoreValues;
   const { register, handleSubmit, formState, reset } = useForm<StoreValues>({ resolver: zodResolver(storeSchema), defaultValues: defaults });
   const e = formState.errors;
 
   const onSubmit = handleSubmit(async (v) => {
     const out: Record<string, unknown> = {};
-    for (const k of STORE_KEYS) {
-      const next = k === "store.default_shipping_fee_vnd" ? Number(v[k].replace(/\D/g, "") || 0) : v[k].trim();
-      if (next !== values[k]) out[k] = next;
+    for (const f of STORE_FIELDS) {
+      const next = f === "default_shipping_fee_vnd" ? Number(v[f].replace(/\D/g, "") || 0) : v[f].trim();
+      if (next !== (values[`store.${f}`] ?? "")) out[`store.${f}`] = next;
     }
     if (!Object.keys(out).length) return notifySuccess("Không có gì thay đổi");
     await save.mutateAsync(out);
@@ -145,21 +150,21 @@ function StoreForm({ values }: { values: Record<string, unknown> }) {
     <form onSubmit={onSubmit} className="flex flex-col gap-5">
       <fieldset disabled={!owner} className="flex flex-col gap-3">
         <SectionLabel>Cửa hàng</SectionLabel>
-        <Input label="Tên cửa hàng" error={e["store.name"]?.message} {...register("store.name")} />
-        <Input label="Câu giới thiệu" hint="Một dòng dưới tên cửa hàng." {...register("store.tagline")} />
+        <Input label="Tên cửa hàng" error={e.name?.message} {...register("name")} />
+        <Input label="Câu giới thiệu" hint="Một dòng dưới tên cửa hàng." error={e.tagline?.message} {...register("tagline")} />
       </fieldset>
       <fieldset disabled={!owner} className="flex flex-col gap-3">
         <SectionLabel>Người chọn</SectionLabel>
-        <Input label="Tên người chọn" placeholder="Vd: Mai" hint="Khách thấy tên này ở trang «Về người chọn» và trong khung hỏi đáp; chỉ ghi tên, không thêm «chị»." {...register("store.picker_name")} />
-        <Textarea label="Lời giới thiệu" rows={4} placeholder="Chị chọn hàng thế nào, thử bao lâu, vì sao bán…" {...register("store.picker_intro")} />
+        <Input label="Tên người chọn" placeholder="Vd: Mai" hint="Khách thấy tên này ở trang «Về người chọn» và trong khung hỏi đáp; chỉ ghi tên, không thêm «chị»." error={e.picker_name?.message} {...register("picker_name")} />
+        <Textarea label="Lời giới thiệu" rows={4} placeholder="Vd: Mình chọn hàng thế nào, thử bao lâu, vì sao bán…" hint="Khách đọc đoạn này ở trang «Về người chọn»: viết xưng «mình»." error={e.picker_intro?.message} {...register("picker_intro")} />
       </fieldset>
       <fieldset disabled={!owner} className="flex flex-col gap-3">
         <SectionLabel>Nhận chuyển khoản</SectionLabel>
         <div className="grid grid-cols-[7rem_1fr] gap-3">
-          <Input label="Ngân hàng" placeholder="VCB" {...register("store.bank_code")} />
-          <Input label="Số tài khoản" inputMode="numeric" error={e["store.bank_account_no"]?.message} {...register("store.bank_account_no")} />
+          <Input label="Ngân hàng" placeholder="VCB" error={e.bank_code?.message} {...register("bank_code")} />
+          <Input label="Số tài khoản" inputMode="numeric" error={e.bank_account_no?.message} {...register("bank_account_no")} />
         </div>
-        <Input label="Tên chủ tài khoản" hint="Viết hoa không dấu, đúng như trên ngân hàng." {...register("store.bank_account_name")} />
+        <Input label="Tên chủ tài khoản" hint="Viết hoa không dấu, đúng như trên ngân hàng." error={e.bank_account_name?.message} {...register("bank_account_name")} />
       </fieldset>
       <fieldset disabled={!owner} className="flex flex-col gap-3">
         <SectionLabel>Giao hàng</SectionLabel>
@@ -168,8 +173,8 @@ function StoreForm({ values }: { values: Record<string, unknown> }) {
           inputMode="numeric"
           trailing="đ"
           hint="Áp khi chưa lấy được báo giá của hãng giao."
-          error={e["store.default_shipping_fee_vnd"]?.message}
-          {...register("store.default_shipping_fee_vnd")}
+          error={e.default_shipping_fee_vnd?.message}
+          {...register("default_shipping_fee_vnd")}
         />
       </fieldset>
       {owner ? (

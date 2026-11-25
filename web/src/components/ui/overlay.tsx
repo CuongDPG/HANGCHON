@@ -28,6 +28,8 @@ type OverlayProps = {
   /** Bấm nền mờ để đóng (mặc định bật; tắt cho hộp xác nhận). */
   dismissOnBackdrop?: boolean;
   className?: string;
+  /** Bề ngang trên máy tính (Sheet): `md` 32rem (mặc định), `lg` 56rem cho nội dung dài như hộp duyệt. */
+  size?: "md" | "lg";
 };
 
 function useNativeDialog(open: boolean, onClose: () => void) {
@@ -77,6 +79,7 @@ function OverlayFrame({
   role = "dialog",
   dismissOnBackdrop = true,
   className,
+  size = "md",
 }: OverlayProps & { variant: "sheet" | "dialog" }) {
   const ref = useNativeDialog(open, onClose);
   const titleId = useId();
@@ -99,8 +102,9 @@ function OverlayFrame({
         "m-0 max-h-none max-w-none border-0 bg-transparent p-0 text-ink backdrop:bg-overlay",
         "transition-[opacity,translate,overlay,display] transition-discrete duration-200 ease-out",
         "backdrop:transition-[opacity,overlay,display] backdrop:transition-discrete backdrop:duration-200 backdrop:opacity-0 open:backdrop:opacity-100 starting:open:backdrop:opacity-0",
+        variant === "sheet" && (size === "lg" ? "md:w-[min(56rem,calc(100%-4rem))]" : "md:w-[min(32rem,calc(100%-2rem))]"),
         variant === "sheet"
-          ? "fixed inset-x-0 top-auto bottom-0 w-full translate-y-full open:translate-y-0 starting:open:translate-y-full md:inset-0 md:m-auto md:h-fit md:w-[min(32rem,calc(100%-2rem))] md:translate-y-2 md:opacity-0 md:open:translate-y-0 md:open:opacity-100 md:starting:open:translate-y-2 md:starting:open:opacity-0"
+          ? "fixed inset-x-0 top-auto bottom-0 w-full translate-y-full open:translate-y-0 starting:open:translate-y-full md:inset-0 md:m-auto md:h-fit md:translate-y-2 md:opacity-0 md:open:translate-y-0 md:open:opacity-100 md:starting:open:translate-y-2 md:starting:open:opacity-0"
           : "fixed inset-0 m-auto h-fit w-[min(26rem,calc(100%-2rem))] scale-[0.98] opacity-0 open:scale-100 open:opacity-100 starting:open:scale-[0.98] starting:open:opacity-0",
       )}
     >

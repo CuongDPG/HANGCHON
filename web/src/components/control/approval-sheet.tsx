@@ -65,6 +65,7 @@ export function ApprovalSheet({
     <Sheet
       open={open}
       onClose={onClose}
+      size="lg"
       title={item?.title ?? "Việc chờ duyệt"}
       description={item?.summary ?? undefined}
     >
@@ -163,7 +164,11 @@ function ApprovalBody({ item, onClose, onDone }: { item: ApprovalItem; onClose: 
           )}
         </div>
       ) : (
-        <PreviewView preview={item.preview} />
+        <PreviewView
+          preview={item.preview}
+          // tóm tắt đã là mô tả hộp, đường dẫn đã có «Mở chi tiết →» ở trên: không lặp
+          omit={[...(item.preview.summary === item.summary ? ["summary"] : []), ...(item.href ? ["href"] : [])]}
+        />
       )}
 
       {mode === "return" ? (

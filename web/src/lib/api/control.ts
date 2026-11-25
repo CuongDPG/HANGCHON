@@ -28,7 +28,7 @@ export type Preview = {
   /** Danh sách gạch đầu dòng. */
   list?: string[];
   /** Dòng hàng (hoá đơn, đơn đặt). */
-  lines?: { name: string; quantity: number; unit_price_vnd: number; unit?: string }[];
+  lines?: { name?: string; description?: string; quantity: number; unit_price_vnd?: number; unit_price_amount?: number; unit?: string }[];
   total_vnd?: number;
   /** Trang chi tiết trên bàn làm việc để xem kỹ hơn. */
   href?: string;
