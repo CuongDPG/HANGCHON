@@ -26,7 +26,6 @@ import {
   RETURN_REASON_LABELS,
   RETURN_STATUS_LABELS,
   useIgnorePayment,
-  useInventory,
   useListings,
   useMatchPayment,
   useOrderCounts,
@@ -44,6 +43,7 @@ import {
   type NotifyChannel,
   type PaymentRow,
 } from "@/lib/api/orders";
+import { InventoryTab } from "./inventory-tab";
 
 type Tab = "tien" | "doi-tra" | "ton" | "san" | "mau-tin";
 
@@ -218,33 +218,6 @@ function ReturnsTab() {
         </Card>
       ))}
     </div>
-  );
-}
-
-function InventoryTab() {
-  const q = useInventory();
-  if (q.isPending) return <SkeletonList rows={3} />;
-  if (q.isError) return <EmptyState tone="error" title="Chưa tải được" description={q.error.message} />;
-  if (!q.data.length) return <EmptyState title="Chưa có món giữ sẵn" description="Tồn kho do mục Sản phẩm quản; ở đây chị xem còn bao nhiêu sau các đơn đang chờ." />;
-  return (
-    <Card flush>
-      <ul className="divide-y divide-line">
-        {q.data.map((r) => (
-          <li key={r.inventory_item_id} className="flex items-center justify-between gap-3 px-3 py-3">
-            <span className="min-w-0">
-              <span className="block truncate text-[15px] font-semibold">{r.name}</span>
-              <span className="text-[12.5px] text-ink-2">
-                Trong kho {r.on_hand} · đã giữ {r.reserved} · đơn chờ {r.pending_orders_qty} · báo khi ≤ {r.low_stock_threshold}
-              </span>
-            </span>
-            <span className="flex shrink-0 items-center gap-2">
-              <span className="font-display text-[20px] font-extrabold tabular-nums">{r.available}</span>
-              {r.low ? <Badge tone="danger">Sắp hết</Badge> : null}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </Card>
   );
 }
 

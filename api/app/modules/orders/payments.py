@@ -15,6 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import control
+from app.core import events
 from app.core.enums import Actor
 from app.core.errors import BadRequest, Conflict, NotFound
 from app.core.timeutil import now_utc
@@ -35,6 +36,14 @@ from app.modules.orders.util import find_codes_in_transfer, normalize_order_code
 log = logging.getLogger("app.orders.payments")
 
 REVIEW_ACTION = "orders.review_payment"
+MATCH_ACTION = "orders.match_payment"
+# bỏ khớp chỉ an toàn khi đơn chưa rời kho, chưa hoàn tiền
+UNMATCHABLE = (
+    OrderStatus.PENDING_PAYMENT,
+    OrderStatus.CONFIRMED,
+    OrderStatus.AWAITING_STOCK,
+    OrderStatus.READY_TO_SHIP,
+)
 
 
 async def ingest_transfers(db: AsyncSession, provider: str, transfers: list[IncomingTransfer]) -> list[Payment]:
@@ -75,7 +84,25 @@ async def match_payment(db: AsyncSession, p: Payment) -> None:
     codes = find_codes_in_transfer(p.content)
     orders = [o for o in [await service.get_by_code(db, c, lock=True) for c in codes] if o is not None]
     if len(orders) == 1:
-        await apply_to_order(db, orders[0], p, method=MatchMethod.AUTO_CODE, confidence=Decimal("0.99"))
+        o = orders[0]
+        # g2 «AI tự làm»: đi qua control để có dòng nhật ký + hoàn tác (bỏ khớp)
+        out = await control.propose(
+            MATCH_ACTION, f"Khớp {vnd(p.amount_vnd)} vào đơn {o.code}",
+            {"payment_id": str(p.id), "order_id": str(o.id)},
+            {"amount_vnd": p.amount_vnd, "content": p.content, "payer_name": p.payer_name, "order_code": o.code,
+             "recipient": o.recipient_name, "order_total_vnd": o.total_vnd, "order_paid_vnd": o.paid_vnd},
+            db=db, rationale=f"Nội dung chuyển khoản «{p.content or ''}» có mã đơn {o.code}.",
+            ref_type="payments", ref_id=p.id, dedupe_key=f"match:{p.id}", priority=5, ai_generated=False,
+        )  # fmt: skip
+        if out.status in ("applied", "pending"):
+            return
+        # đang tắt / lỗi: để chị khớp tay
+        p.status = PaymentStatus.NEEDS_REVIEW
+        await db.flush()
+        await propose_review(
+            db, p, "unmatched", f"Nội dung chuyển khoản có mã đơn {o.code}. Chị xác nhận khớp vào đơn này?",
+            decision="match", order=o,
+        )  # fmt: skip
         return
     p.status = PaymentStatus.NEEDS_REVIEW
     await db.flush()
@@ -309,6 +336,100 @@ async def resolve_review(db: AsyncSession, payload: dict[str, Any], *, user: Any
         )
         return f"Mở lại đơn {order.code}"
     raise BadRequest(f"Không hiểu quyết định «{decision}».")
+
+
+async def auto_match(db: AsyncSession, payload: dict[str, Any]) -> control.HandlerResult:
+    """Handler của orders.match_payment: khớp khoản tiền vào đơn có mã trong nội dung chuyển khoản."""
+    p = await db.get(Payment, uuid.UUID(payload["payment_id"]), with_for_update=True)
+    if p is None:
+        raise NotFound("Không thấy khoản tiền.")
+    if p.order_id is not None:
+        raise Conflict("Khoản tiền này đã khớp đơn rồi.")
+    order = await service.get_order(db, uuid.UUID(payload["order_id"]), lock=True)
+    before = order.paid_vnd
+    await apply_to_order(db, order, p, method=MatchMethod.AUTO_CODE, confidence=Decimal("0.99"))
+    counted = order.paid_vnd > before  # đơn huỷ / nháp: tiền không cộng vào đơn, đã chuyển chị xem
+    if not counted:
+        note = "đơn đã huỷ hoặc còn nháp, chuyển chị xem"
+    elif p.status == PaymentStatus.MATCHED:
+        note = "đơn đã xác nhận" if order.paid_at else "đã ghi nhận"
+    else:
+        note = f"còn thiếu {vnd(service.amount_due(order))}, chờ chị xem"
+    return control.HandlerResult(
+        result={"payment_id": str(p.id), "order_id": str(order.id), "status": p.status.value},
+        undo={"payment_id": str(p.id), "order_id": str(order.id)} if counted else None,
+        summary=f"Khớp {vnd(p.amount_vnd)} vào đơn {order.code} · {note}",
+        ref_type="orders", ref_id=order.id,
+    )  # fmt: skip
+
+
+async def unmatch(db: AsyncSession, payment_id: uuid.UUID, order_id: uuid.UUID, *, user: Any = None) -> str:
+    """Hoàn tác khớp tự động: gỡ khoản tiền khỏi đơn, đơn về chờ chuyển khoản (nếu không còn đủ tiền),
+    khoản tiền về «cần xem» để chị khớp đúng đơn. Chỉ khi đơn chưa rời kho, chưa có vận đơn, chưa hoàn tiền."""
+    from app.modules.orders.models import Customer, Return, Shipment
+
+    p = await db.get(Payment, payment_id, with_for_update=True)
+    if p is None:
+        raise NotFound("Không thấy khoản tiền.")
+    order = await service.get_order(db, order_id, lock=True)
+    if p.order_id != order.id:
+        raise Conflict("Khoản tiền không còn gắn với đơn này.", code="not_matched")
+    if order.status not in UNMATCHABLE:
+        raise Conflict(
+            f"Đơn {order.code} đang «{service.STATUS_LABELS[order.status]}», không bỏ khớp được nữa.",
+            code="not_unmatchable",
+        )
+    if await db.scalar(
+        select(func.count()).where(Shipment.order_id == order.id, Shipment.status.in_(service.ACTIVE_SHIPMENT))
+    ):
+        raise Conflict("Đơn đã có vận đơn, chị huỷ vận đơn trước rồi bỏ khớp.", code="has_shipment")
+    if order.refunded_vnd > 0 or await db.scalar(select(func.count()).where(Return.order_id == order.id)):
+        raise Conflict("Đơn đã có yêu cầu hoàn tiền / đổi trả, chị xử lý ở đó.", code="has_return")
+
+    order.paid_vnd = max(0, order.paid_vnd - p.amount_vnd)
+    service.recompute_payment_state(order)
+    p.order_id = None
+    p.matched_at = None
+    p.match_method = None
+    p.match_confidence = None
+    p.status = PaymentStatus.NEEDS_REVIEW
+    p.note = "Chị bỏ khớp tự động, cần khớp lại đúng đơn"
+    still_ok = order.paid_vnd >= order.total_vnd or (
+        bool(order.deposit_required_vnd) and order.paid_vnd >= order.deposit_required_vnd
+    )
+    unpaid = order.paid_at is not None and not still_ok
+    if unpaid:
+        order.paid_at = None
+        order.confirmed_at = None
+        if order.payment_method == PaymentMethod.BANK_TRANSFER:
+            order.cod_amount_vnd = 0
+        hours = int(await control.get_setting(db, "orders.payment_window_hours") or 24)
+        if order.payment_due_at is None or order.payment_due_at < now_utc():
+            order.payment_due_at = now_utc() + timedelta(hours=hours)
+        service.set_status(
+            db, order, OrderStatus.PENDING_PAYMENT, "Chưa nhận được tiền, đơn chờ chuyển khoản",
+            actor=Actor.OWNER if user else Actor.SYSTEM,
+        )  # fmt: skip
+        if order.customer_id:
+            c = await db.get(Customer, order.customer_id)
+            if c is not None:
+                c.total_spent_vnd = max(0, c.total_spent_vnd - order.total_vnd)
+    service.add_event(
+        db, order, "payment_unmatched", f"Bỏ khớp khoản {vnd(p.amount_vnd)}", visible=False,
+        actor=Actor.OWNER if user else Actor.SYSTEM, data={"payment_id": str(p.id)},
+    )  # fmt: skip
+    await db.flush()
+    if unpaid:
+        # bên nghe (catalog tính lại phần tồn giữ cho đơn đã trả, finance ghi giảm doanh thu) — phát dù chưa ai nghe
+        await events.emit(
+            "order.unpaid", {"order_id": str(order.id), "payment_id": str(p.id), "amount_vnd": p.amount_vnd}, db=db
+        )
+    await control.cancel_pending(db, action=REVIEW_ACTION, dedupe_key=f"payment:{p.id}")
+    await propose_review(
+        db, p, "unmatched", f"Chị đã bỏ khớp {vnd(p.amount_vnd)} khỏi đơn {order.code}. Ghi mã đơn đúng để khớp lại.",
+        decision="match",
+    )  # fmt: skip
+    return f"Bỏ khớp {vnd(p.amount_vnd)} khỏi đơn {order.code}"
 
 
 async def record_manual(

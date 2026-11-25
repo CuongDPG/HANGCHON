@@ -145,6 +145,7 @@ CUSTOMERS = {
     "ngoc": ("Bùi Bảo Ngọc", "0900000107", "Cần Thơ"),
     "huy": ("Ngô Quang Huy", "0900000108", "Hà Nội"),
     "thao": ("Hoàng Phương Thảo", "0900000109", "Huế"),
+    "trang": ("Lý Thu Trang", "0900000110", "Hà Nội"),  # bạn được Hà giới thiệu (h7)
 }
 
 
@@ -368,7 +369,8 @@ class Story:
         return d
 
     async def order(self, key: str, who: str, lines: list[tuple[str, int, str | None]], *, pay: bool = True,
-                    method: str = "bank_transfer", src: str | None = None) -> dict[str, Any]:  # fmt: skip
+                    method: str = "bank_transfer", src: str | None = None,
+                    referral_code: str | None = None) -> dict[str, Any]:  # fmt: skip
         from app.integrations import get_driver
 
         name, phone, province = CUSTOMERS[who]
@@ -377,7 +379,7 @@ class Story:
                       for p, q, d in lines],
             "name": name, "phone": phone, "address_line": "Số 12 ngõ Ví Dụ", "ward": "Phường Mẫu",
             "district": "Quận Mẫu", "province": province, "payment_method": method, "client_ref": f"demo-{key}",
-            **({"src": src} if src else {}),
+            **({"src": src} if src else {}), **({"referral_code": referral_code} if referral_code else {}),
         }  # fmt: skip
         o = await self.call("POST", "/api/store/orders", json=body, public=True)
         if pay and method == "bank_transfer":
@@ -593,6 +595,14 @@ class Story:
                 for stt in steps:
                     await self.call("POST", f"{OWNER}/supply/inbound/{lot['id']}/milestones", json={"status": stt})
             _ = i
+        # g8: kiểm hàng thấy một bộ gãy lò xo → trừ tồn có lý do; kẹp phơi bán chạy nên báo sớm hơn ngưỡng chung
+        inv = next((r for r in await self.call("GET", f"{OWNER}/orders/inventory")
+                    if r["product_id"] == self.ids["prod_p_kep"]), None)  # fmt: skip
+        if inv:
+            url = f"{OWNER}/orders/inventory/{inv['inventory_item_id']}"
+            await self.call("POST", f"{url}/adjust", json={"mode": "delta", "quantity": -1, "kind": "damaged",
+                                                           "reason": "Một bộ gãy lò xo khi kiểm hàng"})  # fmt: skip
+            await self.call("PATCH", url, json={"low_stock_threshold": 8})
 
     async def src_of(self, key: str) -> str | None:
         from app.modules.content.models import ContentDraft, PostStatus, ScheduledPost
@@ -662,7 +672,14 @@ class Story:
         if ha:
             await self.call("POST", f"{OWNER}/crm/customers/{ha}/notes",
                             json={"body": "Hay mua đồ cho bé, thích hàng Nhật, nhận hàng giờ hành chính.", "pinned": True})  # fmt: skip
-            await self.call("POST", f"{OWNER}/crm/customers/{ha}/referral", ok=(200, 201))
+            ref = await self.call("POST", f"{OWNER}/crm/customers/{ha}/referral", ok=(200, 201))
+            code = (ref.get("referral") or {}).get("code")
+            if code:  # h7: Trang đặt đơn đầu bằng mã của Hà (giảm ngay), giao xong → AI tặng quà cho Hà
+                with at(4, 10):
+                    await self.order("ref_trang", "trang", [("p_kep", 1, None)], method="cod", referral_code=code)
+                    sids = await self.ship(["ref_trang"])
+                for sid in sids:
+                    await self.call("POST", f"{OWNER}/orders/shipments/{sid}/sync")
         # khách quen thử hàng cùng chị (h8): mời thử áo choàng tắm, một khách đã gửi cảm nhận
         ids = [cust[CUSTOMERS[k][1]] for k in ("ha", "minh") if CUSTOMERS[k][1] in cust]
         if ids:

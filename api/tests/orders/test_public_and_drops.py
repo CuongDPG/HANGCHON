@@ -13,7 +13,7 @@ from app.core import events
 from app.core.db import SessionLocal
 from app.core.timeutil import local_today, now_utc
 from app.modules.catalog.models import DropStatus, SaleMode
-from app.modules.control.models import ApprovalItem
+from app.modules.control.models import AIActivity, ApprovalItem
 from app.modules.orders import drops
 from app.modules.orders.models import Notification, Order, OrderEvent
 from app.modules.supply.models import InboundShipment, InboundStatus, POKind, PurchaseOrder
@@ -203,10 +203,24 @@ async def test_low_stock_alert_once(client: httpx.AsyncClient, owner_client: htt
     await place(client, cart((s_, 1, None)), payment_method="cod", phone="0900000102")
     await place(client, cart((s_, 1, None)), payment_method="cod", phone="0900000103")
     async with SessionLocal() as s:
-        items = (
-            (await s.execute(select(ApprovalItem).where(ApprovalItem.action == "orders.restock_alert"))).scalars().all()
-        )
-        assert len(items) == 1 and items[0].preview["available"] == 1
+        # mặc định AI tự làm (chỉ báo nội bộ): ghi Nhật ký AI một lần, không lặp mỗi lần bán, không tạo việc chờ
+        acts = (await s.execute(select(AIActivity).where(AIActivity.action == "orders.restock_alert"))).scalars().all()
+        assert len(acts) == 1 and acts[0].payload["available"] == 2 and "Khăn lau" in acts[0].summary
+        assert (await s.execute(select(ApprovalItem))).scalars().all() == []
     inv = (await owner_client.get("/api/desk/orders/inventory")).json()
     assert inv[0]["available"] == 1 and inv[0]["pending_orders_qty"] == 3 and inv[0]["low"] is True
     assert PHONE  # dùng hằng của conftest
+
+
+async def test_low_stock_alert_ask_level(client: httpx.AsyncClient, owner_client: httpx.AsyncClient) -> None:
+    r = await owner_client.patch("/api/desk/control/autonomy/orders.restock_alert", json={"level": "ask"})
+    assert r.status_code == 200, r.text
+    s_ = await make_product(name="Khăn lau", mode=SaleMode.IN_STOCK, price=89_000)
+    await make_inventory(s_, 3, threshold=2)
+    await place(client, cart((s_, 1, None)), payment_method="cod")
+    await place(client, cart((s_, 1, None)), payment_method="cod", phone="0900000102")
+    async with SessionLocal() as s:
+        items = (
+            (await s.execute(select(ApprovalItem).where(ApprovalItem.action == "orders.restock_alert"))).scalars().all()
+        )
+        assert len(items) == 1 and items[0].preview["available"] == 1  # việc đang chờ được cập nhật, không lặp

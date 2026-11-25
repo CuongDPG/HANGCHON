@@ -9,6 +9,7 @@ from app.core.timeutil import now_utc
 from app.integrations._mockutil import short_id
 from app.integrations.base import IntegrationError
 from app.integrations.marketplaces import (
+    ORDER_STATUSES,
     MarketplaceOrder,
     MarketplaceOrderLine,
     MarketplaceProduct,
@@ -22,6 +23,9 @@ class Driver(MarketplacesDriver):
     def __init__(self) -> None:
         self.products: dict[str, tuple[Channel, MarketplaceProduct]] = {}
         self.orders: list[MarketplaceOrder] = []
+        self.status_updates: list[
+            tuple[Channel, str, str, str | None]
+        ] = []  # (sàn, mã đơn sàn, trạng thái, mã vận đơn)
 
     async def upsert_product(self, marketplace: Channel, product: MarketplaceProduct) -> str:
         ext = product.external_id or f"{marketplace.value}_{short_id(product.sku, marketplace)}"
@@ -56,8 +60,10 @@ class Driver(MarketplacesDriver):
     async def update_order_status(
         self, marketplace: Channel, external_id: str, status: str, tracking_code: str | None = None
     ) -> None:
+        if status not in ORDER_STATUSES:
+            raise IntegrationError(f"Trạng thái «{status}» không hỗ trợ.")
+        # sàn giả giữ đơn trong bộ nhớ của từng tiến trình: đơn kéo về ở tiến trình khác vẫn nhận cập nhật (ghi lại)
+        self.status_updates.append((marketplace, external_id, status, tracking_code))
         for i, o in enumerate(self.orders):
             if o.external_id == external_id:
                 self.orders[i] = o.model_copy(update={"status": status})
-                return
-        raise IntegrationError("Không thấy đơn trên sàn.")

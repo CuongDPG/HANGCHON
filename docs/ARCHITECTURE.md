@@ -182,6 +182,8 @@ Module không gọi service của module khác. Bên phát gọi `await events.e
 | `order.cancelled` | `order_id`, `was_paid` | orders | catalog (trả suất/tồn) |
 | `order.shipped` | `order_id`, `shipment_id` | orders | catalog (món giữ sẵn rời kho: trừ `on_hand` một lần); orders tự báo khách |
 | `order.delivered` | `order_id` | orders | catalog (xin đánh giá, e8), crm (nhắc mua lại h6, giới thiệu h7) |
+| `order.unpaid` | `order_id`, `payment_id`, `amount_vnd` | orders (chị hoàn tác «khớp khoản chuyển tới», đơn về chờ chuyển khoản) | catalog (tính lại phần tồn/suất đang giữ); finance (chưa nghe: ghi giảm doanh thu — việc của người tích hợp) |
+| `inventory.adjust_requested` | `request_id`, `product_id`, `variant_id?`, `set_on_hand?`, `kind`, `note?`, `user_id?`, `low_stock_threshold?` | orders (g8: chị nhập tồn đầu kỳ / điều chỉnh / đặt ngưỡng) | catalog (ghi `inventory_items` + `inventory_movements`, idempotent theo `request_id`) |
 | `order.refunded` | `order_id`, `amount_vnd`, `return_id?`, `payment_id?` | orders | finance (ghi giảm trừ), catalog (trả suất/tồn) |
 | `inbound.arrived` | `inbound_shipment_id` | supply | orders (đơn chuyển sang chờ giao), catalog (lô bổ sung → nhập tồn; mọi lô của đợt đã về → đợt sang giao) |
 | `message.received` | `thread_id`, `message_id` | inbox | orders (hồ sơ khách cho người lạ; nhận ra ý định mua g6), crm (sổ khách), sourcing (nghe khách muốn gì, a6) |

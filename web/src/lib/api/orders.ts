@@ -70,6 +70,9 @@ export type Quote = {
   delivery_hint: string | null;
   problems: string[];
   ok: boolean;
+  /** h7: quà giảm cho bạn mới có mã giới thiệu (dự kiến; áp thật khi đặt nếu là đơn đầu). */
+  referral_discount_vnd: number;
+  referral_note: string | null;
 };
 
 export type CheckoutInput = AddressFields & {
@@ -262,7 +265,24 @@ export type DropOverview = {
   inbound: { id: string; code: string | null; status: string; status_label: string; eta: string | null; last_note: string | null; last_at: string | null }[];
 };
 
-export type InventoryRow = { inventory_item_id: string; product_id: string; name: string; on_hand: number; reserved: number; pending_orders_qty: number; available: number; low_stock_threshold: number | null; low: boolean };
+export type InventoryRow = {
+  inventory_item_id: string;
+  product_id: string;
+  variant_id: string | null;
+  name: string;
+  on_hand: number;
+  reserved: number;
+  pending_orders_qty: number;
+  available: number;
+  low_stock_threshold: number | null;
+  low: boolean;
+  threshold_is_default: boolean;
+  default_threshold: number;
+  last_counted_at: string | null;
+};
+export type StockCandidate = { product_id: string; variant_id: string | null; name: string };
+export type InventoryMovement = { id: string; delta_on_hand: number; reason: string; reason_label: string; note: string | null; created_by_name: string | null; created_at: string };
+export type AdjustKind = "count" | "received" | "damaged" | "other";
 export type Listing = { id: string; marketplace: "tiktok_shop" | "shopee"; product_id: string; product_name: string; external_id: string | null; status: "pending" | "active" | "inactive" | "error"; price_vnd: number | null; synced_stock: number | null; last_synced_at: string | null; error: string | null };
 export type SyncResult = { synced: number; created_orders: number; skipped: number; errors: string[] };
 export type NotifyChannel = { channel: string; label: string; role: "primary" | "fallback"; driver: string; ready: boolean; note: string | null };
@@ -383,7 +403,7 @@ export function statusTone(status: OrderStatus): "neutral" | "accent" | "success
  * ============================================================================================================== */
 
 export const storeOrdersApi = {
-  quote: (body: { items: CartLine[]; payment_method?: "bank_transfer" | "cod" } & AddressFields) => api.post<Quote>("/api/store/orders/quote", body),
+  quote: (body: { items: CartLine[]; payment_method?: "bank_transfer" | "cod"; referral_code?: string } & AddressFields) => api.post<Quote>("/api/store/orders/quote", body),
   checkout: (body: CheckoutInput) => api.post<PublicOrder>("/api/store/orders", body),
   lookup: (body: { phone: string; code: string }) => api.post<{ code: string; token: string }>("/api/store/orders/lookup", body),
   get: (code: string, t: string) => api.get<PublicOrder>(`/api/store/orders/${encodeURIComponent(code)}`, { query: { t } }),
@@ -400,7 +420,7 @@ export const storeOrderKeys = {
   order: (code: string) => ["store", "orders", code] as const,
 };
 
-export function useQuote(body: { items: CartLine[]; payment_method?: "bank_transfer" | "cod" } & AddressFields, enabled = true) {
+export function useQuote(body: { items: CartLine[]; payment_method?: "bank_transfer" | "cod"; referral_code?: string } & AddressFields, enabled = true) {
   return useQuery({
     queryKey: storeOrderKeys.quote(body),
     queryFn: () => storeOrdersApi.quote(body),
@@ -470,6 +490,18 @@ export function useInventory() {
   return useQuery({ queryKey: ordersKeys.inventory, queryFn: () => api.get<InventoryRow[]>(`${D}/inventory`) });
 }
 
+export function useStockCandidates(enabled: boolean) {
+  return useQuery({ queryKey: [...ordersKeys.inventory, "candidates"], queryFn: () => api.get<StockCandidate[]>(`${D}/inventory/candidates`), enabled });
+}
+
+export function useInventoryMovements(id: string | null) {
+  return useQuery({
+    queryKey: [...ordersKeys.inventory, "movements", id],
+    queryFn: () => api.get<InventoryMovement[]>(`${D}/inventory/${id}/movements`),
+    enabled: !!id,
+  });
+}
+
 export function useReturns() {
   return useQuery({ queryKey: ordersKeys.returns, queryFn: () => api.get<Paginated<ReturnRow>>(`${D}/returns`, { query: { size: 50 } }) });
 }
@@ -514,6 +546,16 @@ export const useCancelShipment = () => useInvalidating((id: string) => api.post<
 export const useMatchPayment = () => useInvalidating(({ id, order_code }: { id: string; order_code: string }) => api.post<PaymentRow>(`${D}/payments/${id}/match`, { order_code }));
 export const useIgnorePayment = () => useInvalidating((id: string) => api.post<PaymentRow>(`${D}/payments/${id}/ignore`));
 export const useSimulateTransfer = () => useInvalidating((body: { amount_vnd: number; content: string }) => api.post<PaymentRow[]>(`${D}/payments/simulate`, body));
+export const useCreateInventory = () =>
+  useInvalidating((body: { product_id: string; variant_id?: string | null; on_hand: number; low_stock_threshold?: number | null; note?: string }) =>
+    api.post<InventoryRow>(`${D}/inventory`, body),
+  );
+export const useAdjustInventory = () =>
+  useInvalidating(({ id, ...body }: { id: string; mode: "set" | "delta"; quantity: number; kind: AdjustKind; reason: string }) =>
+    api.post<InventoryRow>(`${D}/inventory/${id}/adjust`, body),
+  );
+export const useSetThreshold = () =>
+  useInvalidating(({ id, low_stock_threshold }: { id: string; low_stock_threshold: number | null }) => api.patch<InventoryRow>(`${D}/inventory/${id}`, { low_stock_threshold }));
 export const useReturnReceived = () => useInvalidating((id: string) => api.post<ReturnRecord>(`${D}/returns/${id}/received`));
 export const useSaveTemplates = () => useInvalidating((templates: Record<string, string>) => api.put<Templates>(`${D}/templates`, { templates }));
 export const useSyncProducts = () => useInvalidating((mk: string) => api.post<SyncResult>(`${D}/marketplaces/${mk}/sync-products`));

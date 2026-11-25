@@ -333,6 +333,9 @@ class ReferralUseView(ReferralUseOut):
     referrer_name: str | None
     referred_name: str | None
     order_code: str | None
+    referred_discount_vnd: int = 0  # h7: bạn được giới thiệu được giảm ở đơn đầu (theo đơn)
+    referrer_credit_vnd: int = 0  # h7: phần giảm AI tặng người giới thiệu (0 = chưa tặng / chị tặng tay)
+    credit_order_code: str | None = None  # đơn của người giới thiệu đã dùng phần giảm
 
 
 class ReferralStats(BaseModel):

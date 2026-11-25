@@ -9,10 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import control
 from app.core.config import settings
-from app.core.enums import Channel
+from app.core.enums import Channel, ShippingStatus
+from app.core.errors import NotFound
 from app.core.timeutil import local_day_bounds_utc
 from app.modules.orders import drafts, notify, payments, returns, service, shipping
-from app.modules.orders.models import Order, OrderStatus, Payment, PaymentDirection, PaymentStatus
+from app.modules.orders.models import Order, OrderStatus, Payment, PaymentDirection, PaymentStatus, Shipment
 
 GROUP = "Đơn hàng"
 
@@ -39,8 +40,20 @@ control.register_action(
     description="Khách bấm «Hỏi về đơn này». Chị ghi câu trả lời rồi duyệt để gửi khách.",
 )  # fmt: skip
 control.register_action(
-    "orders.restock_alert", "Báo món giữ sẵn sắp hết", GROUP, default="ask",
-    description="Tồn còn bằng hoặc dưới ngưỡng. Chị xem để đặt thêm; duyệt = đã biết.",
+    payments.MATCH_ACTION, "Khớp khoản chuyển tới với đơn", GROUP, default="auto",
+    description="Nội dung chuyển khoản có đúng một mã đơn: AI ghi nhận tiền vào đơn. Hoàn tác = bỏ khớp, "
+    "đơn về chờ chuyển khoản (khi đơn chưa có vận đơn, chưa hoàn tiền).",
+)  # fmt: skip
+control.register_action(
+    notify.NOTIFY_ACTION, "Báo tin mốc đơn cho khách", GROUP, default="auto", customer_facing=True,
+    description="Tin theo mẫu chị đã duyệt: đã nhận đơn, đã nhận tiền, hàng đang về, đang giao... "
+    "Tin đã gửi không thu hồi được.",
+)  # fmt: skip
+# Chỉ là báo nội bộ cho chị (không gửi gì ra ngoài) → AI tự làm, hiện ở «Hôm nay» và Nhật ký AI.
+control.register_action(
+    "orders.restock_alert", "Báo món giữ sẵn sắp hết", GROUP, default="auto",
+    description="Tồn còn bằng hoặc dưới ngưỡng: AI ghi vào Nhật ký AI và «Hôm nay» để chị đặt thêm. "
+    "Chỉ báo nội bộ, không gửi gì cho khách.",
 )  # fmt: skip
 control.register_action(
     shipping.PROBLEM_ACTION, "Giao hàng trục trặc", GROUP, default="ask",
@@ -57,9 +70,41 @@ async def _ship(ctx: control.ActionContext) -> control.HandlerResult:
     )  # fmt: skip
     return control.HandlerResult(
         result={"shipment_id": str(sh.id), "tracking_code": sh.tracking_code, "fee_vnd": sh.fee_vnd},
+        undo={"shipment_id": str(sh.id)},
         summary=f"Vận đơn {sh.tracking_code} cho đơn {order.code} ({notify.vnd(sh.fee_vnd)})",
         ref_type="orders", ref_id=order.id,
     )  # fmt: skip
+
+
+@control.undoer(shipping.SHIP_ACTION)
+async def _unship(ctx: control.UndoContext) -> None:
+    """Hoàn tác = huỷ vận đơn (chỉ khi hãng chưa lấy hàng)."""
+    sh = await ctx.db.get(Shipment, uuid.UUID(ctx.undo["shipment_id"]), with_for_update=True)
+    if sh is None:
+        raise NotFound("Không thấy vận đơn.")
+    if sh.status == ShippingStatus.CANCELLED:
+        return
+    await shipping.cancel_shipment(ctx.db, sh)
+
+
+@control.handler(payments.MATCH_ACTION)
+async def _match_payment(ctx: control.ActionContext) -> control.HandlerResult:
+    return await payments.auto_match(ctx.db, ctx.payload)
+
+
+@control.undoer(payments.MATCH_ACTION)
+async def _unmatch_payment(ctx: control.UndoContext) -> None:
+    await payments.unmatch(ctx.db, uuid.UUID(ctx.undo["payment_id"]), uuid.UUID(ctx.undo["order_id"]), user=ctx.user)
+
+
+@control.handler(notify.NOTIFY_ACTION)
+async def _notify_customer(ctx: control.ActionContext) -> control.HandlerResult:
+    return await notify.send_reserved(ctx.db, ctx.payload)
+
+
+@control.on_returned(notify.NOTIFY_ACTION)
+async def _notify_returned(ctx: control.ReturnContext) -> None:
+    await notify.skip_reserved(ctx.db, ctx.item.payload.get("notification_id"), ctx.note)
 
 
 @control.handler(drafts.CONFIRM_ACTION)
@@ -107,6 +152,13 @@ async def _answer_question(ctx: control.ActionContext) -> control.HandlerResult:
 
 @control.handler("orders.restock_alert")
 async def _ack_restock(ctx: control.ActionContext) -> control.HandlerResult:
+    if ctx.mode == "auto":
+        p = ctx.preview
+        return control.HandlerResult(
+            result={"available": ctx.payload.get("available")},
+            summary=f"Báo chị: {p.get('name', 'món giữ sẵn')} còn {max(int(p.get('available') or 0), 0)} cái "
+            f"(ngưỡng {p.get('threshold')}). Chị cân nhắc đặt thêm.",
+        )
     return control.HandlerResult(result={"acknowledged": True}, summary="Chị đã biết món sắp hết")
 
 

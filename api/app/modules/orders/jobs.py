@@ -84,7 +84,7 @@ async def retry_notifications(ctx: dict[str, Any]) -> int:
 
 @cron("orders.pull_marketplaces", minute={12, 42})
 async def pull_marketplaces(ctx: dict[str, Any]) -> int:
-    """g9: kéo đơn TikTok Shop, Shopee về danh sách chung."""
+    """g9: kéo đơn TikTok Shop, Shopee về danh sách chung; đẩy lại mốc giao chưa báo được lên sàn."""
     total = 0
     async with ctx["db"]() as db:
         for mk in (Channel.TIKTOK_SHOP, Channel.SHOPEE):
@@ -93,6 +93,11 @@ async def pull_marketplaces(ctx: dict[str, Any]) -> int:
                     total += (await marketplace.pull_orders(db, mk)).created_orders
             except Exception as e:
                 log.warning("Kéo đơn %s lỗi: %s", mk.value, e)
+        try:
+            async with db.begin_nested():
+                await marketplace.push_pending(db)  # mốc giao chưa báo được lên sàn (lần trước sàn lỗi)
+        except Exception as e:
+            log.warning("Đẩy trạng thái đơn lên sàn lỗi: %s", e)
         await db.commit()
     return total
 

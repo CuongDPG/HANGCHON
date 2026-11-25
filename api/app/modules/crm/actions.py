@@ -14,6 +14,7 @@ from app.modules.crm.models import CustomerNote, NoteKind, NoteSource, ReminderS
 from app.modules.crm.service import (
     ACTION_BROADCAST,
     ACTION_PROFILE,
+    ACTION_REFERRAL_REWARD,
     ACTION_REORDER,
     REFERRAL_REWARD_KEY,
     REGULAR_MIN_KEY,
@@ -52,6 +53,24 @@ control.register_setting(
     description='{"<product_id>": {"days": 60, "active": true}} — đặt trên màn hình Nhắc mua lại.',
 )  # fmt: skip
 control.register_setting(REFERRAL_REWARD_KEY, "Quà giới thiệu bạn cho mỗi bên (VND)", 30_000, group="Khách")
+control.register_action(
+    ACTION_REFERRAL_REWARD,
+    "Tặng quà giới thiệu bạn cho người giới thiệu",
+    GROUP,
+    default="auto",
+    description="Đơn đầu của bạn được giới thiệu đã trả tiền và đã giao: AI tặng người giới thiệu phần giảm cho đơn "
+    "kế tiếp (tự trừ khi đặt). Không nhắn gì cho khách. Hoàn tác được khi phần quà chưa dùng.",
+)
+
+
+@control.handler(ACTION_REFERRAL_REWARD)
+async def _reward(ctx: control.ActionContext) -> control.HandlerResult:
+    return await service.grant_reward(ctx.db, uuid.UUID(str(ctx.payload["referral_use_id"])))
+
+
+@control.undoer(ACTION_REFERRAL_REWARD)
+async def _unreward(ctx: control.UndoContext) -> None:
+    await service.revoke_reward(ctx.db, uuid.UUID(str(ctx.undo["referral_use_id"])))
 
 
 @control.handler(ACTION_PROFILE)

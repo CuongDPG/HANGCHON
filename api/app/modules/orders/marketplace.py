@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import events
 from app.core.config import settings
-from app.core.enums import Actor, Channel
+from app.core.enums import Actor, Channel, ShippingStatus
 from app.core.errors import BadRequest
 from app.core.timeutil import now_utc
 from app.integrations import get_driver
@@ -221,6 +221,75 @@ async def pull_orders(db: AsyncSession, mk: Channel) -> MarketplaceSyncOut:
         else:
             out.skipped += 1
     return out
+
+
+MK_NAMES = {Channel.TIKTOK_SHOP: "TikTok Shop", Channel.SHOPEE: "Shopee"}
+PUSH_STATUSES = (OrderStatus.READY_TO_SHIP, OrderStatus.SHIPPING, OrderStatus.DELIVERED, OrderStatus.COMPLETED)
+
+
+async def push_status(db: AsyncSession, order: Order) -> list[str]:
+    """Đẩy trạng thái giao của đơn sàn ngược lên sàn: có vận đơn → «shipped» (kèm mã vận đơn), đã giao → «delivered».
+
+    Idempotent: mốc đã đẩy lưu ở `orders.raw["marketplace_push"]` (shipped = mã vận đơn đã báo); gọi lặp không gửi lại.
+    Lỗi sàn không làm hỏng luồng đơn: ghi lỗi, cron `orders.pull_marketplaces` đẩy lại. Trả các mốc vừa đẩy."""
+    if order.channel not in MARKETPLACES or not order.external_id or order.status not in PUSH_STATUSES:
+        return []
+    from app.modules.orders.models import Shipment
+
+    state: dict[str, Any] = dict((order.raw or {}).get("marketplace_push") or {})
+    sh = (
+        await db.execute(
+            select(Shipment)
+            .where(Shipment.order_id == order.id, Shipment.tracking_code.is_not(None))
+            .where(Shipment.status.not_in((ShippingStatus.CANCELLED, ShippingStatus.RETURNED)))
+            .order_by(Shipment.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    todo: list[tuple[str, str | None]] = []
+    if sh is not None and state.get("shipped") != sh.tracking_code:
+        todo.append(("shipped", sh.tracking_code))
+    if order.status in (OrderStatus.DELIVERED, OrderStatus.COMPLETED) and not state.get("delivered"):
+        todo.append(("delivered", sh.tracking_code if sh else state.get("shipped")))
+    if not todo:
+        return []
+    pushed: list[str] = []
+    name = MK_NAMES.get(order.channel, order.channel.value)
+    for status, code in todo:
+        try:
+            await driver_for(order.channel).update_order_status(order.channel, order.external_id, status, code)
+        except IntegrationError as e:
+            log.warning("Đẩy trạng thái %s đơn %s lên %s lỗi: %s", status, order.code, name, e.message)
+            state.update(error=e.message[:300], error_at=now_utc().isoformat())
+            break
+        state[status] = code or True
+        state.pop("error", None)
+        state.pop("error_at", None)
+        pushed.append(status)
+        label = "đã gửi hàng" + (f" (mã vận đơn {code})" if code else "") if status == "shipped" else "đã giao"
+        service.add_event(db, order, f"marketplace_{status}", f"Đã báo {name}: {label}", visible=False)
+    order.raw = {**(order.raw or {}), "marketplace_push": state}
+    await db.flush()
+    return pushed
+
+
+async def push_pending(db: AsyncSession, *, days: int = 30) -> int:
+    """Lưới an toàn cho `push_status`: đơn sàn còn mốc chưa đẩy (lần trước sàn lỗi / tiến trình dừng giữa chừng)."""
+    since = now_utc() - timedelta(days=days)
+    rows = list(
+        (
+            await db.execute(
+                select(Order).where(
+                    Order.channel.in_(MARKETPLACES), Order.external_id.is_not(None), Order.status.in_(PUSH_STATUSES),
+                    Order.placed_at >= since,
+                )
+            )
+        ).scalars()
+    )  # fmt: skip
+    n = 0
+    for o in rows:
+        n += len(await push_status(db, o))
+    return n
 
 
 async def simulate(db: AsyncSession, mk: Channel, product: Product, quantity: int) -> MarketplaceOrder:

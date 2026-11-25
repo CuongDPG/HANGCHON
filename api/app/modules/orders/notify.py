@@ -1,7 +1,8 @@
 """Báo tin cho khách (g5): mỗi mốc một tin theo mẫu tiếng Việt chị sửa được, lưu `notifications`, không gửi trùng.
 
-Tin mốc đơn là tin theo mẫu chị đã duyệt (không phải AI soạn) nên gửi thẳng, không qua hàng chờ duyệt;
-chị tắt được bằng cài đặt `orders.notify_enabled`.
+Tin mốc đơn là tin theo mẫu chị đã duyệt (không phải AI soạn) nên mặc định AI tự gửi (`orders.notify_customer`,
+mức `auto`): mỗi tin một dòng Nhật ký AI, không hoàn tác được vì tin đã tới khách. Chị đặt «hỏi» thì tin chờ duyệt,
+«tắt» (hoặc cài đặt `orders.notify_enabled`) thì không gửi.
 
 Kênh: thử kênh chính `orders.notify_channel`, không gửi được thì lần lượt các kênh `orders.notify_fallback_channels`
 (vd `["email"]`, chỉ khi khách có định danh ở kênh đó). Driver của từng kênh chọn bằng `NOTIFY_CHANNEL_DRIVERS`.
@@ -13,6 +14,7 @@ mã vận đơn, kết quả đổi trả...) không còn; mẫu ZNS cần các 
 from __future__ import annotations
 
 import logging
+import uuid
 from collections import defaultdict
 from typing import Any
 
@@ -23,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import control
 from app.core.config import settings
 from app.core.enums import Channel
+from app.core.errors import NotFound
 from app.core.money import format_vnd
 from app.core.timeutil import format_local, now_utc
 from app.integrations import notify as notify_api
@@ -41,6 +44,7 @@ from app.modules.orders.util import order_access_token
 log = logging.getLogger("app.orders.notify")
 
 MAX_ATTEMPTS = 3
+NOTIFY_ACTION = "orders.notify_customer"
 CHANNEL_LABELS = {Channel.ZALO_OA: "Zalo", Channel.EMAIL: "Email", Channel.SMS: "SMS", Channel.FACEBOOK: "Messenger"}
 
 TEMPLATE_LABELS: dict[str, str] = {
@@ -231,8 +235,43 @@ async def notify_order(
         n.error = None if recipient else "Khách chưa có kênh nhận tin."
         await db.flush()
         return n
-    await deliver(db, n, candidates=candidates, values=values, order=order)
+    # g5 «AI tự làm»: qua control để có dòng nhật ký (tin đã gửi không hoàn tác được); chị đặt «hỏi» thì tin chờ duyệt
+    out = await control.propose(
+        NOTIFY_ACTION, f"Báo khách: {TEMPLATE_LABELS.get(key, 'Thông báo')} · đơn {order.code}",
+        {"notification_id": str(n.id), "values": {k: "" if v is None else str(v) for k, v in values.items()}},
+        {"order_code": order.code, "recipient_name": order.recipient_name, "channel": channel.value,
+         "event": TEMPLATE_LABELS.get(key, "Thông báo"), "body": body},
+        db=db, summary=body[:300], ref_type="orders", ref_id=order.id, dedupe_key=f"notify:{n.id}", ai_generated=False,
+    )  # fmt: skip
+    if out.status == "blocked":
+        n.status = NotificationStatus.SKIPPED
+        n.error = "Chị đang tắt việc tự báo tin cho khách."
+        await db.flush()
     return n
+
+
+async def send_reserved(db: AsyncSession, payload: dict[str, Any]) -> Any:
+    """Handler của orders.notify_customer: gửi tin đã giữ chỗ. Tin đã gửi không thu hồi được → không có hoàn tác."""
+    n = await db.get(Notification, uuid.UUID(str(payload["notification_id"])), with_for_update=True)
+    if n is None:
+        raise NotFound("Không thấy tin cần gửi.")
+    if n.status != NotificationStatus.SENT:
+        await deliver(db, n, values=payload.get("values") or None)
+    label = CHANNEL_LABELS.get(n.channel, n.channel.value)
+    summary = f"Đã gửi qua {label}: {n.body}" if n.status == NotificationStatus.SENT else f"Gửi chưa được: {n.error}"
+    return control.HandlerResult(
+        result={"notification_id": str(n.id), "status": n.status.value, "channel": n.channel.value, "error": n.error},
+        summary=summary[:500], ref_type="orders", ref_id=n.order_id,
+    )  # fmt: skip
+
+
+async def skip_reserved(db: AsyncSession, notification_id: Any, note: str) -> None:
+    """Chị trả lại tin đang chờ duyệt → không gửi tin này."""
+    n = await db.get(Notification, uuid.UUID(str(notification_id)))
+    if n is not None and n.status == NotificationStatus.QUEUED:
+        n.status = NotificationStatus.SKIPPED
+        n.error = f"Chị không gửi: {note}"[:500]
+        await db.flush()
 
 
 async def _primary_channel(db: AsyncSession) -> Channel:

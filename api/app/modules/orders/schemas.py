@@ -315,6 +315,7 @@ class AddressFields(BaseModel):
 class QuoteIn(AddressFields):
     items: list[CartLineIn] = Field(min_length=1, max_length=30)
     payment_method: CheckoutPayment = "bank_transfer"
+    referral_code: str | None = Field(default=None, max_length=30, description="Mã giới thiệu (?ref=)")
 
 
 class CheckoutIn(AddressFields):
@@ -377,6 +378,8 @@ class QuoteOut(BaseModel):
     delivery_hint: str | None
     problems: list[str]
     ok: bool
+    referral_discount_vnd: int = Field(default=0, description="h7: quà giảm cho bạn mới có mã giới thiệu (dự kiến)")
+    referral_note: str | None = None
 
 
 class PaymentInfo(BaseModel):
@@ -759,6 +762,53 @@ class InventoryRow(BaseModel):
     available: int
     low_stock_threshold: int | None
     low: bool
+    threshold_is_default: bool = True
+    default_threshold: int = 3
+    last_counted_at: datetime | None = None
+
+
+class InventoryCreateIn(BaseModel):
+    """g8: thêm món giữ sẵn với số tồn đầu kỳ."""
+
+    product_id: uuid.UUID
+    variant_id: uuid.UUID | None = None
+    on_hand: int = Field(ge=0, le=100_000)
+    low_stock_threshold: int | None = Field(default=None, ge=0, le=10_000, description="Bỏ trống = ngưỡng chung")
+    note: str | None = Field(default=None, max_length=300)
+
+
+class InventoryAdjustIn(BaseModel):
+    """g8: điều chỉnh tồn tay. `mode=set`: đếm lại, đặt đúng số; `mode=delta`: cộng/trừ."""
+
+    mode: Literal["set", "delta"] = "delta"
+    quantity: int = Field(ge=-100_000, le=100_000)
+    kind: Literal["count", "received", "damaged", "other"] = "other"
+    reason: str = Field(min_length=2, max_length=300)
+
+    @field_validator("reason", mode="before")
+    @classmethod
+    def _strip_reason(cls, v: Any) -> Any:
+        return v.strip() if isinstance(v, str) else v
+
+
+class InventoryThresholdIn(BaseModel):
+    low_stock_threshold: int | None = Field(default=None, ge=0, le=10_000, description="null = dùng ngưỡng chung")
+
+
+class InventoryMovementRow(BaseModel):
+    id: uuid.UUID
+    delta_on_hand: int
+    reason: str
+    reason_label: str
+    note: str | None
+    created_by_name: str | None
+    created_at: datetime
+
+
+class StockCandidate(BaseModel):
+    product_id: uuid.UUID
+    variant_id: uuid.UUID | None
+    name: str
 
 
 class ListingRow(MarketplaceListingOut):

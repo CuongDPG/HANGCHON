@@ -256,7 +256,21 @@ async def create_shipment(
         data={"shipment_id": str(sh.id)},
     )  # fmt: skip
     await db.flush()
+    await _push_marketplace(db, order)
     return sh
+
+
+async def _push_marketplace(db: AsyncSession, order: Order) -> None:
+    """g9: đơn từ sàn có vận đơn / đã giao → báo ngược lên sàn (lỗi không làm hỏng luồng đơn; cron đẩy lại)."""
+    from app.modules.orders import marketplace
+
+    if order.channel not in marketplace.MARKETPLACES:
+        return
+    try:
+        async with db.begin_nested():
+            await marketplace.push_status(db, order)
+    except Exception:
+        log.exception("Đẩy trạng thái đơn %s lên sàn lỗi", order.code)
 
 
 async def apply_tracking(db: AsyncSession, sh: Shipment, evs: list[TrackingEvent]) -> int:
@@ -334,6 +348,7 @@ async def _set_shipment_status(
         await pay_svc.record_cod(db, order)
         await events.emit("order.delivered", {"order_id": str(order.id)}, db=db)
         await notify.notify_order(db, order, "delivered", extra)
+        await _push_marketplace(db, order)
     if status in (ShippingStatus.FAILED_DELIVERY, ShippingStatus.RETURNING, ShippingStatus.RETURNED):
         title = SHIPPING_LABELS[status]
         if status == ShippingStatus.RETURNED and order.status in (OrderStatus.SHIPPING, OrderStatus.READY_TO_SHIP):

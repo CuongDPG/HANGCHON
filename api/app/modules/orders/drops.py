@@ -15,7 +15,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import control
-from app.modules.catalog.models import Drop, DropStatus, InventoryItem, Product, ProductVariant
+from app.modules.catalog.models import Drop, DropStatus, InventoryItem, InventoryMovement, Product, ProductVariant
+from app.modules.control.models import AIActivity
 from app.modules.orders import notify, refs, service
 from app.modules.orders.models import FulfillmentSource, Notification, Order, OrderEvent, OrderItem, OrderStatus
 from app.modules.orders.schemas import DropItemStat, DropOverview, InventoryRow
@@ -250,17 +251,45 @@ async def inventory_rows(db: AsyncSession) -> list[InventoryRow]:
                 available=available,
                 low_stock_threshold=threshold,
                 low=available <= threshold,
+                threshold_is_default=inv.low_stock_threshold is None,
+                default_threshold=default_threshold,
+                last_counted_at=inv.last_counted_at,
             )
         )
     out.sort(key=lambda r: (not r.low, r.available))
     return out
 
 
+async def _alerted_since_restock(db: AsyncSession, inventory_item_id: uuid.UUID) -> bool:
+    """Đã báo (AI tự làm) món này sau lần nhập thêm gần nhất → không báo lặp mỗi lần bán."""
+    last_alert = await db.scalar(
+        select(func.max(AIActivity.created_at)).where(
+            AIActivity.action == LOW_STOCK_ACTION,
+            AIActivity.ref_type == "inventory_items",
+            AIActivity.ref_id == inventory_item_id,
+            AIActivity.undone_at.is_(None),
+        )
+    )
+    if last_alert is None:
+        return False
+    last_in = await db.scalar(
+        select(func.max(InventoryMovement.created_at)).where(
+            InventoryMovement.inventory_item_id == inventory_item_id, InventoryMovement.delta_on_hand > 0
+        )
+    )
+    return last_in is None or last_in < last_alert
+
+
 async def check_low_stock(db: AsyncSession, items: list[OrderItem]) -> int:
-    """Sau khi bán món giữ sẵn: còn ≤ ngưỡng thì tạo việc chờ chị (mỗi món một việc đang chờ, không lặp)."""
+    """Sau khi bán món giữ sẵn: còn ≤ ngưỡng thì báo chị (mặc định AI tự ghi vào nhật ký; mức «hỏi» thì mỗi món
+    một việc đang chờ). Không báo lặp cho tới khi món được nhập thêm."""
     keys = {
         (i.product_id, i.variant_id) for i in items if i.product_id and i.fulfillment_source == FulfillmentSource.STOCK
     }
+    return await check_low_stock_keys(db, keys)
+
+
+async def check_low_stock_keys(db: AsyncSession, keys: set[tuple[uuid.UUID, uuid.UUID | None]]) -> int:
     if not keys:
         return 0
     default_threshold = int(await control.get_setting(db, "orders.low_stock_default_threshold") or 3)
@@ -273,6 +302,8 @@ async def check_low_stock(db: AsyncSession, items: list[OrderItem]) -> int:
         available = inv.on_hand - inv.reserved - held
         threshold = inv.low_stock_threshold if inv.low_stock_threshold is not None else default_threshold
         if available > threshold:
+            continue
+        if await _alerted_since_restock(db, inv.id):
             continue
         p = await db.get(Product, product_id)
         name = p.name if p else "Món giữ sẵn"

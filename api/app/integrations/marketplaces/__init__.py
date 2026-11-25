@@ -11,6 +11,8 @@ from pydantic import BaseModel, Field
 
 from app.core.enums import Channel
 
+ORDER_STATUSES = ("shipped", "delivered")
+
 
 class MarketplaceProduct(BaseModel):
     sku: str
@@ -62,4 +64,6 @@ class MarketplacesDriver(abc.ABC):
     @abc.abstractmethod
     async def update_order_status(
         self, marketplace: Channel, external_id: str, status: str, tracking_code: str | None = None
-    ) -> None: ...
+    ) -> None:
+        """Báo trạng thái giao của đơn lên sàn. `status` ∈ ORDER_STATUSES: «shipped» (kèm mã vận đơn của hãng giao
+        mình tự gọi) · «delivered». Gọi lặp cùng mốc phải an toàn ở phía mình (orders tự giữ mốc đã báo)."""
