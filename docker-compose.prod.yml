@@ -21,6 +21,8 @@ x-api-env: &api-env
   REDIS_URL: redis://${CONTAINER_PREFIX:-hangchon}-redis:6379/0
   # ---- đăng nhập ----
   JWT_SECRET: ${JWT_SECRET:?JWT_SECRET bắt buộc (chuỗi ngẫu nhiên >= 32 ký tự)}
+  # mã hoá khoá API lưu trong CSDL (Cài đặt → AI và khoá API); khoá Fernet riêng, không dùng lại JWT_SECRET
+  SECRETS_ENCRYPTION_KEY: ${SECRETS_ENCRYPTION_KEY:?SECRETS_ENCRYPTION_KEY bắt buộc (khoá Fernet, xem docs/deployment.md)}
   JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-20160}
   COOKIE_NAME: ${COOKIE_NAME:-hc_session}
   COOKIE_SECURE: ${COOKIE_SECURE:-true}
@@ -30,9 +32,11 @@ x-api-env: &api-env
   OWNER_NAME: ${OWNER_NAME:-Chị}
   CREATE_OWNER_ON_STARTUP: ${CREATE_OWNER_ON_STARTUP:-true}
   HC_DEMO_ACTIONS: ${HC_DEMO_ACTIONS:-}
-  # ---- AI ----
+  # ---- AI (chị đổi được ở Cài đặt → AI và khoá API; giá trị trong CSDL ghi đè các biến này) ----
   AI_PROVIDER: ${AI_PROVIDER:-fake}
   ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+  OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
   AI_MODEL_SMART: ${AI_MODEL_SMART:-claude-opus-5-5}
   AI_MODEL_FAST: ${AI_MODEL_FAST:-claude-haiku-5-5}
   AI_EFFORT_SMART: ${AI_EFFORT_SMART:-medium}

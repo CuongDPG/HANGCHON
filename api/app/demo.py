@@ -717,6 +717,9 @@ async def seed_demo(*, allow_prod: bool = False) -> dict[str, int]:
     saved = {k: getattr(settings, k) for k in ("ai_provider", "jobs_eager", "sources_driver", "social_driver",
                                                 "payments_driver", "shipping_driver", "notify_driver", "app_env")}  # fmt: skip
     settings.ai_provider, settings.jobs_eager = "fake", True
+    from app.ai import config as ai_config
+
+    ai_config.force_provider("fake")  # kể cả khi chị đã chọn provider thật ở Cài đặt
     for k in ("sources_driver", "social_driver", "payments_driver", "shipping_driver", "notify_driver"):
         setattr(settings, k, "mock")
     if settings.app_env == "prod":  # chỉ tới đây khi có --allow-prod
@@ -739,5 +742,6 @@ async def seed_demo(*, allow_prod: bool = False) -> dict[str, int]:
         return story.counts
     finally:
         ratelimit.force_local(False)
+        ai_config.force_provider(None)
         for k, v in saved.items():
             setattr(settings, k, v)

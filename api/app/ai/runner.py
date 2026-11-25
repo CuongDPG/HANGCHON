@@ -11,7 +11,8 @@ from typing import Any
 from pydantic import BaseModel
 from sqlalchemy import func, select
 
-from app.ai.errors import AIBudgetExceeded, AIError
+from app.ai.config import AIConfig, current_config
+from app.ai.errors import AIBudgetExceeded, AIError, AIUnavailable
 from app.ai.pricing import estimate_cost
 from app.ai.providers import get_provider
 from app.ai.registry import TASKS, budget_hooks
@@ -84,18 +85,23 @@ async def run[T: BaseModel](
     system: str | None = None,
     max_tokens: int | None = None,
     effort: str | None = None,
+    config: AIConfig | None = None,
 ) -> AIResult[T]:
     """Gọi AI cho tác vụ `task` ("<module>.<viec>") và trả `AIResult` (`.output` là `output` đã kiểm khuôn).
+
+    Provider, khoá, model, effort theo cấu hình hiệu lực (`app.ai.config`: Cài đặt > biến môi trường > mặc định);
+    `config` chỉ dùng cho «Kiểm tra kết nối» (cấu hình đang nhập, chưa lưu).
 
     Lỗi: AIBudgetExceeded (chạm trần), AIRefused (model từ chối), AIUnavailable (mạng/khoá/quá tải),
     AIOutputInvalid (sai khuôn). Mọi lần gọi (kể cả lỗi) đều có một dòng ai_runs."""
     spec = TASKS.get(task)
     tier = tier or (spec.tier if spec else "fast")
     web = spec.web if (web is None and spec) else bool(web)
-    provider_name = settings.ai_provider
-    model = (
-        "fake" if provider_name == "fake" else (settings.ai_model_smart if tier == "smart" else settings.ai_model_fast)
-    )
+    cfg = config or await current_config()
+    provider_name = cfg.provider
+    fake = provider_name == "fake"
+    tier_cfg = cfg.tier(tier)
+    model = "fake" if fake else tier_cfg.model
     base = {"task": task, "provider": provider_name, "model": model, "tier": tier}
 
     spent, budget = await monthly_spend_vnd(), await monthly_budget_vnd()
@@ -121,19 +127,20 @@ async def run[T: BaseModel](
         images=[AIImage.coerce(i) for i in images or []],
         web=web,
         max_tokens=max_tokens or (spec.max_tokens if spec and spec.max_tokens else settings.ai_max_tokens),
-        effort=effort
-        or (spec.effort if spec else None)
-        or (
-            None
-            if provider_name == "fake"
-            else settings.ai_effort_smart
-            if tier == "smart"
-            else settings.ai_effort_fast
-        ),
+        effort=effort or (spec.effort if spec else None) or (None if fake else tier_cfg.effort),
     )
     started = time.perf_counter()
     try:
-        resp = await get_provider(provider_name).complete(req)
+        if cfg.error is not None:
+            raise AIUnavailable(cfg.error.message, code=cfg.error.code)
+        provider = get_provider(provider_name)
+        if web and not provider.supports_web:
+            raise AIUnavailable(
+                f"Tác vụ này cần tra cứu web nhưng provider «{provider.label}» chưa hỗ trợ. "
+                "Chị chọn provider khác ở Cài đặt → AI và khoá API.",
+                code="ai_web_unsupported",
+            )
+        resp = await provider.complete(req, cfg.connection)
     except AIError as e:
         await _record(
             **base,
@@ -146,7 +153,7 @@ async def run[T: BaseModel](
         )
         raise
     usage: Usage = resp.usage
-    cost_usd, cost_vnd = estimate_cost(resp.model, usage)
+    cost_usd, cost_vnd = estimate_cost(resp.model, usage, smart_model=None if fake else cfg.smart.model)
     row = await _record(
         **{**base, "model": resp.model},
         status="ok",

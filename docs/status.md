@@ -84,8 +84,8 @@ hoặc mở tay trên máy dev với dữ liệu mẫu `uv run python -m app.see
 | i5 | Báo cáo tuần | chạy thật phần số liệu; nhận xét bằng AI giả | `/desk/bao-cao` |
 | i6 | Ra lệnh bằng lời | chạy với AI giả | nút «Nói với AI» mọi màn |
 | k1 | Sổ doanh thu, chi phí | chạy thật (doanh thu khi đơn đã trả, chi phí NCC + tiền AI hằng tháng, bảng kê CSV) | `/desk/so-sach` |
-| k2 | Trần chi phí AI | chạy thật phần đếm/chặn; chi phí thật chưa đo (AI giả = 0đ) | `/desk/tu-chu/chi-phi-ai` |
-| k3 | Nhãn AI và lưu vết | chạy thật | nhật ký AI, bài đăng |
+| k2 | Trần chi phí AI | chạy thật phần đếm/chặn; đổi nhà cung cấp/khoá/model/trần ngay ở Cài đặt (Anthropic, OpenRouter, AI giả). Anthropic đã gọi thật được với `claude-haiku-5-5`, `claude-opus-5-5`; OpenRouter mới kiểm bằng máy chủ giả, chưa gọi thật. Model ngoài bảng giá: OpenRouter lấy chi phí nó tự báo (`usage.cost`), provider khác tính theo giá model «việc khó» (có cảnh báo trong log) | `/desk/tu-chu/chi-phi-ai`, `/desk/cai-dat/ai` |
+| k3 | Nhãn AI và lưu vết | chạy thật; lưu vết cả việc đổi khoá API / cấu hình AI (ai đổi, lúc nào, đổi trường nào — không ghi giá trị khoá) | nhật ký AI, bài đăng |
 | k4 | Sao lưu và phân quyền | chạy thật phần tài khoản phụ; sao lưu chạy được khi máy có `pg_dump` hoặc container Postgres (`docker exec`) — bản chạy thật cần `postgresql-client` trong image | `/desk/cai-dat/sao-luu`, `/desk/cai-dat/nguoi-phu-giup` |
 | k5 | Hoá đơn điện tử | một phần — luồng soạn/duyệt/chống trùng chạy với mock; **chưa có driver nhà cung cấp hoá đơn thật** | `/desk/so-sach` |
 
@@ -95,7 +95,7 @@ hoặc mở tay trên máy dev với dữ liệu mẫu `uv run python -m app.see
 
 | Việc | Cần | Biến |
 |---|---|---|
-| AI thật (mọi chức năng «AI giả») | Khoá Claude API, đặt trần chi phí tháng | `AI_PROVIDER=anthropic`, `ANTHROPIC_API_KEY`, `AI_MONTHLY_BUDGET_VND` |
+| AI thật (mọi chức năng «AI giả») | Khoá Claude API hoặc OpenRouter, đặt trần chi phí tháng — nhập ở *Cài đặt → AI và khoá API* (mã hoá trong CSDL) | `SECRETS_ENCRYPTION_KEY` (bắt buộc ở prod); hoặc qua env: `AI_PROVIDER=anthropic`/`openrouter`, `ANTHROPIC_API_KEY`/`OPENROUTER_API_KEY`, `AI_MONTHLY_BUDGET_VND` |
 | Săn hàng 1688/Taobao | Tài khoản Onebound (key + secret) | `SOURCES_DRIVER=onebound`, `ONEBOUND_API_KEY`, `ONEBOUND_API_SECRET` (hoặc `SOURCES_DRIVER=web` chỉ cần khoá Anthropic) |
 | Facebook Page, Instagram, Threads (đăng bài + hộp thư) | Ứng dụng Meta đã duyệt quyền `pages_manage_posts`, `pages_messaging`, `instagram_content_publish`, `instagram_manage_messages`; Page token dài hạn; webhook trỏ về `/api/hooks/social/facebook` | `META_APP_ID`, `META_APP_SECRET`, `META_PAGE_ID`, `META_PAGE_TOKEN`, `META_IG_USER_ID`, `META_WEBHOOK_VERIFY_TOKEN`, `THREADS_USER_ID`, `THREADS_ACCESS_TOKEN` |
 | Zalo OA (tin nhắn, bài viết OA) | OA đã xác thực + ứng dụng Zalo, access token OA (làm mới định kỳ), webhook `/api/hooks/social/zalo_oa` | `ZALO_APP_ID`, `ZALO_OA_ID`, `ZALO_OA_ACCESS_TOKEN`, `ZALO_OA_SECRET` |

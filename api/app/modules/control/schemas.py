@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import date, datetime
 from typing import Annotated, Any, Literal
@@ -278,6 +279,96 @@ class AICostsOut(BaseModel):
 
 class BudgetUpdate(BaseModel):
     monthly_budget_vnd: int = Field(ge=0)
+
+
+# ---- cấu hình AI (Cài đặt → AI và khoá API) ---------------------------------------------------------------------
+
+AIEffort = Literal["low", "medium", "high", "max"]
+ConfigSource = Literal["settings", "env"]
+
+
+def _blank_none(v: str | None) -> str | None:
+    if v is None:
+        return None
+    v = v.strip()
+    return v or None
+
+
+def _key(v: str | None) -> str | None:
+    v = _blank_none(v)
+    if v is not None and any(c.isspace() for c in v):
+        raise ValueError("Khoá API không được chứa khoảng trắng.")
+    return v
+
+
+def _url(v: str | None) -> str | None:
+    v = _blank_none(v)
+    if v is not None and not re.match(r"^https?://[^\s]+$", v):
+        raise ValueError("Base URL phải bắt đầu bằng http:// hoặc https://.")
+    return v
+
+
+ModelName = Annotated[str | None, Field(max_length=120, pattern=r"^[A-Za-z0-9._:/@+-]*$"), AfterValidator(_blank_none)]
+
+
+class AIProviderOut(BaseModel):
+    name: str
+    label: str
+    needs_key: bool
+    supports_web: bool
+    needs_base_url: bool
+    default_base_url: str | None
+    model_suggestions: list[str]
+    key_placeholder: str
+    saved: bool = Field(description="Đã có dòng cấu hình trong CSDL")
+    has_key: bool
+    key_hint: str | None = Field(description="Dạng che, vd sk-ant-…8AAA; không bao giờ trả khoá thật")
+    key_source: ConfigSource | None
+    key_updated_at: datetime | None
+    key_updated_by: str | None
+    base_url: str | None
+    model_smart: str
+    model_fast: str
+    effort_smart: str | None
+    effort_fast: str | None
+
+
+class AIConfigOut(BaseModel):
+    provider: str = Field(description="Provider đang dùng")
+    source: ConfigSource = Field(description="settings = chị lưu ở Cài đặt; env = biến môi trường / mặc định")
+    providers: list[AIProviderOut]
+    efforts: list[str]
+    monthly_budget_vnd: int
+    budget_source: ConfigSource
+
+
+class AIConfigIn(BaseModel):
+    provider: str = Field(max_length=30)
+    api_key: Annotated[str | None, Field(max_length=500), AfterValidator(_key)] = Field(
+        default=None, description="Để trống = giữ khoá đã lưu"
+    )
+    base_url: Annotated[str | None, Field(max_length=300), AfterValidator(_url)] = None
+    model_smart: ModelName = None
+    model_fast: ModelName = None
+    effort_smart: AIEffort | None = None
+    effort_fast: AIEffort | None = None
+    monthly_budget_vnd: int | None = Field(default=None, ge=0)
+    activate: bool = Field(default=True, description="Lưu xong chuyển sang dùng provider này (False = chỉ lưu sẵn)")
+
+
+class AITestResult(BaseModel):
+    tier: Literal["fast", "smart"]
+    ok: bool
+    model: str
+    latency_ms: int
+    cost_vnd: int = 0
+    error: str | None = None
+    code: str | None = None
+
+
+class AITestOut(BaseModel):
+    provider: str
+    results: list[AITestResult]
 
 
 class AIRunOut(ORM):

@@ -8,7 +8,10 @@ import uuid
 import httpx
 import pytest
 
-from app.core.config import Settings, settings
+from app.core.config import DEV_SECRETS_ENCRYPTION_KEY, Settings, settings
+
+# khoá Fernet chỉ dùng trong test (base64 của 32 byte cố định)
+PROD_FERNET_KEY = "dGVzdC1vbmx5LXByb2QtZmVybmV0LWtleS0zMmJ5dGU="
 
 
 @pytest.fixture
@@ -41,7 +44,11 @@ def test_prod_refuses_default_jwt_secret() -> None:
                 "ngan"):  # fmt: skip
         with pytest.raises(ValueError, match="JWT_SECRET"):
             Settings(app_env="prod", jwt_secret=bad, _env_file=None)
-    assert Settings(app_env="prod", jwt_secret="x" * 40, owner_password="p" * 16, _env_file=None).jwt_secret == "x" * 40
+    ok = Settings(
+        app_env="prod", jwt_secret="x" * 40, owner_password="p" * 16, secrets_encryption_key=PROD_FERNET_KEY,
+        _env_file=None,
+    )  # fmt: skip
+    assert ok.jwt_secret == "x" * 40
     assert Settings(app_env="dev", jwt_secret="ngan", _env_file=None).app_env == "dev"
 
 
@@ -67,5 +74,16 @@ def test_prod_refuses_sample_owner_password() -> None:
                 app_env="prod", jwt_secret="x" * 40, owner_password=bad, create_owner_on_startup=True, _env_file=None
             )
     ok = Settings(app_env="prod", jwt_secret="x" * 40, owner_password="doimatkhau", create_owner_on_startup=False,
-                  _env_file=None)  # fmt: skip
+                  secrets_encryption_key=PROD_FERNET_KEY, _env_file=None)  # fmt: skip
     assert ok.app_env == "prod"
+
+
+def test_prod_refuses_missing_or_dev_secrets_key() -> None:
+    """Khoá API lưu trong CSDL được mã hoá bằng SECRETS_ENCRYPTION_KEY: production thiếu biến này (hay dùng khoá dev
+    công khai trong repo) thì không khởi động; dev/test thì dùng khoá dev."""
+    base = {"app_env": "prod", "jwt_secret": "x" * 40, "owner_password": "p" * 16, "_env_file": None}
+    for bad in (None, "", DEV_SECRETS_ENCRYPTION_KEY, f"{PROD_FERNET_KEY},{DEV_SECRETS_ENCRYPTION_KEY}"):
+        with pytest.raises(ValueError, match="SECRETS_ENCRYPTION_KEY"):
+            Settings(**base, secrets_encryption_key=bad)
+    assert Settings(**base, secrets_encryption_key=PROD_FERNET_KEY).app_env == "prod"
+    assert Settings(app_env="dev", _env_file=None).secrets_encryption_key is None

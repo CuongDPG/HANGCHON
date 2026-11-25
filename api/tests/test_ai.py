@@ -10,6 +10,7 @@ from sqlalchemy import select
 
 from app import ai
 from app.ai.pricing import estimate_cost
+from app.ai.providers import Connection
 from app.ai.providers.anthropic import WEB_TOOLS, AnthropicProvider
 from app.ai.types import AIImage, AIRequest, Usage
 from app.core.config import settings
@@ -166,7 +167,7 @@ def _req(model: str = "claude-opus-5-5", web: bool = False) -> AIRequest:
 
 async def test_anthropic_request_shape_and_fallbacks() -> None:
     p, msgs = _provider([_resp("end_turn", Inp(text="ok"))])
-    out = await p.complete(_req())
+    out = await p.complete(_req(), Connection())
     call = msgs.calls[0]
     assert out.output.text == "ok" and out.request_id == "req_test"
     assert call["output_format"] is Inp and call["output_config"] == {"effort": "medium"}
@@ -176,7 +177,7 @@ async def test_anthropic_request_shape_and_fallbacks() -> None:
     assert call["messages"][0]["content"][0]["source"]["type"] == "url"
     # model nhanh: không gửi fallbacks
     p2, msgs2 = _provider([_resp("end_turn", Inp(text="ok"), model="claude-haiku-5-5")])
-    await p2.complete(_req(model="claude-haiku-5-5"))
+    await p2.complete(_req(model="claude-haiku-5-5"), Connection())
     assert "fallbacks" not in msgs2.calls[0]
 
 
@@ -186,7 +187,7 @@ async def test_anthropic_web_pause_turn_and_sources() -> None:
         model_dump=lambda **_: {"type": "web_search_tool_result"},
     )  # fmt: skip
     p, msgs = _provider([_resp("pause_turn", None, [search], web=2), _resp("end_turn", Inp(text="xong"), web=1)])
-    out = await p.complete(_req(web=True))
+    out = await p.complete(_req(web=True), Connection())
     assert len(msgs.calls) == 2 and msgs.calls[0]["tools"] == WEB_TOOLS
     assert "country" not in WEB_TOOLS[0]["user_location"]
     assert msgs.calls[1]["messages"][-1]["role"] == "assistant"
@@ -196,7 +197,7 @@ async def test_anthropic_web_pause_turn_and_sources() -> None:
 async def test_anthropic_refusal_and_fallback_detection() -> None:
     p, _ = _provider([_resp("refusal", None, category="cyber")])
     with pytest.raises(ai.AIRefused) as e:
-        await p.complete(_req())
+        await p.complete(_req(), Connection())
     assert e.value.category == "cyber"
 
     its = [SimpleNamespace(type="message", model="claude-opus-5-5", input_tokens=10, output_tokens=0,
@@ -204,7 +205,7 @@ async def test_anthropic_refusal_and_fallback_detection() -> None:
            SimpleNamespace(type="fallback_message", model="claude-opus-4-8", input_tokens=10, output_tokens=20,
                            cache_read_input_tokens=0, cache_creation_input_tokens=0)]  # fmt: skip
     p, _ = _provider([_resp("end_turn", Inp(text="ok"), model="claude-opus-4-8", iterations=its)])
-    out = await p.complete(_req())
+    out = await p.complete(_req(), Connection())
     assert out.fallback_model == "claude-opus-4-8" and len(out.usage.per_model or []) == 2
 
 
@@ -231,11 +232,11 @@ async def test_anthropic_errors_map_to_vietnamese() -> None:
         p = AnthropicProvider()
         p._client = SimpleNamespace(messages=_Boom(exc), beta=SimpleNamespace(messages=_Boom(exc)))  # type: ignore[assignment]
         with pytest.raises(ai.AIError) as e:
-            await p.complete(_req())
+            await p.complete(_req(), Connection())
         assert e.value.code == code
         assert not e.value.message.isascii()  # thông báo tiếng Việt
 
 
 async def test_anthropic_without_key_is_unavailable() -> None:
     with pytest.raises(ai.AIUnavailable):
-        AnthropicProvider().client  # noqa: B018
+        AnthropicProvider().client_for(Connection())
