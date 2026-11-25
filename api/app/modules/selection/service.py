@@ -39,6 +39,7 @@ from app.modules.selection.ai_tasks import (
     TasteIn,
     TasteOut,
     TasteTraitOut,
+    to_mine,
 )
 from app.modules.selection.models import (
     Decision,
@@ -565,6 +566,9 @@ async def draft_reasons(db: AsyncSession, decision: SelectionDecision, owner_req
         await db.flush()
         return
     out = res.output
+    # lời này lên trang khách: chốt chặn khi model vẫn lỡ viết «chị đo», «chị thấy»
+    out.reasons_selected = [to_mine(x) for x in out.reasons_selected]
+    out.not_satisfied = [to_mine(x) for x in out.not_satisfied]
     decision.draft_reason_selected = join_lines(out.reasons_selected)
     decision.draft_not_satisfied = join_lines(out.not_satisfied)
     decision.ai_run_id = res.run_id

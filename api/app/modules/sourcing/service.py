@@ -23,12 +23,13 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app import ai, control
 from app.core import events
+from app.core.config import settings
 from app.core.enums import Channel, Language, SourcePlatform
 from app.core.errors import BadRequest, Conflict, NotFound
 from app.core.timeutil import local_today, now_utc
 from app.integrations import IntegrationError, IntegrationNotConfigured, get_driver
 from app.integrations.sources import SourceItem, SourceProduct, SourceQuery, SourcesDriver
-from app.modules.sourcing import vocab
+from app.modules.sourcing import guidance, imagehash, vocab
 from app.modules.sourcing.ai_io import (
     BriefParse,
     DescribeImageIn,
@@ -490,8 +491,11 @@ def build_results(
     ranked: dict[str, RankItemOut],
     rates: dict[str, Any],
     origin: CandidateOrigin,
+    guide: guidance.Guidance | None = None,
 ) -> list[dict[str, Any]]:
-    """Gom cùng mẫu (same_model_key), giữ tin rao tốt nhất mỗi mẫu, lọc theo đề, xếp theo điểm."""
+    """Gom cùng mẫu (same_model_key), giữ tin rao tốt nhất mỗi mẫu, lọc theo đề, xếp theo điểm.
+
+    `guide` (c5 + c6): nguyên tắc của chị và gu đã học chỉnh điểm; món trái nguyên tắc «không chấp nhận» xuống cuối."""
     ceiling = brief.target_landed_cost_max_vnd
     groups: dict[str, list[tuple[SourceItem, RankItemOut, int | None]]] = {}
     for it in items:
@@ -524,8 +528,31 @@ def build_results(
                 offers=[_offer(m[0], rates) for m in members],
             )
         )
-    out.sort(key=lambda c: -(c["ai_score"] or 0))
+    if guide:
+        out = [guidance.apply(guide, c) for c in out]
+    out.sort(key=lambda c: (bool((c["raw"].get("guidance") or {}).get("violates")), -(c["ai_score"] or 0)))
     return out
+
+
+def image_hashing_enabled() -> bool:
+    """Chỉ băm ảnh thật. Dữ liệu giả lập (driver mock, AI fake) dùng ảnh giữ chỗ giống hệt nhau trừ dòng chữ → băm
+    theo hình sẽ báo trùng sai; test không tải ảnh qua mạng (test tự bật bằng monkeypatch)."""
+    return not settings.is_test and settings.ai_provider != "fake" and sources().name != "mock"
+
+
+async def attach_image_hashes(results: list[dict[str, Any]]) -> None:
+    """b7: băm theo hình ảnh chính của ứng viên và ảnh của từng shop cùng mẫu (lưu vào `image_hash` / offer)."""
+    if not results or not image_hashing_enabled():
+        return
+    urls = [r.get("main_image_url") for r in results]
+    urls += [o.get("image_url") for r in results for o in (r.get("raw") or {}).get("offers", [])]
+    hashes = await imagehash.hash_urls([u for u in urls if u])
+    for r in results:
+        if h := hashes.get(r.get("main_image_url") or ""):
+            r["image_hash"] = h
+        for o in (r.get("raw") or {}).get("offers", []):
+            if hashes.get(o.get("image_url") or ""):
+                o["image_hash"] = hashes[o["image_url"]]
 
 
 async def _search_all(
@@ -654,7 +681,8 @@ async def execute_scan(db: AsyncSession, run_id: uuid.UUID) -> SourcingRun:
         ranked, ai_run_id, srcs = await _rank(_rank_brief(brief), items, rates)
         run.ai_run_id = ai_run_id
         origin = CandidateOrigin.IMAGE if run.kind == RunKind.IMAGE_SEARCH else CandidateOrigin.BRIEF_SCAN
-        results = build_results(brief, items, ranked, rates, origin)
+        results = build_results(brief, items, ranked, rates, origin, await guidance.load(db, brief.category_id))
+        await attach_image_hashes(results)
         run.above_threshold_count = len(results)
         out = await _save(db, run, brief, results, ai_run_id=ai_run_id, sources_=srcs)
         run.finished_at = now_utc()
@@ -745,8 +773,16 @@ async def save_candidates(db: AsyncSession, run_id: str, items: list[dict[str, A
                 **(existing.raw or {}),
                 "offers": data["raw"].get("offers") or existing.raw.get("offers", []),
             }
+            if data.get("image_hash") and not existing.image_hash:
+                existing.image_hash = data["image_hash"]
             if existing.stage == CandidateStage.CANDIDATE and data.get("ai_score") is not None:
                 existing.rank_reason = data.get("rank_reason") or existing.rank_reason
+                gd = data["raw"].get("guidance")
+                if gd or existing.raw.get("guidance"):  # nguyên tắc/gu đổi từ lần trước → chấm lại theo lần này
+                    existing.raw = {k: v for k, v in existing.raw.items() if k != "guidance"} | (
+                        {"guidance": gd} if gd else {}
+                    )
+                    existing.ai_score = data["ai_score"]
             all_ids.append(str(existing.id))
             continue
         cand = Candidate(**_coerce(data))
@@ -835,6 +871,7 @@ async def execute_import(db: AsyncSession, run_id: uuid.UUID) -> SourcingRun:
     fields["specs"] = {s.name: s.value for s in t.specs_vi}
     fields["variants"] = [{"name": v} for v in t.variants_vi]
     fields["rank_reason"] = "Chị dán link món này."
+    await attach_image_hashes([fields])
     run.ai_run_id = tr.run_id
     out = await control.propose(
         "sourcing.import_link",
@@ -943,7 +980,9 @@ async def execute_image_search(db: AsyncSession, run_id: uuid.UUID) -> SourcingR
         run.found_count = len(found)
         await _set_progress(db, run, step="rank", done=2, total=3, note=f"AI đang đọc {len(found)} món")
         ranked, rank_run, srcs = await _rank(_rank_brief(brief), list(found.values()), rates)
-        results = build_results(brief, list(found.values()), ranked, rates, CandidateOrigin.IMAGE)
+        guide = await guidance.load(db, brief.category_id)
+        results = build_results(brief, list(found.values()), ranked, rates, CandidateOrigin.IMAGE, guide)
+        await attach_image_hashes(results)
         run.above_threshold_count = len(results)
         out = await _save(db, run, brief, results, ai_run_id=rank_run, sources_=srcs)
         run.finished_at = now_utc()
@@ -1039,6 +1078,8 @@ async def save_trends(db: AsyncSession, run_id: str, detected_on: str, signals: 
 
     day = date.fromisoformat(detected_on)
     ids, new = [], 0
+    created: list[str] = []
+    before: dict[str, dict[str, Any]] = {}  # tín hiệu đã có trong ngày: giá trị cũ để hoàn tác
     for s in signals:
         row = (
             await db.execute(
@@ -1055,6 +1096,8 @@ async def save_trends(db: AsyncSession, run_id: str, detected_on: str, signals: 
             )
             db.add(row)
             new += 1
+        elif str(row.id) not in before:
+            before[str(row.id)] = {k: getattr(row, k) for k in _TREND_FIELDS}
         row.title = s["title"]
         row.title_vi = s["title_vi"][:300]
         row.image_url = s.get("image_url")
@@ -1063,10 +1106,28 @@ async def save_trends(db: AsyncSession, run_id: str, detected_on: str, signals: 
         row.score = s.get("score")
         await db.flush()
         ids.append(str(row.id))
+        if row.id and str(row.id) not in before and str(row.id) not in created:
+            created.append(str(row.id))
     run = await db.get(SourcingRun, uuid.UUID(run_id))
     if run is not None:
         run.new_count = new
-    return {"trend_ids": ids, "new_count": new}
+    return {"trend_ids": ids, "new_count": new, "created_ids": created, "before": before}
+
+
+_TREND_FIELDS = ("title", "title_vi", "image_url", "reason", "metrics", "score")
+
+
+async def undo_trends(db: AsyncSession, created: list[str], before: dict[str, dict[str, Any]]) -> None:
+    """Hoàn tác lưu xu hướng: xoá tín hiệu mới mà chị chưa đụng tới, trả lại nội dung cũ cho tín hiệu đã có."""
+    for tid in created:
+        row = await db.get(TrendSignal, uuid.UUID(tid))
+        if row is not None and row.status == TrendStatus.NEW and row.candidate_id is None:
+            await db.delete(row)
+    for tid, old in before.items():
+        row = await db.get(TrendSignal, uuid.UUID(tid))
+        if row is not None:
+            for k in _TREND_FIELDS:
+                setattr(row, k, old.get(k))
 
 
 async def brief_from_trend(db: AsyncSession, trend: TrendSignal, user_id: uuid.UUID | None) -> SourcingBrief:
@@ -1154,6 +1215,17 @@ async def save_demand(db: AsyncSession, p: dict[str, Any]) -> dict[str, Any]:
         await db.execute(select(DemandSignal).where(DemandSignal.normalized_key == p["key"]))
     ).scalar_one_or_none()
     now = now_utc()
+    created = signal is None
+    prev = (
+        {}
+        if signal is None
+        else {
+            "find_request_id": str(signal.find_request_id) if signal.find_request_id else None,
+            "last_asked_at": signal.last_asked_at.isoformat() if signal.last_asked_at else None,
+            "status": signal.status.value,
+        }
+    )
+    mention_id: str | None = None
     if signal is None:
         signal = DemandSignal(
             title=p["title"], normalized_key=p["key"], description=p.get("detail"), first_asked_at=now
@@ -1163,23 +1235,52 @@ async def save_demand(db: AsyncSession, p: dict[str, Any]) -> dict[str, Any]:
     if p.get("find_request_id") and signal.find_request_id is None:
         signal.find_request_id = uuid.UUID(p["find_request_id"])
     if not await _mention_exists(db, p["source_type"], source_id):
-        db.add(
-            DemandMention(
-                signal_id=signal.id,
-                source=DemandSource(p["source"]),
-                channel=Channel(p["channel"]) if p.get("channel") else None,
-                customer_id=uuid.UUID(p["customer_id"]) if p.get("customer_id") else None,
-                source_type=p["source_type"],
-                source_id=source_id,
-                text=p["text"],
-            )
+        mention = DemandMention(
+            signal_id=signal.id,
+            source=DemandSource(p["source"]),
+            channel=Channel(p["channel"]) if p.get("channel") else None,
+            customer_id=uuid.UUID(p["customer_id"]) if p.get("customer_id") else None,
+            source_type=p["source_type"],
+            source_id=source_id,
+            text=p["text"],
         )
+        db.add(mention)
         await db.flush()
+        mention_id = str(mention.id)
     signal.last_asked_at = now
     if signal.status == DemandStatus.DISMISSED:
         signal.status = DemandStatus.OPEN
     await recount_demand(db, signal)
-    return {"signal_id": str(signal.id), "ask_count": signal.ask_count}
+    return {
+        "signal_id": str(signal.id),
+        "ask_count": signal.ask_count,
+        "undo": {"signal_id": str(signal.id), "created": created, "mention_id": mention_id, "prev": prev},
+    }
+
+
+async def undo_demand(db: AsyncSession, u: dict[str, Any]) -> None:
+    """Hoàn tác ghi nhu cầu: bỏ lượt nhắc vừa ghi; nhu cầu mới tạo mà không còn lượt nhắc nào (và chưa mở đề) thì xoá."""
+    from datetime import datetime
+
+    signal = await db.get(DemandSignal, uuid.UUID(u["signal_id"]))
+    if signal is None:
+        return
+    if u.get("mention_id"):
+        m = await db.get(DemandMention, uuid.UUID(u["mention_id"]))
+        if m is not None:
+            await db.delete(m)
+            await db.flush()
+    left = (await db.execute(select(func.count()).where(DemandMention.signal_id == signal.id))).scalar_one()
+    if u.get("created") and not left and signal.status == DemandStatus.OPEN:
+        await db.delete(signal)
+        return
+    prev = u.get("prev") or {}
+    if prev:
+        signal.find_request_id = uuid.UUID(prev["find_request_id"]) if prev.get("find_request_id") else None
+        signal.last_asked_at = datetime.fromisoformat(prev["last_asked_at"]) if prev.get("last_asked_at") else None
+        if signal.status == DemandStatus.OPEN and prev.get("status"):
+            signal.status = DemandStatus(prev["status"])
+    await recount_demand(db, signal)
 
 
 async def recount_demand(db: AsyncSession, signal: DemandSignal) -> None:

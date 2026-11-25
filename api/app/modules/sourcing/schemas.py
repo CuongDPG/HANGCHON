@@ -8,7 +8,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
@@ -259,6 +259,21 @@ class Offer(BaseModel):
     review_count: int | None = None
 
 
+class GuidanceNote(BaseModel):
+    kind: Literal["principle", "taste"]
+    delta: int
+    text: str
+
+
+class RankGuidance(BaseModel):
+    """c5 + c6: nguyên tắc và gu đã chỉnh điểm AI thế nào (để chị thấy vì sao món lên/xuống)."""
+
+    base_score: int | None = None
+    delta: int = 0
+    violates: bool = False
+    notes: list[GuidanceNote] = Field(default_factory=list)
+
+
 class CandidateCard(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -282,6 +297,7 @@ class CandidateCard(BaseModel):
     ai_score: int | None
     rank_reason: str | None
     offers_count: int = 0
+    guidance: RankGuidance | None = None
     assessment_status: str | None = None
     score_total: Decimal | None = None
     created_at: datetime
@@ -289,6 +305,7 @@ class CandidateCard(BaseModel):
 
 class CandidateDetail(CandidateOut):
     landed_estimate_vnd: int | None = None
+    guidance: RankGuidance | None = None
     offers: list[Offer] = Field(default_factory=list)
 
 

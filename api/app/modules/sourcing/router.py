@@ -6,7 +6,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, File, Form, Query, UploadFile, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.core.db import DbSession
 from app.core.deps import CurrentUser
@@ -14,7 +14,7 @@ from app.core.errors import BadRequest, NotFound
 from app.core.jobs import enqueue
 from app.core.pagination import Page, Paginated, paginate
 from app.core.storage import get_storage, new_key
-from app.modules.sourcing import service
+from app.modules.sourcing import guidance, service
 from app.modules.sourcing.estimate import landed_total
 from app.modules.sourcing.models import (
     BriefStatus,
@@ -40,6 +40,7 @@ from app.modules.sourcing.schemas import (
     DemandView,
     ImportLinkIn,
     Offer,
+    RankGuidance,
     ReinterpretIn,
     RunView,
     SourcingBriefOut,
@@ -71,6 +72,11 @@ async def _cards(db, briefs: list[SourcingBrief]) -> list[BriefCard]:
     return out
 
 
+def rank_guidance(c: Candidate) -> RankGuidance | None:
+    g = guidance.view(c.raw)
+    return RankGuidance.model_validate(g) if g else None
+
+
 async def candidate_cards(db, rows: list[Candidate]) -> list[CandidateCard]:
     from app.modules.assessment.models import Assessment  # cùng lát cắt, chỉ đọc
 
@@ -94,6 +100,7 @@ async def candidate_cards(db, rows: list[Candidate]) -> list[CandidateCard]:
                         c.price_amount, c.price_currency, weight_grams=c.weight_grams, rates=rates
                     ),
                     "offers_count": len(service.offers_of(c)),
+                    "guidance": rank_guidance(c),
                     "assessment_status": a.status.value if a else None,
                     "score_total": a.score_total if a else None,
                 }
@@ -167,7 +174,8 @@ async def brief_candidates(
     q = select(Candidate).where(Candidate.brief_id == brief_id, Candidate.is_archived.is_(False))
     if stage:
         q = q.where(Candidate.stage == stage)
-    q = q.order_by(Candidate.ai_score.desc().nulls_last(), Candidate.created_at)
+    violates = func.coalesce(Candidate.raw["guidance"]["violates"].as_boolean(), False)  # trái nguyên tắc xuống cuối
+    q = q.order_by(violates, Candidate.ai_score.desc().nulls_last(), Candidate.created_at)
     res = await paginate(db, q, page)
     return Paginated[CandidateCard](
         **{**res.model_dump(exclude={"items"}), "items": await candidate_cards(db, list(res.items))}
@@ -280,6 +288,7 @@ async def get_candidate(candidate_id: uuid.UUID, _: CurrentUser, db: DbSession) 
                 c.price_amount, c.price_currency, weight_grams=c.weight_grams, rates=rates
             ),
             "offers": [Offer.model_validate(o) for o in service.offers_of(c)],
+            "guidance": rank_guidance(c),
         }
     )
 

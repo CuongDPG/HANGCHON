@@ -101,9 +101,18 @@ export type CandidateCard = {
   ai_score: number | null;
   rank_reason: string | null;
   offers_count: number;
+  guidance: RankGuidance | null;
   assessment_status: string | null;
   score_total: string | null;
   created_at: string;
+};
+
+/** c5 + c6: nguyên tắc và gu của chị đã chỉnh điểm AI thế nào. */
+export type RankGuidance = {
+  base_score: number | null;
+  delta: number;
+  violates: boolean;
+  notes: { kind: "principle" | "taste"; delta: number; text: string }[];
 };
 
 export type Offer = {

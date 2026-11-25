@@ -48,7 +48,10 @@ ai.task(
         "Việc của bạn: tách lời thành từng ý ngắn (mỗi ý một câu), gắn nhãn cho từng ý:\n"
         "- good: điều chị thấy tốt, hài lòng;\n"
         "- bad: điều chị chưa ưng, lỗi, phiền;\n"
-        "- measure: con số chị đo hoặc đếm (kích thước, cân nặng, thời gian, số lần...).\n"
+        "- measure: con số đo hoặc đếm được khi thử (kích thước, cân nặng, thời gian, số lần...).\n"
+        "Các ý này có thể được dùng lại trên trang sản phẩm khách đọc, nên viết không chủ ngữ hoặc xưng «mình» "
+        "(vd «Giữ nóng khoảng 8 tiếng», «Mình đo: 7h sáng đến 5h chiều còn ấm»); không bao giờ ghi «chị đo», "
+        "«chị thấy» hay gọi người bán là «chị».\n"
         "Giữ nguyên ý và cách nói của chị, sửa lỗi chép lời rõ ràng. KHÔNG thêm ý chị không nói, KHÔNG suy diễn công dụng, "
         "KHÔNG bịa con số. Lời chị nói lan man hoặc không có ý nào rõ thì trả danh sách ý rỗng.\n"
         "Nếu có danh sách `candidates` (ghi chú chưa gắn món): chọn id món khớp nhất với nội dung; không chắc thì để null "
@@ -62,6 +65,14 @@ _NEG = {"long", "mop", "ro", "ri", "gi", "nut", "gay", "vong", "truot", "mui", "
 _POS = {"chac", "em", "gon", "nhanh", "dep", "thich", "ung", "sach", "vua", "ben", "nhe", "mem", "de", "tot", "kin"}
 _NEGATORS = {"khong", "chua", "chang", "it"}
 _MEASURE = re.compile(r"\d+([.,]\d+)?\s*(cm|mm|m|kg|g|gam|ml|l|lit|phut|giay|gio|ngay|lan|cai|do|%)\b", re.I)
+
+
+_CHI = re.compile(r"(?<!\w)chị(?!\w)", re.IGNORECASE)
+
+
+def to_mine(text: str) -> str:
+    """Lời chị tự kể («chị đo», «chị thấy») → giọng với khách: «mình đo», «mình thấy»."""
+    return _CHI.sub(lambda m: "Mình" if m.group(0)[0].isupper() else "mình", text)
 
 
 def _plain(s: str) -> str:
@@ -97,7 +108,7 @@ def classify_sentence(s: str) -> str:
 
 @ai.fake("selection.organize_note")
 def _fake_organize(inp: OrganizeNoteIn) -> OrganizeNoteOut:
-    points = [OrganizedPoint(kind=classify_sentence(s), text=s) for s in _sentences(inp.text)]  # type: ignore[arg-type]
+    points = [OrganizedPoint(kind=classify_sentence(s), text=to_mine(s)) for s in _sentences(inp.text)]  # type: ignore[arg-type]
     kinds = {p.kind for p in points if p.kind != "measure"}
     sentiment = (
         "neutral" if not kinds else "mixed" if len(kinds) == 2 else ("positive" if "good" in kinds else "negative")
@@ -153,7 +164,7 @@ ai.task(
 
 def _as_mine(text: str) -> str:
     """Giữ nguyên lời chị (hàm giả không viết lại để khỏi thêm ý)."""
-    t = text.strip().rstrip(".")
+    t = to_mine(text.strip().rstrip("."))
     return f"{t[:1].upper()}{t[1:]}." if t else t
 
 

@@ -53,6 +53,13 @@ BRIEFS = [
     ("nha", "Tìm đồ nhà tắm và góc đọc cho nhà nhỏ: khăn tắm cho bé, đèn kẹp đọc sách không pin, móc dán chịu lực"),
 ]
 
+# nguyên tắc chọn hàng của chị (c5)
+PRINCIPLES = [
+    ("must_not", "Không chọn hàng có pin hoặc sạc điện"),
+    ("avoid", "Nên tránh đồ nhựa mỏng, có mùi nhựa"),
+    ("prefer", "Ưu tiên inox 304 cho đồ tiếp xúc thực phẩm"),
+]
+
 # ứng viên: (khoá, đề, tên, tên gốc, nền tảng, giá, tiền tệ, gram, sao, số đánh giá, nhà cung cấp, cột đích)
 CANDIDATES = [
     ("p_binh", "binh", "Bình giữ nhiệt nắp bật 500 ml", "一键弹盖保温杯500ml", "1688", "42", "CNY", 260, "4.7", 812, "sup_inox", "selected"),
@@ -210,6 +217,8 @@ class Story:
 
         for key, data in SUPPLIERS:
             self.ids[key] = (await self.call("POST", f"{OWNER}/supply/suppliers", json=data))["id"]
+        for kind, text in PRINCIPLES:  # c5: săn hàng hạ hạng món trái nguyên tắc
+            await self.call("POST", f"{OWNER}/selection/principles", json={"kind": kind, "text": text})
         for key, text in BRIEFS:
             b = await self.call("POST", f"{OWNER}/sourcing/briefs", json={"text": text})
             self.ids[key] = b["id"]

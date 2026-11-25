@@ -131,18 +131,31 @@ async def _undo_import(ctx: control.UndoContext) -> None:
 async def _save_trends(ctx: control.ActionContext) -> control.HandlerResult:
     p = ctx.payload
     res = await service.save_trends(ctx.db, p["run_id"], p["detected_on"], p["signals"])
-    return control.HandlerResult(result=res, summary=f"{len(res['trend_ids'])} tín hiệu đáng xem.")
+    undo = {"created_ids": res.pop("created_ids"), "before": res.pop("before")}
+    return control.HandlerResult(result=res, undo=undo, summary=f"{len(res['trend_ids'])} tín hiệu đáng xem.")
+
+
+@control.undoer("sourcing.save_trends")
+async def _undo_trends(ctx: control.UndoContext) -> None:
+    await service.undo_trends(ctx.db, ctx.undo.get("created_ids", []), ctx.undo.get("before", {}))
 
 
 @control.handler("sourcing.record_demand")
 async def _record_demand(ctx: control.ActionContext) -> control.HandlerResult:
     res = await service.save_demand(ctx.db, ctx.payload)
+    undo = res.pop("undo")
     return control.HandlerResult(
         result=res,
+        undo=undo,
         summary=f"{ctx.payload['title']}: {res['ask_count']} người đã hỏi.",
         ref_type="demand_signals",
         ref_id=uuid.UUID(res["signal_id"]),
     )
+
+
+@control.undoer("sourcing.record_demand")
+async def _undo_demand(ctx: control.UndoContext) -> None:
+    await service.undo_demand(ctx.db, ctx.undo)
 
 
 @control.handler("sourcing.scheduled_alert")

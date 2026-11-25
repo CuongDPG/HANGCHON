@@ -37,7 +37,7 @@ from app.modules.assessment.schemas import (
 )
 from app.modules.sourcing.estimate import landed_total
 from app.modules.sourcing.models import Candidate, CandidateStage, SourcingBrief
-from app.modules.sourcing.router import candidate_cards
+from app.modules.sourcing.router import candidate_cards, rank_guidance
 from app.modules.sourcing.schemas import CandidateDetail, Offer
 
 router = APIRouter(prefix="/api/desk/assessment", tags=["assessment"])
@@ -69,6 +69,7 @@ async def _profile_page(db, c: Candidate) -> ProfilePage:
                 c.price_amount, c.price_currency, weight_grams=c.weight_grams, rates=rates
             ),
             "offers": [Offer.model_validate(o) for o in (c.raw or {}).get("offers", [])],
+            "guidance": rank_guidance(c),
         }
     )
     brief_ref = None
