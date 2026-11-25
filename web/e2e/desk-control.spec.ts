@@ -75,7 +75,9 @@ test("Hôm nay → sửa rồi duyệt, trả lại, đổi mức tự chủ, ho
   if (!(await undo.count())) await main(page).getByRole("button", { name: "Cũ hơn →" }).click();
   await expect(undo.first()).toBeVisible();
   {
-    await undo.first().click();
+    // hoàn tác việc cũ nhất trên trang (của dữ liệu mẫu), không đụng việc mới do bài chạy song song vừa tạo
+    // (vd. bài vòng đời: hoàn tác «lưu ứng viên» sẽ xoá ứng viên nó đang mở)
+    await undo.last().click();
     await page.getByRole("alertdialog").getByRole("button", { name: "Hoàn tác" }).click();
     await expect(page.getByText("Đã hoàn tác").first()).toBeVisible();
   }
