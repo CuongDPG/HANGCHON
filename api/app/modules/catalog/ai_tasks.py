@@ -1,4 +1,4 @@
-"""Tác vụ AI của catalog: viết trang sản phẩm (e1), lọc đánh giá (e8), lọc yêu cầu Nhờ chị tìm (e9).
+"""Tác vụ AI của catalog: viết trang sản phẩm (e1), lọc đánh giá (e8), lọc yêu cầu Nhờ tìm (e9).
 
 Hàm giả (`@ai.fake`) có ý nghĩa thật để test và chạy thử không cần khoá: viết trang chỉ từ dữ kiện đưa vào,
 lọc bằng danh sách từ thô tục / dấu hiệu quảng cáo."""
@@ -198,9 +198,7 @@ recommend = "hide" chỉ khi có spam, offensive hoặc personal_info. Viết `r
 Với find_request, `cleaned_title` là tiêu đề gọn (≤ 12 chữ) giữ nguyên ý khách, không thêm chi tiết."""
 
 ai.task("catalog.moderate_review", tier="fast", system=_MODERATE_SYSTEM, description="Lọc đánh giá của khách (e8)")
-ai.task(
-    "catalog.moderate_find_request", tier="fast", system=_MODERATE_SYSTEM, description="Lọc yêu cầu Nhờ chị tìm (e9)"
-)
+ai.task("catalog.moderate_find_request", tier="fast", system=_MODERATE_SYSTEM, description="Lọc yêu cầu Nhờ tìm (e9)")
 
 BAD_WORDS = {"dm", "dcm", "vcl", "vkl", "cmm", "dit", "deo", "fuck", "shit", "dmm"}
 BAD_PHRASES = ("ngu nhu", "oc cho", "cho chet", "do ngu")

@@ -333,7 +333,7 @@ async def edit_voice(body: VoicePatch, user: OwnerUser, db: DbSession) -> VoiceV
 
 @router.post("/voice/learn", response_model=VoiceLearnResult)
 async def learn_voice(body: VoiceLearnBody, user: OwnerUser, db: DbSession) -> VoiceLearnResult:
-    out = await voice.learn(db, body.samples, body.notes, user)
+    out = await voice.learn(db, body.samples, body.notes, user, spoken=body.spoken)
     vp = await facts.active_voice(db)
     await db.refresh(vp)  # type: ignore[arg-type]
     return VoiceLearnResult(status=out.status, voice=VoiceView.model_validate(voice.voice_view(vp)))  # type: ignore[arg-type]

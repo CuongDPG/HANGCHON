@@ -1,4 +1,4 @@
-"""e9 Nhờ chị tìm: gửi (chống spam), duyệt hiện, «mình cũng cần» một lượt mỗi thiết bị, ngưỡng, trạng thái công khai."""
+"""e9 Nhờ tìm: gửi (chống spam), duyệt hiện, «mình cũng cần» một lượt mỗi thiết bị, ngưỡng, trạng thái công khai."""
 
 from __future__ import annotations
 

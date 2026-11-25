@@ -261,6 +261,37 @@ export const DOC_LABELS: Record<DocumentKind, string> = {
   contract: "Hợp đồng",
   other: "Chứng từ khác",
 };
+/** Phần AI đọc từ chứng từ (d4). `status`: reading (đang đọc) · read · pending (chờ chị duyệt) · failed · unreadable · off. */
+export type DocExtract = {
+  status?: "reading" | "read" | "pending" | "failed" | "unreadable" | "off";
+  note?: string;
+  readable?: boolean;
+  edited?: boolean;
+  source?: "image" | "pdf_text";
+  product_name?: string | null;
+  product_name_vi?: string | null;
+  manufacturer?: string | null;
+  origin_country?: string | null;
+  lot_number?: string | null;
+  production_date?: string | null;
+  expiry_date?: string | null;
+  doc_number?: string | null;
+  doc_date?: string | null;
+  amount?: number | null;
+  currency?: string | null;
+  certifications?: string[];
+  summary?: string | null;
+};
+export type ExtractField = "product_name" | "product_name_vi" | "manufacturer" | "origin_country" | "lot_number" | "production_date" | "expiry_date";
+export const EXTRACT_LABELS: Record<ExtractField, string> = {
+  product_name: "Tên hàng trên chứng từ",
+  product_name_vi: "Tên hàng (tiếng Việt)",
+  manufacturer: "Nhà sản xuất",
+  origin_country: "Xuất xứ",
+  lot_number: "Số lô",
+  production_date: "Ngày sản xuất",
+  expiry_date: "Hạn dùng",
+};
 export type ProvenanceDoc = {
   id: string;
   kind: DocumentKind;
@@ -271,8 +302,17 @@ export type ProvenanceDoc = {
   size_bytes: number;
   doc_number: string | null;
   doc_date: string | null;
+  amount: string | null;
+  currency: string | null;
+  notes: string | null;
+  extracted: DocExtract;
   created_at: string;
   url: string | null;
+};
+export type DocPatch = {
+  doc_number?: string | null;
+  doc_date?: string | null;
+  extracted?: Partial<Record<ExtractField, string | null>> & { certifications?: string[]; summary?: string | null };
 };
 export type DocWarning = {
   purchase_order_id: string;
@@ -511,7 +551,25 @@ export function useUpdateInbound() {
 /* ---------- d4 ---------- */
 
 export function useDocuments(q: { purchase_order_id?: string; inbound_shipment_id?: string }) {
-  return useQuery({ queryKey: supplyKeys.docs(q), queryFn: () => api.get<ProvenanceDoc[]>(`${S}/documents`, { query: q }) });
+  return useQuery({
+    queryKey: supplyKeys.docs(q),
+    queryFn: () => api.get<ProvenanceDoc[]>(`${S}/documents`, { query: q }),
+    // AI đang đọc chứng từ (việc nền) → hỏi lại vài giây một lần cho tới khi xong
+    refetchInterval: (query) => (query.state.data?.some((d) => d.extracted?.status === "reading") ? 3000 : false),
+  });
+}
+
+export function useEditDocument() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: ({ id, ...body }: DocPatch & { id: string }) => api.patch<ProvenanceDoc>(`${S}/documents/${id}`, body),
+    onSuccess: invalidate,
+  });
+}
+
+export function useRereadDocument() {
+  const invalidate = useInvalidate();
+  return useMutation({ mutationFn: (id: string) => api.post<ProvenanceDoc>(`${S}/documents/${id}/read`), onSuccess: invalidate });
 }
 
 export function useDocWarnings() {

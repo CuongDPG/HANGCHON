@@ -218,7 +218,7 @@ class ReviewOut(ORM):
 
 
 class FindRequestOut(ORM):
-    """Trang Nhờ chị tìm (e9): khách gửi nhu cầu, người khác bấm «cùng cần»; đủ người thì mở tìm."""
+    """Trang Nhờ tìm (e9): khách gửi nhu cầu, người khác bấm «cùng cần»; đủ người thì mở tìm."""
 
     id: uuid.UUID
     public_slug: str
@@ -651,9 +651,19 @@ class SitemapEntry(BaseModel):
 # ---- đầu ra desk -------------------------------------------------------------------------------------------------
 
 
+class VoiceIssue(BaseModel):
+    """Chỗ trên trang còn gọi người bán là «chị» (khách đọc): đăng sẽ bị chặn tới khi sửa."""
+
+    path: str = Field(description="name | description | faq.0.q | specs.1.value ...")
+    field: str
+    quote: str
+    suggestion: str
+
+
 class DeskProduct(ProductOut):
     images: list[ImageSet] = Field(default_factory=list)
     candidate_title: str | None = None
+    voice_issues: list[VoiceIssue] = Field(default_factory=list)
 
 
 class DeskProductRow(BaseModel):

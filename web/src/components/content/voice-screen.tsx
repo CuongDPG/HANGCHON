@@ -1,14 +1,15 @@
 "use client";
 
-import { Plus, Sparkles, Trash2 } from "lucide-react";
+import { Mic, Plus, Sparkles, Square, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Button, Card, EmptyState, IconButton, Input, PageHeader, SectionLabel, SkeletonList, Textarea, notifySuccess } from "@/components/ui";
 import { useSession } from "@/lib/api/auth";
 import { useEditVoice, useLearnVoice, useVoice, type Voice, type VoicePatch } from "@/lib/api/content";
 import { formatDateTime } from "@/lib/format";
 import { ContentNav } from "./shared";
+import { useSpeech } from "./use-speech";
 
-/** Giọng của chị (f2): dán bài cũ / ghi chú → AI rút hồ sơ giọng; chị xem và sửa. */
+/** Giọng của chị (f2): dán bài cũ, nói vài câu (giọng nói → chữ), ghi chú → AI rút hồ sơ giọng; chị xem và sửa. */
 export function VoiceScreen() {
   const { data, isPending, error } = useVoice();
   const { user: session } = useSession();
@@ -165,7 +166,12 @@ function LearnCard() {
   const learn = useLearnVoice();
   const [samples, setSamples] = useState("");
   const [notes, setNotes] = useState("");
+  const [spoken, setSpoken] = useState("");
+  const speech = useSpeech((t) => {
+    if (t) setSpoken((cur) => (cur.trim() ? `${cur.trim()} ${t}` : t));
+  });
   const parts = samples.split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean);
+  const said = spoken.trim();
   return (
     <Card tone="soft" className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
@@ -180,18 +186,41 @@ function LearnCard() {
         hint={`Mỗi bài cách nhau một dòng trống · ${parts.length} bài`}
         placeholder={"Cả nhà ơi, mình mới thử…\n\nMình dùng hộp cơm này…"}
       />
+      {speech.supported ? (
+        <div className="flex flex-col gap-2">
+          <Textarea
+            label="Lời chị nói"
+            rows={3}
+            value={speech.interim ? `${spoken}${spoken ? " " : ""}${speech.interim}` : spoken}
+            onChange={(e) => setSpoken(e.target.value)}
+            readOnly={speech.listening}
+            error={speech.error ?? undefined}
+            hint="Bấm «Nói», kể về một món như đang nói với khách. Chữ chép ra sửa được trước khi học."
+            placeholder="Vd: cả nhà ơi, mình mới thử cái hộp cơm này…"
+          />
+          {speech.listening ? (
+            <Button size="sm" variant="danger" className="self-start" icon={<Square className="size-3.5" aria-hidden />} onClick={speech.stop}>
+              Đang nghe… bấm để dừng
+            </Button>
+          ) : (
+            <Button size="sm" variant="secondary" className="self-start" icon={<Mic className="size-4" aria-hidden />} onClick={speech.start}>
+              Nói
+            </Button>
+          )}
+        </div>
+      ) : null}
       <Textarea label="Ghi chú của chị (không bắt buộc)" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Vd: không dùng chữ «siêu phẩm», hay kết bằng câu hỏi" />
       <Button
         loading={learn.isPending}
-        disabled={!parts.length && !notes.trim()}
+        disabled={(!parts.length && !notes.trim() && !said) || speech.listening}
         onClick={() =>
           learn.mutate(
-            { samples: parts, notes: notes.trim() || undefined },
-            { onSuccess: (r) => { notifySuccess(r.status === "applied" ? "AI đã cập nhật hồ sơ giọng" : "Đang chờ chị duyệt"); setSamples(""); setNotes(""); } },
+            { samples: parts, notes: notes.trim() || undefined, spoken: said ? [said] : [] },
+            { onSuccess: (r) => { notifySuccess(r.status === "applied" ? "AI đã cập nhật hồ sơ giọng" : "Đang chờ chị duyệt"); setSamples(""); setNotes(""); setSpoken(""); } },
           )
         }
       >
-        Học giọng từ các bài này
+        Học giọng
       </Button>
       <p className="text-[12.5px] text-ink-2">Lần học nào cũng hoàn tác được ở Nhật ký AI.</p>
     </Card>

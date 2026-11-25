@@ -450,6 +450,30 @@ class DocumentView(ProvenanceDocumentOut):
     url: str | None
 
 
+class ExtractedPatch(BaseModel):
+    """Chị sửa phần AI đọc từ chứng từ (d4)."""
+
+    product_name: str | None = Field(default=None, max_length=300)
+    product_name_vi: str | None = Field(default=None, max_length=300)
+    manufacturer: str | None = Field(default=None, max_length=300)
+    origin_country: str | None = Field(default=None, max_length=60)
+    lot_number: str | None = Field(default=None, max_length=100)
+    production_date: str | None = Field(default=None, max_length=30)
+    expiry_date: str | None = Field(default=None, max_length=30)
+    certifications: list[str] | None = Field(default=None, max_length=20)
+    summary: str | None = Field(default=None, max_length=500)
+
+
+class DocumentPatch(BaseModel):
+    kind: DocumentKind | None = None
+    doc_number: str | None = Field(default=None, max_length=100)
+    doc_date: date | None = None
+    amount: Decimal | None = Field(default=None, ge=0)
+    currency: str | None = Field(default=None, min_length=3, max_length=3)
+    notes: str | None = Field(default=None, max_length=2000)
+    extracted: ExtractedPatch | None = None
+
+
 class DocumentWarning(BaseModel):
     purchase_order_id: uuid.UUID
     po_code: str

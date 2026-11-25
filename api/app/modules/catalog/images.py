@@ -1,6 +1,7 @@
 """Xử lý ảnh sản phẩm (e6) bằng Pillow — chỉ chỉnh ảnh thật chị chụp, không tạo ảnh giả.
 
-Các bước: xoay theo EXIF → cân sáng nhẹ → cắt vuông giữ chủ thể ở giữa → các cỡ 1600/800/400 dạng webp + jpg.
+Các bước: xoay theo EXIF → cân sáng nhẹ → làm sạch nền (chỉ khi nền sáng, đều màu; tắt được) → cắt vuông giữ chủ thể ở
+giữa → các cỡ 1600/800/400 dạng webp + jpg.
 Bản xử lý không mang EXIF (bỏ toạ độ GPS trong ảnh gốc). Ảnh gốc lưu ở `private/`, bản xử lý ở `public/`.
 """
 
@@ -11,7 +12,17 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFont, ImageOps, ImageStat, UnidentifiedImageError
+from PIL import (
+    Image,
+    ImageChops,
+    ImageDraw,
+    ImageEnhance,
+    ImageFilter,
+    ImageFont,
+    ImageOps,
+    ImageStat,
+    UnidentifiedImageError,
+)
 
 from app.core.errors import BadRequest
 from app.core.storage import get_storage, new_key
@@ -100,6 +111,44 @@ def subject_box(img: Image.Image) -> tuple[int, int, int, int] | None:
     return (int(box[0] * sx), int(box[1] * sy), int(box[2] * sx), int(box[3] * sy))
 
 
+def clean_background(img: Image.Image) -> tuple[Image.Image, dict[str, Any] | None]:
+    """Làm sạch nền đơn giản (e6): nền sáng gần trắng hoặc xám nhạt, đều màu → đưa về trắng. Chỉ làm trắng vùng nền
+    LIỀN với mép ảnh và gần màu nền (loang từ mép), nên không đụng vào món hàng ở giữa; không tách vật thể bằng AI,
+    không vẽ thêm gì. Nền không đủ đơn giản (tối, có màu, lốm đốm) hoặc tách không chắc → giữ nguyên, trả None."""
+    small = img.copy()
+    small.thumbnail((240, 240))
+    w, h = small.size
+    if w < 16 or h < 16:
+        return img, None
+    px = small.load()
+    border = [px[x, y] for x in range(w) for y in (0, 1, h - 2, h - 1)]
+    border += [px[x, y] for y in range(2, h - 2) for x in (0, 1, w - 2, w - 1)]
+    bg = tuple(sorted(c[i] for c in border)[len(border) // 2] for i in range(3))
+    lum = 0.299 * bg[0] + 0.587 * bg[1] + 0.114 * bg[2]
+    if lum < 175 or max(bg) - min(bg) > 24:  # nền tối hoặc có màu: không phải nền trắng/xám
+        return img, None
+    if lum >= 250 and max(bg) - min(bg) <= 3:  # đã trắng sẵn
+        return img, None
+    near = sum(max(abs(c[i] - bg[i]) for i in range(3)) <= 22 for c in border)
+    if near < 0.85 * len(border):  # mép ảnh lốm đốm (bàn gỗ, vải hoa...): không đủ đơn giản
+        return img, None
+    diff = ImageChops.difference(small, Image.new("RGB", small.size, bg)).convert("L")
+    flood = diff.point(lambda v: 255 if v <= 26 else 0)  # 255 = gần màu nền
+    fpx = flood.load()
+    seeds = [(x, 0) for x in range(0, w, 4)] + [(x, h - 1) for x in range(0, w, 4)]
+    seeds += [(0, y) for y in range(0, h, 4)] + [(w - 1, y) for y in range(0, h, 4)]
+    for x, y in seeds:  # loang từ mép: chỉ lấy nền liền với mép ảnh
+        if fpx[x, y] == 255:
+            ImageDraw.floodfill(flood, (x, y), 128)
+    mask_small = flood.point(lambda v: 255 if v == 128 else 0)
+    share = mask_small.histogram()[255] / (w * h)
+    if share < 0.25 or share > 0.95:  # nền quá ít (ảnh cận) hoặc gần như cả ảnh (không thấy món): không chắc
+        return img, None
+    mask = mask_small.resize(img.size, Image.Resampling.BILINEAR).filter(ImageFilter.GaussianBlur(2))
+    out = Image.composite(Image.new("RGB", img.size, (255, 255, 255)), img, mask)
+    return out, {"op": "clean_background", "background": list(bg), "share": round(share, 3)}
+
+
 def square_crop(img: Image.Image, *, follow_subject: bool = True) -> tuple[Image.Image, dict[str, Any]]:
     w, h = img.size
     side = min(w, h)
@@ -113,8 +162,9 @@ def square_crop(img: Image.Image, *, follow_subject: bool = True) -> tuple[Image
     return img.crop(crop), {"op": "crop", "box": list(crop), "subject": list(box) if box else None}
 
 
-def process_photo(data: bytes, *, enhance: bool = True) -> ProcessedImage:
-    """`enhance=False` = chỉ xoay đúng chiều + cắt vuông chính giữa + đổi cỡ (dùng khi chị hoàn tác phần chỉnh)."""
+def process_photo(data: bytes, *, enhance: bool = True, clean_bg: bool = True) -> ProcessedImage:
+    """`enhance=False` = chỉ xoay đúng chiều + cắt vuông chính giữa + đổi cỡ (dùng khi chị hoàn tác phần chỉnh).
+    `clean_bg=False` = không làm sạch nền (chị tắt ở cài đặt)."""
     src = open_image(data)
     ops: list[dict[str, Any]] = []
     orientation = src.getexif().get(0x0112, 1)
@@ -125,6 +175,10 @@ def process_photo(data: bytes, *, enhance: bool = True) -> ProcessedImage:
     if enhance:
         img, light_ops = balance_light(img)
         ops += light_ops
+        if clean_bg:
+            img, bg_op = clean_background(img)
+            if bg_op:
+                ops.append(bg_op)
     img, crop_op = square_crop(img, follow_subject=enhance)
     ops.append(crop_op)
     side = img.width

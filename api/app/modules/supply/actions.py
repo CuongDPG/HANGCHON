@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import control
+from app.core.errors import NotFound
 from app.modules.supply import service
 from app.modules.supply.models import (
     InboundShipment,
@@ -16,6 +17,7 @@ from app.modules.supply.models import (
     PriceProposal,
     ProposalStatus,
     PurchaseOrder,
+    Supplier,
     SupplierMessage,
     SupplierMessageStatus,
 )
@@ -50,6 +52,38 @@ control.register_action(
     GROUP,
     default="auto",
     description="AI dịch câu trả lời và ghi lại giá, số lượng tối thiểu, thời gian chuẩn bị hàng.",
+)
+
+control.register_action(
+    service.ACTION_RECALC,
+    "Tính lại giá vốn khi tỷ giá, cước đổi",
+    GROUP,
+    default="auto",
+    description="Mỗi sáng và khi chị đổi tham số, AI tính lại giá vốn về tay. Đổi từ 2% trở lên thì ghi nhật ký; "
+    "hoàn tác = khôi phục số cũ.",
+)
+control.register_action(
+    service.ACTION_TRACK,
+    "Cập nhật mốc lô hàng về từ hãng vận chuyển",
+    GROUP,
+    default="auto",
+    description="AI tự dò vận đơn mỗi 30 phút, có mốc mới thì ghi vào lô. Chỉ ghi nhật ký khi có mốc mới.",
+)
+control.register_action(
+    service.ACTION_TRUST,
+    "Đổi bậc uy tín nhà cung cấp",
+    GROUP,
+    default="auto",
+    description="Điểm uy tín tính từ lịch sử đúng hẹn và hàng lỗi. Ghi nhật ký khi nhà cung cấp đổi bậc "
+    "(Tin được / Tạm ổn / Cần dè chừng).",
+)
+control.register_action(
+    service.ACTION_READ_DOC,
+    "Đọc chứng từ nguồn gốc",
+    GROUP,
+    default="auto",
+    description="AI đọc ảnh hoặc PDF hoá đơn, tờ khai, nhãn gốc: tên hàng, nhà sản xuất, xuất xứ, số lô, ngày, "
+    "chứng nhận. Chị sửa được; hoàn tác = xoá phần AI đọc.",
 )
 
 control.register_setting(
@@ -120,6 +154,49 @@ async def _read_reply(ctx: control.ActionContext) -> control.HandlerResult:
         result={"message_id": str(msg.id)}, summary=(msg.extracted or {}).get("summary") or "Đã dịch tin",
         ref_type="supplier_messages", ref_id=msg.id,
     )  # fmt: skip
+
+
+@control.handler(service.ACTION_RECALC)
+async def _recalc(ctx: control.ActionContext) -> control.HandlerResult:
+    return await service.apply_recalc(ctx.db, ctx.payload)
+
+
+@control.undoer(service.ACTION_RECALC)
+async def _undo_recalc(ctx: control.UndoContext) -> None:
+    await service.undo_recalc(ctx.db, ctx.undo)
+
+
+@control.handler(service.ACTION_TRACK)
+async def _track(ctx: control.ActionContext) -> control.HandlerResult:
+    return await service.apply_track_action(ctx.db, ctx.payload)
+
+
+@control.undoer(service.ACTION_TRACK)
+async def _undo_track(ctx: control.UndoContext) -> None:
+    await service.undo_track_action(ctx.db, ctx.undo)
+
+
+@control.handler(service.ACTION_TRUST)
+async def _trust(ctx: control.ActionContext) -> control.HandlerResult:
+    s = await ctx.db.get(Supplier, uuid.UUID(ctx.payload["supplier_id"]))
+    if s is None:
+        raise NotFound("Không tìm thấy nhà cung cấp.")
+    s.trust_score = ctx.payload["trust_score"]
+    label, basis = service.trust_label(s)
+    return control.HandlerResult(
+        result={"supplier_id": str(s.id), "trust_score": s.trust_score}, summary=f"{s.name}: {label} ({basis})",
+        ref_type="suppliers", ref_id=s.id,
+    )  # fmt: skip
+
+
+@control.handler(service.ACTION_READ_DOC)
+async def _read_doc(ctx: control.ActionContext) -> control.HandlerResult:
+    return await service.apply_document_read(ctx.db, ctx.payload)
+
+
+@control.undoer(service.ACTION_READ_DOC)
+async def _undo_read_doc(ctx: control.UndoContext) -> None:
+    await service.undo_document_read(ctx.db, ctx.undo)
 
 
 @control.stat_provider("supply.overview", order=50)

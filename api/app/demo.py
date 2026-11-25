@@ -533,6 +533,17 @@ class Story:
             for lot in po["inbound"]:
                 for stt in ("seller_shipped", "at_agent_warehouse", "international_transit"):
                     await self.call("POST", f"{OWNER}/supply/inbound/{lot['id']}/milestones", json={"status": stt})
+            if pid == pos[0]:  # chứng từ nguồn gốc (d4): chị chụp nhãn gốc, AI đọc các trường chính
+                from app.modules.catalog.images import sample_photo
+
+                label = sample_photo("Nhãn gốc (ví dụ)", (214, 210, 196), size=900, note="Ảnh mẫu chứng từ")
+                await self.call(
+                    "POST",
+                    f"{OWNER}/supply/documents",
+                    data={"kind": "original_label", "purchase_order_id": str(pid)},
+                    files={"file": ("nhan-goc.jpg", label, "image/jpeg")},
+                )
+                self.bump("documents")
 
     async def finish_inbound(self, drop_key: str) -> None:
         for pid in filter(None, self.ids.get(f"po_{drop_key}", "").split(",")):

@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from typing import Any
 
 from sqlalchemy import select
 
 from app.core.errors import AppError
-from app.core.jobs import cron
+from app.core.jobs import cron, job
 from app.modules.supply import service
-from app.modules.supply.models import InboundShipment, InboundStatus
+from app.modules.supply.models import InboundShipment, InboundStatus, ProvenanceDocument
 
 log = logging.getLogger("app.supply")
 
@@ -29,7 +30,7 @@ async def poll_inbound(ctx: dict[str, Any]) -> int:
         ).scalars()
         for s in ships:
             try:
-                added += await service.sync_tracking(db, s)
+                added += await service.sync_tracking(db, s, log=True)
             except AppError as e:
                 log.info("Lô %s chưa tra được: %s", s.id, e.message)
         await db.commit()
@@ -43,3 +44,15 @@ async def recalc_cost_sheets(ctx: dict[str, Any]) -> int:
         n = await service.recalc_all(db)
         await db.commit()
     return n
+
+
+@job("supply.read_document")
+async def read_document(ctx: dict[str, Any], document_id: str) -> str | None:
+    """AI đọc chứng từ vừa tải lên (d4). Lỗi AI đã được bắt trong service: không lặp lại vô hạn."""
+    async with ctx["db"]() as db:
+        doc = await db.get(ProvenanceDocument, uuid.UUID(document_id))
+        if doc is None:
+            return None
+        await service.read_document(db, doc)
+        await db.commit()
+        return str((doc.extracted or {}).get("status"))
