@@ -131,6 +131,7 @@ export type StudioDetail = {
   compose_pending: boolean;
   /** Trạng thái trang sản phẩm trên website (chỉ với `kind: "product"`). */
   page_status?: string | null;
+  candidate_id?: string | null;
 };
 
 export type PostCard = {

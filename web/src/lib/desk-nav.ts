@@ -33,7 +33,7 @@ export type DeskNavItem = {
   features: string[];
 };
 
-/** 5 mục điều hướng dưới (điện thoại) / nhóm đầu ở cột trái (máy tính). */
+/** 6 mục điều hướng chính theo đường đi của món hàng: Hôm nay → Săn hàng → Bàn chọn → Sản phẩm → Nội dung → Khách. */
 export const DESK_PRIMARY_NAV: DeskNavItem[] = [
   {
     key: "today",
@@ -58,6 +58,14 @@ export const DESK_PRIMARY_NAV: DeskNavItem[] = [
     description: "Ứng viên, mua mẫu, đang thử, đã chọn, đã loại — kèm ghi chú thử hàng.",
     icon: Stamp,
     features: ["c1", "c2", "c3", "c4", "c5", "c6"],
+  },
+  {
+    key: "products",
+    href: "/desk/san-pham",
+    label: "Sản phẩm",
+    description: "Món đã chọn đang bán (tự tạo khi đóng dấu «Đã chọn»): giá, tồn kho, cách bán, đợt mua chung, đánh giá.",
+    icon: LayoutGrid,
+    features: ["e1", "e2", "e3", "e6", "e8", "e9", "e10", "g8"],
   },
   {
     key: "content",
@@ -134,14 +142,6 @@ export const DESK_MORE_NAV: DeskNavItem[] = [
     description: "Sổ doanh thu, chi phí, bảng kê khai thuế, hoá đơn điện tử.",
     icon: BookOpenText,
     features: ["k1", "k5"],
-  },
-  {
-    key: "products",
-    href: "/desk/san-pham",
-    label: "Sản phẩm",
-    description: "Trang sản phẩm trên website, đợt mở bán, tồn kho nhỏ, đánh giá.",
-    icon: LayoutGrid,
-    features: ["e1", "e2", "e3", "e6", "e8", "e9", "e10", "g8"],
   },
   {
     key: "settings",

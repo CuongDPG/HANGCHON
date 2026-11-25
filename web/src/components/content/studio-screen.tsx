@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarClock, Clapperboard, ExternalLink, PenLine, RefreshCw, Send, Sparkles } from "lucide-react";
+import { CalendarClock, Clapperboard, ExternalLink, Globe, PenLine, RefreshCw, Send, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
@@ -26,7 +26,7 @@ import {
   useConfirm,
 } from "@/components/ui";
 import { useSession } from "@/lib/api/auth";
-import { PRODUCT_STATUS_LABELS, type ProductStatus } from "@/lib/api/catalog";
+import { PageContentEditor } from "@/components/catalog/desk/page-content-editor";
 import {
   useApproveDraft,
   useCompose,
@@ -35,6 +35,7 @@ import {
   useRewriteDraft,
   useStudioDetail,
   type CheckFinding,
+  type ContentChannel,
   type Draft,
   type RewritePreset,
   type Scene,
@@ -45,14 +46,20 @@ import { cn } from "@/lib/cn";
 import { CheckChips, ChannelMark, CHANNEL_LABEL, draftDisplay, isDone, localFile, MicButton, StatusBadge, toLocalInput, useSpeech } from "./shared";
 import { RelatedLinks } from "@/components/desk/related-links";
 
-const ORDER = ["facebook", "instagram", "threads", "tiktok", "zalo_oa"];
+const ORDER: ContentChannel[] = ["facebook", "instagram", "threads", "tiktok", "zalo_oa"];
+const WEBSITE = "website";
 
 export function StudioScreen({ kind, id }: { kind: "product" | "drop"; id: string }) {
   const { data, isPending, error } = useStudioDetail(kind, id);
   const [tab, setTab] = useState<string>("");
   const drafts = useMemo(() => [...(data?.drafts ?? [])].sort((a, b) => ORDER.indexOf(a.channel) - ORDER.indexOf(b.channel)), [data]);
-  const current = drafts.find((d) => d.channel === tab) ?? drafts[0];
   const done = drafts.filter(isDone).length;
+  const isProduct = kind === "product";
+  // sản phẩm: Website là kênh đầu tiên (trang chính thức), rồi tới từng mạng xã hội — tab luôn đủ kênh
+  const channels: string[] = isProduct ? [WEBSITE, ...ORDER] : drafts.map((d) => d.channel);
+  const active = channels.includes(tab) ? tab : (channels[0] ?? "");
+  const current = drafts.find((d) => d.channel === active);
+  const live = data?.page_status === "published";
 
   return (
     <div className="flex flex-col gap-4">
@@ -60,56 +67,60 @@ export function StudioScreen({ kind, id }: { kind: "product" | "drop"; id: strin
         backHref="/desk/noi-dung"
         eyebrow={kind === "drop" ? "ĐỢT MỞ BÁN" : "XƯỞNG NỘI DUNG"}
         title={data?.name ?? "Xưởng nội dung"}
-        actions={data && drafts.length ? <Badge tone={done === drafts.length ? "success" : "neutral"}>{done}/{drafts.length} đã duyệt</Badge> : null}
+        actions={data && drafts.length ? <Badge tone={done === drafts.length ? "success" : "neutral"}>{done}/{drafts.length} bài đã duyệt</Badge> : null}
       />
-      <RelatedLinks links={[kind === "drop" ? { href: `/desk/san-pham/dot/${id}`, label: "Đợt mở bán" } : { href: `/desk/san-pham/${id}`, label: "Sản phẩm" }]} />
-      {kind === "product" && data ? <WebsiteCard detail={data} /> : null}
+      <RelatedLinks
+        links={
+          kind === "drop"
+            ? [{ href: `/desk/san-pham/dot/${id}`, label: "Đợt mở bán" }]
+            : [
+                data?.candidate_id && { href: `/desk/ban-chon/${data.candidate_id}`, label: "Hồ sơ chọn (Bàn chọn)" },
+                { href: `/desk/san-pham/${id}`, label: "Giá và cách bán (Sản phẩm)" },
+              ]
+        }
+      />
       {isPending ? (
         <SkeletonList rows={4} />
       ) : error ? (
         <EmptyState tone="error" title="Chưa tải được" description={error.message} />
-      ) : !data ? null : drafts.length === 0 ? (
+      ) : !data ? null : !isProduct && drafts.length === 0 ? (
         <ComposeEmpty detail={data} />
       ) : (
         <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_320px] md:items-start">
           <div className="flex min-w-0 flex-col gap-4">
             <Tabs
               aria-label="Kênh"
-              value={current?.channel ?? ""}
+              value={active}
               onChange={setTab}
-              items={drafts.map((d) => ({ value: d.channel, label: `${d.channel_label}${isDone(d) ? " ✓" : ""}` }))}
+              items={channels.map((ch) => {
+                if (ch === WEBSITE) return { value: ch, label: `Website${live ? " ✓" : ""}` };
+                const d = drafts.find((x) => x.channel === ch);
+                return { value: ch, label: `${d?.channel_label ?? CHANNEL_LABEL[ch as ContentChannel] ?? ch}${d && isDone(d) ? " ✓" : ""}` };
+              })}
             />
-            {current ? <DraftPanel key={current.id} draft={current} detail={data} /> : null}
+            {active === WEBSITE ? (
+              <PageContentEditor productId={id} />
+            ) : current ? (
+              <DraftPanel key={current.id} draft={current} detail={data} />
+            ) : live || !isProduct ? (
+              <ComposeEmpty detail={data} />
+            ) : (
+              <EmptyState
+                icon={<Globe />}
+                title="Đăng trang website trước, AI sẽ soạn bài các kênh từ trang đó"
+                description="Bài Facebook, Instagram, Threads, TikTok và Zalo đều dẫn khách về trang sản phẩm, nên AI chỉ soạn khi trang đã lên website."
+                action={
+                  <Button variant="secondary" onClick={() => setTab(WEBSITE)}>
+                    Mở tab Website
+                  </Button>
+                }
+              />
+            )}
           </div>
           <ProfileCard detail={data} />
         </div>
       )}
     </div>
-  );
-}
-
-/** Website là kênh chính thức cạnh Facebook/Instagram/Zalo: trang do AI viết ở mục Sản phẩm (`catalog.write_product_page`). */
-function WebsiteCard({ detail }: { detail: StudioDetail }) {
-  const status = (detail.page_status ?? "draft") as ProductStatus;
-  const live = status === "published";
-  return (
-    <Card className="flex flex-wrap items-center gap-x-4 gap-y-2">
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="font-semibold">Website · trang sản phẩm (kênh chính thức)</span>
-        <span className="text-[13px] text-ink-2">AI viết trang từ hồ sơ món ở mục Sản phẩm; chị sửa lời rồi duyệt thì trang lên web.</span>
-      </div>
-      <Badge tone={live ? "success" : "neutral"}>{live ? "Đã đăng" : (PRODUCT_STATUS_LABELS[status] ?? "Nháp")}</Badge>
-      <div className="flex flex-wrap gap-2">
-        <ButtonLink href={`/desk/san-pham/${detail.id}`} variant="secondary" size="sm" icon={<PenLine className="size-4" aria-hidden />}>
-          Sửa trang sản phẩm
-        </ButtonLink>
-        {live ? (
-          <a href={detail.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 self-center text-[13px] text-accent">
-            Xem trang đang đăng <ExternalLink className="size-3.5" aria-hidden />
-          </a>
-        ) : null}
-      </div>
-    </Card>
   );
 }
 
@@ -155,11 +166,14 @@ function ProfileCard({ detail }: { detail: StudioDetail }) {
           {detail.not_satisfied}
         </p>
       ) : null}
-      <div className="flex flex-wrap gap-2">
-        <a href={detail.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[13px] text-accent">
-          Xem trên web <ExternalLink className="size-3.5" aria-hidden />
-        </a>
-      </div>
+      {detail.kind === "drop" || detail.page_status === "published" ? (
+        <div className="flex flex-wrap gap-2">
+          <a href={detail.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[13px] text-accent">
+            Xem trên web <ExternalLink className="size-3.5" aria-hidden />
+          </a>
+        </div>
+      ) : null}
+      {detail.drafts.length ? (
       <Button
         variant="ghost"
         size="sm"
@@ -176,6 +190,7 @@ function ProfileCard({ detail }: { detail: StudioDetail }) {
       >
         Soạn lại tất cả
       </Button>
+      ) : null}
     </Card>
   );
 }

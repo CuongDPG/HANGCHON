@@ -160,6 +160,7 @@ class BoardCard(BaseModel):
     decision_id: uuid.UUID | None
     decision_summary: str | None
     draft_status: DraftStatus | None
+    product_id: uuid.UUID | None = None
 
 
 class BoardOut(BaseModel):
@@ -182,6 +183,14 @@ class DecisionView(SelectionDecisionOut):
     rejection_groups: list[dict[str, str]]
 
 
+class ChosenPeer(BaseModel):
+    """Món đã chọn cùng đề với món bị loại (để xem hồ sơ chọn đặt hai món cạnh nhau)."""
+
+    candidate_id: uuid.UUID
+    title: str
+    product_id: uuid.UUID | None
+
+
 class CandidateDetail(BaseModel):
     card: BoardCard
     title_original: str | None
@@ -196,6 +205,7 @@ class CandidateDetail(BaseModel):
     notes: list[TrialNoteView]
     decision: DecisionView | None
     history: list[DecisionView]
+    chosen_peers: list[ChosenPeer] = []
 
 
 class NoteUpdate(BaseModel):

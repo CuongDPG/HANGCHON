@@ -55,7 +55,8 @@ test("chứng từ: AI đọc, chị sửa; trang sản phẩm: chặn chữ «c
   }
 
   const products = await (await page.request.get("/api/desk/catalog/products?size=1")).json();
-  await page.goto(`/desk/san-pham/${products.items[0].id}`);
+  // lời trên trang website sửa ở Nội dung → tab Website
+  await page.goto(`/desk/noi-dung/san-pham/${products.items[0].id}`);
   await page.getByLabel("Câu hỏi").first().fill("Chị đã dùng thử bao lâu?");
   const warn = page.getByLabel("Xưng hô với khách");
   await expect(warn.getByText("Mình đã dùng thử bao lâu?")).toBeVisible();

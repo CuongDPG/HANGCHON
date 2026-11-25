@@ -3,8 +3,8 @@ import { DESK_NAV, DESK_PRIMARY_NAV, findDeskNav } from "./desk-nav";
 import { isStoreNavActive } from "./store-nav";
 
 describe("bản đồ route bàn làm việc", () => {
-  it("có đúng 5 mục điều hướng chính", () => {
-    expect(DESK_PRIMARY_NAV.map((i) => i.label)).toEqual(["Hôm nay", "Săn hàng", "Bàn chọn", "Nội dung", "Khách"]);
+  it("có đúng 6 mục điều hướng chính, theo đường đi của món hàng", () => {
+    expect(DESK_PRIMARY_NAV.map((i) => i.label)).toEqual(["Hôm nay", "Săn hàng", "Bàn chọn", "Sản phẩm", "Nội dung", "Khách"]);
   });
 
   it("khoá và đường dẫn không trùng", () => {

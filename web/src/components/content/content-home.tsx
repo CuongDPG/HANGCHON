@@ -4,6 +4,7 @@ import { CalendarDays, ChevronRight, Megaphone, PenLine } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Badge, ButtonLink, Chip, ChipRow, EmptyState, ImageBox, PageHeader, SectionLabel, SkeletonList } from "@/components/ui";
+import { PRODUCT_STATUS_LABELS, type ProductStatus } from "@/lib/api/catalog";
 import { useCalendar, useStudio, type StudioItem } from "@/lib/api/content";
 import { formatTime } from "@/lib/format";
 import { ContentNav, localFile, StatusBadge } from "./shared";
@@ -14,15 +15,16 @@ export function ContentHome() {
   const { data, isPending, error } = useStudio();
   const [filter, setFilter] = useState<Filter>("todo");
   const items = useMemo(() => data?.items ?? [], [data]);
-  const todo = items.filter((i) => i.pending > 0 || i.drafting > 0 || i.total === 0);
-  const done = items.filter((i) => i.total > 0 && i.approved === i.total);
+  // còn việc: bài chờ duyệt / đang soạn, hoặc chưa có bài, hoặc trang website chưa đăng
+  const todo = items.filter((i) => i.pending > 0 || i.drafting > 0 || i.total === 0 || (i.kind === "product" && i.status !== "published"));
+  const done = items.filter((i) => i.total > 0 && i.approved === i.total && (i.kind === "drop" || i.status === "published"));
   const shown = filter === "todo" ? todo : filter === "done" ? done : items;
 
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
         title="Nội dung"
-        description="Một món, mỗi kênh một bản. AI soạn và soát, chị duyệt rồi mới đăng."
+        description="Món đã chọn ở Bàn chọn về đây: trang website trước, rồi mỗi mạng xã hội một bài. AI soạn và soát, chị duyệt rồi mới đăng."
         actions={<ButtonLink href="/desk/noi-dung/lich" variant="secondary" size="sm" icon={<CalendarDays className="size-4" aria-hidden />}>Lịch</ButtonLink>}
       />
       <ContentNav />
@@ -47,11 +49,11 @@ export function ContentHome() {
         ) : shown.length === 0 ? (
           <EmptyState
             icon={<Megaphone />}
-            title={items.length ? "Không còn bài nào chờ chị" : "Chưa có món nào lên web"}
+            title={items.length ? "Không còn bài nào chờ chị" : "Chưa có món nào được chọn"}
             description={
               items.length
                 ? "Mọi bản đã duyệt. Bài mới sẽ hiện ở đây khi có món lên web hoặc đợt mới mở."
-                : "Khi một món được đưa lên web, AI tự soạn bài cho Facebook, Instagram, Threads, TikTok và Zalo."
+                : "Khi chị đóng dấu «Đã chọn» ở Bàn chọn, món về đây: AI viết trang website, chị đăng, rồi AI soạn bài cho Facebook, Instagram, Threads, TikTok và Zalo."
             }
           />
         ) : (
@@ -71,6 +73,7 @@ export function ContentHome() {
 
 function StudioRow({ item }: { item: StudioItem }) {
   const href = `/desk/noi-dung/${item.kind === "drop" ? "dot" : "san-pham"}/${item.id}`;
+  const webLive = item.status === "published";
   return (
     <Link
       href={href}
@@ -89,7 +92,12 @@ function StudioRow({ item }: { item: StudioItem }) {
         <p className="truncate text-[15px] font-semibold">{item.name}</p>
         <p className="truncate text-[13px] text-ink-2">{item.subtitle ?? (item.kind === "drop" ? "Đợt mở bán" : "Sản phẩm")}</p>
         <div className="mt-1.5 flex flex-wrap gap-1.5">
-          {item.drafting > 0 ? (
+          {item.kind === "product" ? (
+            <Badge tone={webLive ? "success" : "warning"}>
+              Website: {webLive ? "đã đăng" : (PRODUCT_STATUS_LABELS[item.status as ProductStatus] ?? item.status).toLowerCase()}
+            </Badge>
+          ) : null}
+          {item.kind === "product" && !webLive && item.total === 0 ? null : item.drafting > 0 ? (
             <Badge tone="accent" icon={<PenLine />}>
               AI đang soạn
             </Badge>

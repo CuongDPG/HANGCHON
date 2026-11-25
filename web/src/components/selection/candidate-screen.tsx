@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, ExternalLink, PackageOpen, Stamp, Undo2, X } from "lucide-react";
+import { ArrowRight, ExternalLink, Megaphone, PackageOpen, Stamp, Undo2, X } from "lucide-react";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import {
@@ -24,7 +24,9 @@ import {
   useConfirm,
 } from "@/components/ui";
 import type { DataListItem } from "@/components/ui";
-import { PLATFORM_LABELS, STAGE_LABELS, useCandidate, useMoveStage, useUpdateRejection, type Decision, type Stage } from "@/lib/api/selection";
+import { useFromCandidate } from "@/lib/api/catalog";
+import { PLATFORM_LABELS, STAGE_LABELS, useCandidate, useMoveStage, useUpdateRejection, type ChosenPeer, type Decision, type Stage } from "@/lib/api/selection";
+import { SelectionDossier } from "@/components/catalog/desk/selection-dossier";
 import { NoteComposer } from "./note-composer";
 import { NoteItem } from "./note-item";
 import { ReasonsCard } from "./reasons-card";
@@ -56,6 +58,7 @@ export function CandidateScreen({ id }: { id: string }) {
   }
 
   const { card } = data;
+  const productId = card.product_id ?? data.decision?.product_id ?? null;
 
   async function go(to: Stage) {
     if (to === "rejected") {
@@ -100,7 +103,13 @@ export function CandidateScreen({ id }: { id: string }) {
         eyebrow={`${STAGE_LABELS[card.stage].toUpperCase()} · ${PLATFORM_LABELS[card.source_platform] ?? card.source_platform}`}
         backHref={`/desk/ban-chon?tab=${card.stage}`}
       />
-      <RelatedLinks links={[{ href: `/desk/san-hang/ung-vien/${card.id}`, label: "Hồ sơ thẩm định" }, { href: `/desk/nguon-cung/gia-von/${card.id}`, label: "Giá vốn" }]} />
+      <RelatedLinks
+        links={[
+          { href: `/desk/san-hang/ung-vien/${card.id}`, label: "Hồ sơ thẩm định" },
+          { href: `/desk/nguon-cung/gia-von/${card.id}`, label: "Giá vốn" },
+          card.stage === "selected" && productId && { href: `/desk/san-pham/${productId}`, label: "Giá và cách bán (Sản phẩm)" },
+        ]}
+      />
 
       <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
         <div className="flex gap-3 md:flex-col">
@@ -137,8 +146,16 @@ export function CandidateScreen({ id }: { id: string }) {
         </div>
       </div>
 
+      {card.stage === "selected" ? <ContentNext candidateId={id} productId={productId} /> : null}
       {data.decision?.decision === "selected" ? <ReasonsCard decision={data.decision} /> : null}
+      {card.stage === "selected" && productId ? (
+        <section className="flex flex-col gap-3" aria-label="Hồ sơ chọn">
+          <SectionLabel aside={<span className="text-[13px] text-ink-3">vì sao chọn, vì sao loại</span>}>Hồ sơ chọn</SectionLabel>
+          <SelectionDossier productId={productId} />
+        </section>
+      ) : null}
       {data.decision?.decision === "rejected" ? <RejectionCard decision={data.decision} /> : null}
+      {card.stage === "rejected" ? <ChosenInstead peers={data.chosen_peers ?? []} /> : null}
 
       <section className="flex flex-col gap-3">
         <SectionLabel aside={<LevelTag level="owner" size="sm" />}>Ghi chú thử · {data.notes.length}</SectionLabel>
@@ -221,11 +238,69 @@ function RejectionCard({ decision }: { decision: Decision }) {
         ))}
       </div>
       <Switch
-        label="Hiện ở trang Hồ sơ chọn"
-        description="Khách thấy món này đã bị loại và vì sao."
+        label="Đặt cạnh món được chọn trong Hồ sơ chọn"
+        description="Hồ sơ chọn của món cùng đề hiện món này (không kèm thương hiệu) cùng vì sao chị loại. Chỉ ở bàn làm việc, không ra website."
         checked={decision.show_on_profile}
         onChange={(v) => update.mutate({ id: decision.id, show_on_profile: v })}
       />
     </Card>
+  );
+}
+
+/** Món đã chọn → bước tiếp: làm nội dung cho mọi kênh bán (Website trước, rồi mạng xã hội). */
+function ContentNext({ candidateId, productId }: { candidateId: string; productId: string | null }) {
+  const create = useFromCandidate();
+  return (
+    <Card tone="accent" className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+      <div className="min-w-0 flex-1">
+        <p className="text-[15px] font-semibold">Bước tiếp: làm nội dung các kênh</p>
+        <p className="text-[13.5px] text-ink-2">
+          {productId
+            ? "Trang website trước (AI đã viết nháp từ hồ sơ này), chị đăng rồi AI soạn bài Facebook, Instagram, Threads, TikTok, Zalo."
+            : "Chưa có sản phẩm nháp cho món này nên chưa làm nội dung được. Thường hệ thống tạo ngay khi đóng dấu; chị tạo tay ở đây."}
+        </p>
+      </div>
+      {productId ? (
+        <ButtonLink href={`/desk/noi-dung/san-pham/${productId}`} icon={<Megaphone className="size-4" aria-hidden />} className="self-start sm:self-center">
+          Làm nội dung các kênh
+        </ButtonLink>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          <Button disabled icon={<Megaphone className="size-4" aria-hidden />}>
+            Làm nội dung các kênh
+          </Button>
+          <Button variant="secondary" loading={create.isPending} onClick={() => create.mutate(candidateId, { onSuccess: () => notifySuccess("Đã tạo sản phẩm nháp") })}>
+            Tạo sản phẩm nháp
+          </Button>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/** Món bị loại: món đã chọn cùng đề (nếu có) — hồ sơ chọn của món đó đặt các món đã loại cạnh nó. */
+function ChosenInstead({ peers }: { peers: ChosenPeer[] }) {
+  if (!peers.length) return null;
+  return (
+    <section className="flex flex-col gap-2" aria-label="Món được chọn thay">
+      <SectionLabel>Cùng đề, chị đã chọn</SectionLabel>
+      <ul className="flex flex-col gap-2">
+        {peers.map((p) => (
+          <li key={p.candidate_id}>
+            <Link
+              href={`/desk/ban-chon/${p.candidate_id}`}
+              className="flex items-center gap-3 rounded-md border border-line bg-surface p-3 transition-colors hover:border-line-strong"
+            >
+              <Seal size={40} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[15px] font-semibold">{p.title}</span>
+                <span className="block text-[13px] text-ink-2">Xem hồ sơ chọn: món này đặt cạnh các món đã loại, kèm lý do</span>
+              </span>
+              <ArrowRight className="size-4 shrink-0 text-ink-3" aria-hidden />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

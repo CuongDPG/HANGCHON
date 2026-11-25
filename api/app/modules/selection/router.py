@@ -384,9 +384,7 @@ async def get_candidate(candidate_id: uuid.UUID, _: CurrentUser, db: DbSession) 
     current = history[0] if history and c.stage.value in (Decision.SELECTED, Decision.REJECTED) else None
     if current is not None and current.decision == Decision.SELECTED and current.product_id is None:
         # sản phẩm nháp do catalog tạo khi nghe candidate.selected → ghi lại vào quyết định (bảng của selection)
-        from app.modules.catalog.models import Product  # chỉ đọc
-
-        current.product_id = await db.scalar(select(Product.id).where(Product.candidate_id == c.id))
+        current.product_id = card.product_id
     return {
         "card": card,
         "title_original": c.title_original,
@@ -401,6 +399,7 @@ async def get_candidate(candidate_id: uuid.UUID, _: CurrentUser, db: DbSession) 
         "notes": [note_view(n) for n in await service.list_notes(db, c.id)],
         "decision": decision_view(current) if current else None,
         "history": [decision_view(d) for d in history],
+        "chosen_peers": await service.chosen_peers(db, c) if current and current.decision == Decision.REJECTED else [],
     }
 
 

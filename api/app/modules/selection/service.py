@@ -25,7 +25,7 @@ from app.core import events
 from app.core.errors import BadRequest, Conflict, NotFound
 from app.core.storage import get_storage
 from app.core.timeutil import now_utc
-from app.modules.catalog.models import Category
+from app.modules.catalog.models import Category, Product
 from app.modules.control.models import ApprovalItem, User
 from app.modules.selection.ai_tasks import (
     DraftNote,
@@ -213,6 +213,7 @@ async def build_cards(db: AsyncSession, cands: list[Candidate]) -> list[dict[str
         ):
             costs[cid] = int(landed)
     seals = await seal_counts(db, {c.brief_id for c in cands if c.brief_id})
+    products = await product_ids_for(db, [c.id for c in cands if c.stage == CandidateStage.SELECTED])
     cards = []
     for c in cands:
         d = decisions.get(c.id) if c.stage in (CandidateStage.SELECTED, CandidateStage.REJECTED) else None
@@ -241,9 +242,44 @@ async def build_cards(db: AsyncSession, cands: list[Candidate]) -> list[dict[str
                 "decision_id": d.id if d else None,
                 "decision_summary": decision_summary(d),
                 "draft_status": d.draft_status if d else None,
+                "product_id": products.get(c.id) if c.stage == CandidateStage.SELECTED else None,
             }
         )
     return cards
+
+
+async def product_ids_for(db: AsyncSession, candidate_ids: list[uuid.UUID]) -> dict[uuid.UUID, uuid.UUID]:
+    """Sản phẩm nháp catalog tạo khi món được chọn (đọc bảng catalog) → link «Làm nội dung các kênh»."""
+    if not candidate_ids:
+        return {}
+    rows = await db.execute(
+        select(Product.candidate_id, Product.id)
+        .where(Product.candidate_id.in_(candidate_ids))
+        .order_by(Product.candidate_id, Product.created_at)
+    )
+    out: dict[uuid.UUID, uuid.UUID] = {}
+    for cid, pid in rows:
+        out.setdefault(cid, pid)
+    return out
+
+
+async def chosen_peers(db: AsyncSession, c: Candidate) -> list[dict[str, Any]]:
+    """Món đã chọn cùng đề săn hàng với món bị loại: hồ sơ chọn của món đó đặt các món đã loại cạnh nó."""
+    if c.brief_id is None:
+        return []
+    peers = list(
+        (
+            await db.execute(
+                select(Candidate)
+                .where(
+                    Candidate.brief_id == c.brief_id, Candidate.id != c.id, Candidate.stage == CandidateStage.SELECTED
+                )
+                .order_by(Candidate.stage_changed_at.desc().nulls_last())
+            )
+        ).scalars()
+    )
+    products = await product_ids_for(db, [p.id for p in peers])
+    return [{"candidate_id": p.id, "title": p.title_vi, "product_id": products.get(p.id)} for p in peers]
 
 
 async def board(db: AsyncSession, q: str | None = None) -> dict[str, Any]:

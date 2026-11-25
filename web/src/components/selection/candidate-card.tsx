@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageSquareText } from "lucide-react";
+import { Megaphone, MessageSquareText } from "lucide-react";
 import Link from "next/link";
 import type { DragEvent } from "react";
 import { Badge, ImageBox, Money, ProgressBar, Seal } from "@/components/ui";
@@ -109,6 +109,20 @@ export function CandidateCard({
           </span>
         </p>
       ) : null}
+    </Link>
+  );
+}
+
+/** Món đã chọn: lối tắt sang xưởng nội dung (Website trước, rồi các kênh). Đặt ngay dưới thẻ — thẻ đã là một link. */
+export function ContentQuickLink({ card, compact = false }: { card: BoardCard; compact?: boolean }) {
+  if (card.stage !== "selected" || !card.product_id) return null;
+  return (
+    <Link
+      href={`/desk/noi-dung/san-pham/${card.product_id}`}
+      className={cn("inline-flex items-center gap-1.5 font-semibold text-accent hover:underline", compact ? "px-1 text-[13px]" : "px-1 text-[14px]")}
+    >
+      <Megaphone className="size-3.5" aria-hidden />
+      Làm nội dung các kênh →
     </Link>
   );
 }

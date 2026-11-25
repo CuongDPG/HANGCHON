@@ -32,7 +32,7 @@ hoặc mở tay trên máy dev với dữ liệu mẫu `uv run python -m app.see
 | c1 | Bảng chọn | chạy thật (5 cột, kéo thả trên máy tính, tab trên điện thoại) | `/desk/ban-chon` |
 | c2 | Nhật ký thử hàng bằng giọng nói | chạy thật phần ghi/ảnh/ghi âm; chép lời bằng Web Speech; AI sắp ý bằng AI giả | `/desk/ban-chon/[id]` |
 | c3 | Lý do chọn và điều chưa ưng | chạy với AI giả; chị sửa lời rồi chốt chạy thật | `/desk/ban-chon/[id]` |
-| c4 | Lý do loại | chạy thật (lý do loại chỉ hiện ở hồ sơ chọn trong desk, không ra website — chốt 25/11) | `/desk/ban-chon/[id]`, `/desk/san-pham/[id]` (mục «Hồ sơ chọn») |
+| c4 | Lý do loại | chạy thật (lý do loại chỉ hiện ở hồ sơ chọn trong desk, không ra website — chốt 25/11); món loại cùng đề với món đã chọn có link sang hồ sơ chọn của món đó (thiếu đề thì chỉ hiện lý do loại) | `/desk/ban-chon/[id]` |
 | c5 | Bộ nguyên tắc của chị | chạy thật; nguyên tắc «không chọn» khớp chữ → trừ 30 điểm, gắn cờ «Trái nguyên tắc», xếp cuối (không xoá); «nên tránh» trừ 10 | `/desk/ban-chon/nguyen-tac` |
 | c6 | AI học gu chị | chạy với AI giả phần học gu; gu đã học cộng/trừ điểm xếp hạng ứng viên (tối đa ±15), hiện lý do «Điểm AI 70 → 40» ở dòng ứng viên và hồ sơ | `/desk/ban-chon/gu` |
 | d1 | Sổ nhà cung cấp | chạy thật; đổi bậc uy tín NCC thì ghi nhật ký AI | `/desk/nguon-cung`, `/desk/nguon-cung/ncc/[id]` |
@@ -42,8 +42,8 @@ hoặc mở tay trên máy dev với dữ liệu mẫu `uv run python -m app.see
 | d5 | Đặt mẫu, đặt lô | chạy thật (luôn chờ chị); gửi cho NCC là chị tự gửi tin AI soạn | `/desk/nguon-cung/don/[id]` |
 | d6 | Nhắn hỏi nhà cung cấp | chạy với AI giả (soạn/dịch); chưa gửi tự động qua WeChat/1688 | `/desk/nguon-cung/ncc/[id]` |
 | d7 | Theo dõi lô hàng về | chạy thật (mốc nhập tay); tự dò qua `shipping` mock, có mốc mới thì ghi nhật ký AI | `/desk/nguon-cung/lo/[id]` |
-| e1 | Tự dựng trang sản phẩm | chạy với AI giả (viết trang ở worker); chị duyệt, đăng chạy thật | `/desk/san-pham/[id]` |
-| e2 | Con dấu và hồ sơ chọn | chạy thật — website chỉ hiện con dấu + lý do chọn; hồ sơ chọn đầy đủ (dải số, món đã loại) chuyển vào desk 25/11, link cũ `/san-pham/[slug]/ho-so-chon` chuyển hẳn (308) về trang sản phẩm | `/san-pham/[slug]`, `/desk/san-pham/[id]` |
+| e1 | Tự dựng trang sản phẩm | chạy với AI giả (viết trang ở worker); chị sửa lời, AI viết lại, đăng lên website ở tab «Website» của xưởng nội dung (chạy thật, 25/11); giá và cách bán ở `/desk/san-pham/[id]`, thiếu giá thì nút đăng chỉ sang đó | `/desk/noi-dung/san-pham/[id]` (tab Website), `/desk/san-pham/[id]` |
+| e2 | Con dấu và hồ sơ chọn | chạy thật — website chỉ hiện con dấu + lý do chọn; hồ sơ chọn đầy đủ (dải số, món đã loại) chỉ ở desk, trên trang chi tiết món đã chọn ở Bàn chọn (25/11), kèm nút «Làm nội dung các kênh»; link cũ `/san-pham/[slug]/ho-so-chon` chuyển hẳn (308) về trang sản phẩm | `/san-pham/[slug]`, `/desk/ban-chon/[id]` |
 | e3 | Mở bán theo đợt | chạy thật (hẹn giờ, hết hạn/hết suất tự đóng, chốt sớm từ màn Đơn hàng) | `/dot`, `/dot/[slug]`, `/desk/san-pham/dot` |
 | e4 | Đặt hàng một trang | chạy thật (COD); chuyển khoản VietQR chạy với mock, cần tài khoản SePay | `/gio-hang`, `/dat-hang` |
 | e5 | Theo dõi đơn | chạy thật | `/don`, `/don/[code]` |
@@ -52,7 +52,7 @@ hoặc mở tay trên máy dev với dữ liệu mẫu `uv run python -m app.see
 | e8 | Đánh giá có ảnh của khách | chạy thật phần xin/gửi/duyệt (link «Viết đánh giá» trên trang theo dõi đơn); lọc bằng AI giả; tin xin đánh giá gửi qua `notify` mock | `/danh-gia/[token]`, `/desk/san-pham/danh-gia` |
 | e9 | Trang Nhờ tìm | chạy thật (AI gợi ý, chị duyệt mới hiện; đủ người thì AI đề xuất mở đề, chị duyệt — mức thận trọng đã chốt 25/11) | `/nho-tim`, `/desk/san-pham/nho-tim` |
 | e10 | Để AI đọc được | chạy thật (JSON-LD Product/Offer, sitemap, `/feed.xml`) | trang sản phẩm |
-| f1 | Một sản phẩm, nhiều bản | chạy với AI giả | `/desk/noi-dung/san-pham/[id]`, `/desk/noi-dung/dot/[id]` |
+| f1 | Một sản phẩm, nhiều bản | chạy với AI giả — xưởng có mọi món đã chọn (cả món chưa lên website); tab đầu là Website, bài Facebook/Instagram/Threads/TikTok/Zalo AI soạn khi trang website được đăng (sự kiện `product.published`), trước đó tab các kênh báo «Đăng trang website trước» | `/desk/noi-dung/san-pham/[id]`, `/desk/noi-dung/dot/[id]` |
 | f2 | Giọng của chị | chạy với AI giả; học từ bài dán, ghi chú và **giọng nói** (nút «Nói», Web Speech vi-VN) | `/desk/noi-dung/giong` |
 | f3 | Lịch đăng | chạy thật (xếp, đổi giờ, huỷ); AI xếp tuần bằng AI giả | `/desk/noi-dung/lich` |
 | f4 | Đăng tự động | chạy với mock, cần ứng dụng Meta (Facebook/Instagram/Threads), Zalo OA, TikTok (đẩy nháp) | `/desk/noi-dung/lich` |

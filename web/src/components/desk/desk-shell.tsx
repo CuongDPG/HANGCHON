@@ -105,15 +105,16 @@ export function DeskShellFallback() {
 
 function DeskTabBar({ activeKey, onMore }: { activeKey?: string; onMore: () => void }) {
   const moreActive = DESK_MORE_NAV.some((i) => i.key === activeKey);
-  const cell = "relative flex h-full w-full flex-col items-center justify-center gap-1 text-[11px] leading-none transition-colors";
+  const cell = "relative flex h-full w-full flex-col items-center justify-center gap-1 px-0.5 text-[11px] leading-none transition-colors";
   return (
     <nav aria-label="Điều hướng" className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface pb-safe md:hidden">
-      <ul className="grid h-tabbar grid-cols-6">
+      {/* 6 mục chính + «Thêm» ở 390px: ô co theo độ dài chữ (flex-auto) thay vì chia đều, để «Sản phẩm», «Nội dung» không chạm nhau */}
+      <ul className="flex h-tabbar">
         {DESK_PRIMARY_NAV.map((item) => {
           const on = item.key === activeKey;
           const Icon = item.icon;
           return (
-            <li key={item.key}>
+            <li key={item.key} className="min-w-0 flex-auto">
               <Link href={item.href} aria-current={on ? "page" : undefined} className={cn(cell, on ? "font-semibold text-accent" : "text-ink-2")}>
                 {on ? <span aria-hidden className="absolute inset-x-3 top-0 h-0.5 bg-accent" /> : null}
                 <Icon className="size-[22px]" strokeWidth={on ? 2.2 : 1.8} aria-hidden />
@@ -122,7 +123,7 @@ function DeskTabBar({ activeKey, onMore }: { activeKey?: string; onMore: () => v
             </li>
           );
         })}
-        <li>
+        <li className="min-w-0 flex-auto">
           <button type="button" onClick={onMore} aria-haspopup="dialog" className={cn(cell, moreActive ? "font-semibold text-accent" : "text-ink-2")}>
             {moreActive ? <span aria-hidden className="absolute inset-x-3 top-0 h-0.5 bg-accent" /> : null}
             <MoreHorizontal className="size-[22px]" strokeWidth={moreActive ? 2.2 : 1.8} aria-hidden />

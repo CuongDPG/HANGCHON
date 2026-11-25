@@ -19,7 +19,7 @@ import type { ThemePreference } from "@/lib/theme";
  * Các khu hiện thẳng trên hàng: TOP_KEYS (theo thứ tự trong desk-nav). Mọi khu khác desk-nav khai báo → menu «Thêm».
  * Hàng hẹp không đủ chỗ thì các mục cuối tự dồn vào «Thêm» (đo bề rộng thật, không xuống dòng, không cuộn ngang).
  */
-const TOP_KEYS = ["today", "sourcing", "selection", "content", "customers", "orders", "approvals"];
+const TOP_KEYS = ["today", "sourcing", "selection", "products", "content", "customers", "orders", "approvals"];
 const TOP_NAV = DESK_NAV.filter((i) => TOP_KEYS.includes(i.key));
 const MORE_NAV = DESK_NAV.filter((i) => !TOP_KEYS.includes(i.key));
 

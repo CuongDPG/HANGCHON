@@ -150,7 +150,7 @@ tính từ số ứng viên cùng `sourcing_brief`.
   Chữ: Be Vietnam Pro (thân), Bricolage Grotesque (tiêu đề). Góc 4px. Con dấu «ĐÃ CHỌN n/m» là dấu hiệu nhận diện.
 - Không dùng `alert/confirm/prompt` của trình duyệt: dùng `useConfirm()` và `notifySuccess/notifyError` trong `components/ui`.
 - Store: Server Components, dữ liệu sản phẩm có cấu trúc (schema.org `Product`/`Offer`), không cần tài khoản để mua.
-- Desk: 5 mục điều hướng dưới (Hôm nay · Săn hàng · Bàn chọn · Nội dung · Khách) + mục «Thêm»; client gọi API
+- Desk: 6 mục điều hướng chính (Hôm nay · Săn hàng · Bàn chọn · Sản phẩm · Nội dung · Khách) + mục «Thêm»; client gọi API
   qua `web/src/lib/api/<module>.ts`; trạng thái máy chủ dùng TanStack Query.
 - Mỗi module giữ file riêng: trang trong `web/src/app/desk/<khu>/**` hoặc `web/src/app/(store)/**`,
   API client trong `web/src/lib/api/<module>.ts`, component riêng trong `web/src/components/<module>/**`.

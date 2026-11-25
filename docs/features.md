@@ -65,8 +65,8 @@ Nơi khách đọc kỹ, đặt hàng và theo dõi đơn.
 
 | Mã | Chức năng | Mức | GĐ | Mô tả |
 |---|---|---|---|---|
-| e1 | Tự dựng trang sản phẩm | AI làm, chị duyệt | 1 | Từ hồ sơ đã chọn, AI viết tên, mô tả, thông số, phần hỏi đáp. Chị duyệt rồi đăng. |
-| e2 | Con dấu và hồ sơ chọn | AI tự làm | 1 | Website hiện con dấu tỉ lệ chọn, thời gian thử, lý do chọn, điều chưa ưng. Quá trình chọn (dải số sàng lọc, các món đã loại kèm lý do) là dữ liệu nội bộ, chỉ xem ở desk. |
+| e1 | Tự dựng trang sản phẩm | AI làm, chị duyệt | 1 | Từ hồ sơ đã chọn, AI viết tên, mô tả, thông số, phần hỏi đáp. Chị sửa và đăng ở tab Website của xưởng nội dung (website là kênh đầu tiên). |
+| e2 | Con dấu và hồ sơ chọn | AI tự làm | 1 | Website hiện con dấu tỉ lệ chọn, thời gian thử, lý do chọn, điều chưa ưng. Quá trình chọn (dải số sàng lọc, các món đã loại kèm lý do) là dữ liệu nội bộ, chỉ xem ở desk, trên trang món đó ở Bàn chọn. |
 | e3 | Mở bán theo đợt | AI làm, chị duyệt | 1 | Đợt gom đơn có hạn chót, số suất, ngày hàng về dự kiến. |
 | e4 | Đặt hàng một trang | AI tự làm | 1 | Không cần tạo tài khoản. Chuyển khoản bằng mã QR tự xác nhận, hoặc trả tiền khi nhận. |
 | e5 | Theo dõi đơn | AI tự làm | 1 | Khách xem hành trình đơn bằng số điện thoại và mã đơn. |
@@ -78,7 +78,7 @@ Nơi khách đọc kỹ, đặt hàng và theo dõi đơn.
 
 ## Xưởng nội dung và đăng bài
 
-Từ một hồ sơ chọn ra bài cho mọi kênh.
+Món «Đã chọn» ở Bàn chọn chuyển sang đây để làm nội dung cho mọi kênh bán: trang website trước (kênh chính thức), rồi Facebook, Instagram, Threads, TikTok, Zalo.
 
 | Mã | Chức năng | Mức | GĐ | Mô tả |
 |---|---|---|---|---|

@@ -233,6 +233,30 @@ async def test_return_draft_redrafts_and_change_mind_cancels(owner_client: httpx
         assert left is None
 
 
+async def test_selected_links_to_product_and_rejected_points_to_chosen(owner_client: httpx.AsyncClient) -> None:
+    """Đã chọn → sản phẩm nháp (lối sang Nội dung); món loại cùng đề → biết món nào được chọn thay."""
+    brief = await make_brief()
+    a = await make_candidate("Bình giữ nhiệt nắp bật", stage=CandidateStage.TRIAL, brief_id=brief.id)
+    b = await make_candidate("Bình giữ nhiệt nắp vặn", stage=CandidateStage.TRIAL, brief_id=brief.id)
+    lone = await make_candidate("Hộp cơm không đề", stage=CandidateStage.TRIAL)
+    assert (await _stage(owner_client, a.id, "selected")).status_code == 200
+    await _stage(owner_client, b.id, "rejected", reason="Nắp vặn khó mở khi tay ướt")
+    await _stage(owner_client, lone.id, "rejected", reason="Ám mùi nhựa")
+
+    board = (await owner_client.get(f"{B}/board")).json()
+    card = next(x for x in board["columns"]["selected"] if x["id"] == str(a.id))
+    assert card["product_id"]
+    assert all(x["product_id"] is None for x in board["columns"]["rejected"])
+
+    da = (await owner_client.get(f"{B}/candidates/{a.id}")).json()
+    assert da["decision"]["product_id"] == card["product_id"] and da["chosen_peers"] == []
+    db_ = (await owner_client.get(f"{B}/candidates/{b.id}")).json()
+    assert db_["chosen_peers"] == [
+        {"candidate_id": str(a.id), "title": "Bình giữ nhiệt nắp bật", "product_id": card["product_id"]}
+    ]
+    assert (await owner_client.get(f"{B}/candidates/{lone.id}")).json()["chosen_peers"] == []
+
+
 # ---- c5 ------------------------------------------------------------------------------------------------------------
 
 

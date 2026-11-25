@@ -41,6 +41,8 @@ export type BoardCard = {
   decision_id: string | null;
   decision_summary: string | null;
   draft_status: DraftStatus | null;
+  /** Sản phẩm nháp tạo khi món được chọn (chỉ có ở cột «Đã chọn»). */
+  product_id: string | null;
 };
 
 export type Board = { trial_days: number; counts: Record<Stage, number>; columns: Record<Stage, BoardCard[]> };
@@ -79,7 +81,11 @@ export type Decision = {
   rejection_tags: string[];
   rejection_groups: { key: string; label: string }[];
   show_on_profile: boolean;
+  product_id: string | null;
 };
+
+/** Món đã chọn cùng đề săn hàng với món bị loại. */
+export type ChosenPeer = { candidate_id: string; title: string; product_id: string | null };
 
 export type CandidateDetail = {
   card: BoardCard;
@@ -95,6 +101,7 @@ export type CandidateDetail = {
   notes: TrialNote[];
   decision: Decision | null;
   history: Decision[];
+  chosen_peers: ChosenPeer[];
 };
 
 export type StageChange = { to: Stage; reason?: string; reason_tags?: string[]; position?: number };

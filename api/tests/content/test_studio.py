@@ -102,6 +102,20 @@ async def test_studio_list_and_detail(product_factory, owner_client):
     assert row["total"] == 5 and row["approved"] == 0 and row["pending"] == 5
 
 
+async def test_studio_list_includes_selected_products_before_website(product_factory, owner_client):
+    """Món vừa chọn (trang website còn nháp) đã có ở xưởng: Website là kênh đầu tiên; món lưu trữ thì không."""
+    from app.modules.catalog.models import ProductStatus
+
+    draft = await product_factory(name="Khay đá silicon", status=ProductStatus.PENDING_REVIEW)
+    gone = await product_factory(name="Món đã lưu trữ", status=ProductStatus.ARCHIVED)
+    items = (await owner_client.get("/api/desk/content/studio")).json()["items"]
+    row = next(i for i in items if i["id"] == str(draft.id))
+    assert row["status"] == "pending_review" and row["total"] == 0
+    assert all(i["id"] != str(gone.id) for i in items)
+    detail = (await owner_client.get(f"/api/desk/content/studio/product/{draft.id}")).json()
+    assert detail["page_status"] == "pending_review" and detail["drafts"] == []
+
+
 async def test_approve_schedules_through_queue(product_factory, owner_client):
     p = await product_factory()
     detail = (await owner_client.post(f"/api/desk/content/studio/product/{p.id}/compose", json={})).json()

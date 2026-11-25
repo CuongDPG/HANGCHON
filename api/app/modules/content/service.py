@@ -872,7 +872,8 @@ def draft_counts(drafts: list[ContentDraft]) -> dict[str, int]:
 
 
 async def studio_items(db: AsyncSession) -> list[dict[str, Any]]:
-    """Danh sách cho màn hình xưởng: sản phẩm đã lên web / có bản nháp, đợt đang mở / có bản nháp."""
+    """Danh sách cho màn hình xưởng: mọi sản phẩm chưa lưu trữ (kể cả món vừa chọn, trang website còn chờ đăng —
+    Website là kênh đầu tiên) hoặc có bản nháp, đợt đang mở / có bản nháp."""
     has_draft = select(ContentDraft.product_id).where(
         ContentDraft.drop_id.is_(None), ContentDraft.product_id.is_not(None)
     )
@@ -880,7 +881,7 @@ async def studio_items(db: AsyncSession) -> list[dict[str, Any]]:
         (
             await db.execute(
                 select(Product)
-                .where(or_(Product.status == ProductStatus.PUBLISHED, Product.id.in_(has_draft)))
+                .where(or_(Product.status != ProductStatus.ARCHIVED, Product.id.in_(has_draft)))
                 .order_by(Product.published_at.desc().nulls_last(), Product.created_at.desc())
                 .limit(100)
             )

@@ -6,7 +6,7 @@ import { expect, test, type APIRequestContext, type Page } from "@playwright/tes
  * thì giả lập qua API/driver mock. Mỗi bước kiểm dữ liệu thật trên màn hình hoặc API.
  *
  * ra đề → quét → thẩm định → mua mẫu (đơn mẫu chờ duyệt, chị duyệt) → đang thử, ghi chú → Đã chọn, chị chốt lời →
- * sản phẩm nháp → giá vốn, chị duyệt giá → đăng lên kệ → bài các kênh, chị duyệt, tới giờ đăng → mở đợt → khách thấy
+ * sản phẩm nháp → giá vốn, chị duyệt giá → hồ sơ chọn ở Bàn chọn → «Làm nội dung các kênh» → Website, đăng → bài các kênh, chị duyệt, tới giờ đăng → mở đợt → khách thấy
  * con dấu, lý do chọn → giỏ, đặt, chuyển khoản → đã trả, sổ doanh thu → khách nhắn, chị gửi → chốt đợt sớm → đơn đặt
  * nguồn, chị duyệt → lô về → tạo vận đơn → giao xong → khách đánh giá, chị cho hiện → Hôm nay, nhật ký AI, báo cáo.
  */
@@ -118,17 +118,30 @@ test("một món hàng từ đề tìm tới đánh giá của khách", async ({
   await approveInQueue(page, proposal.approval_item_id, `Giá bán ${title}`);
   await expect.poll(async () => (await api<{ price_vnd: number }>(page.request, "get", `/api/desk/catalog/products/${productId}`)).price_vnd).toBeGreaterThan(0);
 
-  // ---- e1: AI viết trang (worker) → chị đăng lên kệ → content soạn bài các kênh (f1) ----------------------------
+  // ---- e1/e2: AI viết trang (worker); hồ sơ chọn ở Bàn chọn → «Làm nội dung các kênh» → Website → đăng ----------
   await expect.poll(async () => (await api<{ status: string }>(page.request, "get", `/api/desk/catalog/products/${productId}`)).status, { timeout: 45_000 }).toBe("pending_review");
-  await page.goto(`/desk/san-pham/${productId}`);
-  await page.getByRole("button", { name: "Đăng lên kệ" }).click();
-  await expect(page.getByText("Đã đăng lên kệ")).toBeVisible();
-  const product = await api<{ slug: string; name: string; price_vnd: number }>(page.request, "get", `/api/desk/catalog/products/${productId}`);
+  await page.goto(`/desk/ban-chon/${candId}`);
+  await expect(main.getByText("Mẫu A (đã chọn)", { exact: false })).toBeVisible();
+  await expect(main.getByText("đã xem", { exact: true })).toBeVisible();
+  await main.getByRole("link", { name: "Làm nội dung các kênh" }).click();
+  await expect(page).toHaveURL(new RegExp(`/desk/noi-dung/san-pham/${productId}`));
+  await expect(main.getByRole("tab", { name: "Website", selected: true })).toBeVisible();
+  // chưa đăng website → các kênh mạng xã hội chờ trang
+  await main.getByRole("tab", { name: "Facebook" }).click();
+  await expect(main.getByText("Đăng trang website trước, AI sẽ soạn bài các kênh từ trang đó")).toBeVisible();
+  await main.getByRole("tab", { name: "Website" }).click();
+  await main.getByRole("button", { name: "Đăng lên website" }).click();
+  await expect(page.getByText(/Đã đăng lên website/)).toBeVisible();
+  await expect(main.getByRole("tab", { name: "Website ✓" })).toBeVisible();
+  const product = await api<{ slug: string; name: string; price_vnd: number; status: string }>(page.request, "get", `/api/desk/catalog/products/${productId}`);
+  expect(product.status).toBe("published");
+  // trang lên website thật
+  const live = await page.request.get(`/san-pham/${product.slug}`);
+  expect(live.status()).toBe(200);
 
   // ---- f1/f5/f3/f4: bài Facebook đã soát lời → chị duyệt, xếp lịch → đăng (driver giả) ---------------------------
-  await page.goto(`/desk/noi-dung/san-pham/${productId}`);
-  await expect(main.getByRole("tab", { name: /Facebook/ })).toBeVisible({ timeout: 45_000 });
   await main.getByRole("tab", { name: /Facebook/ }).click();
+  await expect(main.getByRole("button", { name: "Duyệt, xếp lịch" })).toBeVisible({ timeout: 45_000 });
   await main.getByRole("button", { name: "Duyệt, xếp lịch" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Duyệt, xếp lịch" }).click();
   await expect(main.getByRole("tab", { name: "Facebook ✓" })).toBeVisible();
@@ -148,10 +161,10 @@ test("một món hàng từ đề tìm tới đánh giá của khách", async ({
   await page.getByRole("button", { name: "Mở đợt" }).click();
   await expect(page.getByText("Đã mở đợt")).toBeVisible();
 
-  // ---- e2: hồ sơ chọn đầy đủ chỉ ở desk (dải số sàng lọc + món đã loại) --------------------------------------------
+  // ---- e3: trang Sản phẩm chỉ còn phần bán hàng, nội dung trang ở Nội dung → Website -------------------------------
   await page.goto(`/desk/san-pham/${productId}`);
-  await expect(main.getByText("Mẫu A (đã chọn)", { exact: false })).toBeVisible();
-  await expect(main.getByText("đã xem", { exact: true })).toBeVisible();
+  await expect(main.getByText("Nội dung trang: sửa ở Nội dung → Website.")).toBeVisible();
+  await expect(main.getByLabel("Giá bán")).toHaveValue(String(product.price_vnd));
 
   // ---- e2/e4/g2: khách thấy con dấu + lý do chọn (không thấy quá trình chọn) → giỏ → đặt → chuyển khoản -------------
   await page.context().clearCookies();

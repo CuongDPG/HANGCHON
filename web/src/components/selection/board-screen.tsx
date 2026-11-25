@@ -29,7 +29,7 @@ import {
   type Decision,
   type Stage,
 } from "@/lib/api/selection";
-import { CandidateCard } from "./candidate-card";
+import { CandidateCard, ContentQuickLink } from "./candidate-card";
 import { NoteComposer } from "./note-composer";
 import { ReasonsCard } from "./reasons-card";
 import { RejectSheet } from "./reject-sheet";
@@ -195,6 +195,7 @@ export function BoardScreen() {
                           setDragId(c.id);
                         }}
                       />
+                      <ContentQuickLink card={c} compact />
                     </div>
                   ))}
                   {!data.columns[s].length ? <p className="px-1 py-4 text-[13px] text-ink-3">{EMPTY[s]}</p> : null}
@@ -232,8 +233,9 @@ function Column({ cards, stage }: { cards: BoardCard[]; stage: Stage }) {
   return (
     <ul className="flex flex-col gap-2">
       {cards.map((c) => (
-        <li key={c.id}>
+        <li key={c.id} className="flex flex-col gap-1">
           <CandidateCard card={c} />
+          <ContentQuickLink card={c} />
         </li>
       ))}
     </ul>

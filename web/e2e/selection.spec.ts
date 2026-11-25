@@ -78,7 +78,9 @@ test("loại một món phải ghi lý do", async ({ page }, info) => {
     await sheet.getByLabel("Vì sao loại?").fill(reason);
     await sheet.getByRole("button", { name: "Loại món này" }).click();
     await expect(page.getByRole("main").getByText(reason, { exact: true }).first()).toBeVisible();
-    await expect(page.getByText("Lý do loại")).toBeVisible();
+    await expect(page.getByRole("main").getByText("Lý do loại", { exact: true })).toBeVisible();
+    // dữ liệu mẫu: cùng đề có món đã chọn → link sang hồ sơ chọn của món đó
+    await expect(page.getByRole("main").getByText("Cùng đề, chị đã chọn")).toBeVisible();
   } finally {
     await page.request.post(`/api/desk/selection/candidates/${card!.id}/stage`, { data: { to: "candidate" } });
   }

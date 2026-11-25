@@ -237,6 +237,8 @@ class StudioDetail(BaseModel):
     compose_pending: bool = False
     # trang sản phẩm trên website (kênh chính thức): trạng thái của sản phẩm (draft/pending_review/published/…)
     page_status: str | None = None
+    # ứng viên ở Bàn chọn (link «Hồ sơ chọn»)
+    candidate_id: uuid.UUID | None = None
 
 
 class ComposeBody(BaseModel):

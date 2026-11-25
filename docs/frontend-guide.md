@@ -217,8 +217,9 @@ Nguồn duy nhất: `src/lib/desk-nav.ts` (`DESK_PRIMARY_NAV`, `DESK_MORE_NAV`, 
 |---|---|---|
 | `/desk` | Hôm nay | i1 |
 | `/desk/san-hang` | Săn hàng (+ hồ sơ thẩm định) | a1–a7, b1–b7 |
-| `/desk/ban-chon` | Bàn chọn | c1–c6 |
-| `/desk/noi-dung` | Nội dung, lịch đăng | f1–f8 |
+| `/desk/ban-chon` | Bàn chọn; `/desk/ban-chon/[id]`: món đã chọn có «Hồ sơ chọn» (dải số sàng lọc, món đã loại — chỉ ở desk) + nút «Làm nội dung các kênh»; món đã loại có lý do loại + link món đã chọn cùng đề | c1–c6, e2 |
+| `/desk/san-pham` | Sản phẩm (mục chính, sau Bàn chọn): món đã chọn đang bán; `/desk/san-pham/[id]` chỉ giữ phần bán hàng — giá, cách bán, nhóm hàng, xuất xứ, thương hiệu/GTIN/khối lượng/nguồn cấp — và link sang Hồ sơ chọn (Bàn chọn), Nội dung → Website. Phần chung hai trình sửa: `components/catalog/desk/editor-parts.tsx`. `/san-pham/[slug]/ho-so-chon` cũ chuyển hẳn về trang sản phẩm qua `next.config.ts` | e1–e3, e6, e8–e10, g8 |
+| `/desk/noi-dung` | Nội dung, lịch đăng; mọi món đã chọn (cả món chưa lên web). `/desk/noi-dung/san-pham/[id]`: tab đầu «Website» sửa lời trang, ảnh, thông số, hỏi đáp, AI viết lại, đăng lên website (`components/catalog/desk/page-content-editor.tsx`), rồi tab từng mạng xã hội | e1, e6, f1–f8 |
 | `/desk/khach` | Khách, hộp thư | h1–h8 |
 | `/desk/don-hang` | Đơn hàng *(Thêm)* | g1–g9 |
 | `/desk/nguon-cung` | Nguồn cung *(Thêm)* | d1–d7 |
@@ -227,7 +228,6 @@ Nguồn duy nhất: `src/lib/desk-nav.ts` (`DESK_PRIMARY_NAV`, `DESK_MORE_NAV`, 
 | `/desk/nhat-ky-ai` | Nhật ký AI *(Thêm)* | i4, k3 |
 | `/desk/bao-cao` | Báo cáo *(Thêm)* | i5, f7 |
 | `/desk/so-sach` | Sổ sách *(Thêm)* | k1, k5 |
-| `/desk/san-pham` | Sản phẩm *(Thêm)*; `/desk/san-pham/[id]` có mục «Hồ sơ chọn» (dải số sàng lọc, món đã loại — chỉ ở desk, không ra website; `/san-pham/[slug]/ho-so-chon` cũ chuyển hẳn về trang sản phẩm qua `next.config.ts`) | e1–e3, e6, e8–e10, g8 |
 | `/desk/cai-dat` | Cài đặt *(Thêm)* | k4 |
 | `/desk/dang-nhap` | Đăng nhập (ngoài khung, không cần đăng nhập) | — |
 | `/desk/kit` | Trưng bày hệ thiết kế (ngoài khung, không cần đăng nhập) | — |
