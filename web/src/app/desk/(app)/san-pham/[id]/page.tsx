@@ -1,18 +1,19 @@
 import { Suspense } from "react";
-import { ProductEditor } from "@/components/catalog/desk/product-editor";
+import { ProductScreen } from "@/components/catalog/desk/product-screen";
 import { SkeletonList } from "@/components/ui/feedback";
 
-export const metadata = { title: "Sửa sản phẩm" };
+export const metadata = { title: "Sản phẩm" };
 
+/** Một sản phẩm, theo dõi hai chiều: Hồ sơ chọn (ngược về quá trình chọn) · Hồ sơ bán (xuôi theo đường bán) · Giá và cách bán. */
 export default function DeskProductPage({ params }: PageProps<"/desk/san-pham/[id]">) {
   return (
     <Suspense fallback={<SkeletonList rows={6} />}>
-      <Editor params={params} />
+      <Screen params={params} />
     </Suspense>
   );
 }
 
-async function Editor({ params }: { params: PageProps<"/desk/san-pham/[id]">["params"] }) {
+async function Screen({ params }: { params: PageProps<"/desk/san-pham/[id]">["params"] }) {
   const { id } = await params;
-  return <ProductEditor id={id} />;
+  return <ProductScreen id={id} />;
 }

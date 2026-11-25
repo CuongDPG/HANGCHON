@@ -1,28 +1,22 @@
 "use client";
 
 import { Megaphone } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { SkeletonList } from "@/components/ui/feedback";
 import { Switch } from "@/components/ui/choice";
-import { EmptyState, SkeletonList } from "@/components/ui/feedback";
 import { Input } from "@/components/ui/field";
 import { InlineSelect } from "@/components/ui/inline-select";
-import { PageHeader } from "@/components/ui/page-header";
 import { Segmented } from "@/components/ui/segmented";
 import { notifySuccess } from "@/components/ui/toast";
 import {
-  PRODUCT_STATUS_LABELS,
   deskProductApi,
   useCategories,
-  useDeskProduct,
   useProductMutation,
   type DeskProduct,
   type ProductPatch,
 } from "@/lib/api/catalog";
 import { SaveBar, Section, useServerDraft } from "./editor-parts";
-import { STATUS_TONE } from "./products-screen";
-import { RelatedLinks } from "@/components/desk/related-links";
 
 /** Phần bán hàng của sản phẩm. Lời trên trang website (AI soạn) sửa ở Nội dung → Website (`page-content-editor.tsx`). */
 type Draft = {
@@ -77,37 +71,19 @@ function toPatch(d: Draft): ProductPatch {
   };
 }
 
-/** Sản phẩm (e3, e6, e10, g8): giá, cách bán, nhóm hàng, xuất xứ, dữ liệu cho nguồn cấp. */
-export function ProductEditor({ id }: { id: string }) {
-  const { data: p, isPending, error } = useDeskProduct(id);
+/** Tab «Giá và cách bán» của trang sản phẩm (e3, e6, e10, g8): giá, cách bán, nhóm hàng, xuất xứ, dữ liệu nguồn cấp. */
+export function CommerceForm({ p }: { p: DeskProduct }) {
   const categories = useCategories();
   const { draft, setDraft, dirty, reset } = useServerDraft(p, toDraft, toPatch);
-  const save = useProductMutation(id, (body: ProductPatch) => deskProductApi.patch(id, body));
+  const save = useProductMutation(p.id, (body: ProductPatch) => deskProductApi.patch(p.id, body));
 
-  if (isPending) return <SkeletonList rows={6} />;
-  if (error || !p) return <EmptyState tone="error" title="Chưa tải được sản phẩm" description={error?.message} />;
   if (!draft) return <SkeletonList rows={6} />;
 
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft({ ...draft, [k]: v });
   const studio = `/desk/noi-dung/san-pham/${p.id}`;
 
   return (
-    <div className="flex flex-col gap-5 pb-24">
-      <PageHeader
-        title={p.name}
-        eyebrow={p.candidate_title && p.candidate_title !== p.name ? `Từ ứng viên: ${p.candidate_title}` : "Sản phẩm"}
-        backHref="/desk/san-pham"
-        actions={<Badge tone={STATUS_TONE[p.status]}>{PRODUCT_STATUS_LABELS[p.status]}</Badge>}
-      />
-      <RelatedLinks
-        links={[
-          p.candidate_id && { href: `/desk/ban-chon/${p.candidate_id}`, label: "Hồ sơ chọn (Bàn chọn)" },
-          { href: studio, label: "Nội dung các kênh" },
-          p.candidate_id && { href: `/desk/san-hang/ung-vien/${p.candidate_id}`, label: "Hồ sơ thẩm định" },
-          p.status === "published" && { href: `/san-pham/${p.slug}`, label: "Xem trên web" },
-        ]}
-      />
-
+    <div className="flex max-w-3xl flex-col gap-5 pb-24">
       <Card tone="soft" className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
         <p className="min-w-0 flex-1 text-[14px]">
           <span className="font-semibold">Nội dung trang: sửa ở Nội dung → Website.</span>{" "}

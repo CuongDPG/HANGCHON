@@ -161,8 +161,8 @@ test("một món hàng từ đề tìm tới đánh giá của khách", async ({
   await page.getByRole("button", { name: "Mở đợt" }).click();
   await expect(page.getByText("Đã mở đợt")).toBeVisible();
 
-  // ---- e3: trang Sản phẩm chỉ còn phần bán hàng, nội dung trang ở Nội dung → Website -------------------------------
-  await page.goto(`/desk/san-pham/${productId}`);
+  // ---- e3: tab «Giá và cách bán» của trang Sản phẩm; nội dung trang ở Nội dung → Website ---------------------------
+  await page.goto(`/desk/san-pham/${productId}?tab=gia`);
   await expect(main.getByText("Nội dung trang: sửa ở Nội dung → Website.")).toBeVisible();
   await expect(main.getByLabel("Giá bán")).toHaveValue(String(product.price_vnd));
 

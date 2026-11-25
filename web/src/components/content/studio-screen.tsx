@@ -2,6 +2,7 @@
 
 import { CalendarClock, Clapperboard, ExternalLink, Globe, PenLine, RefreshCw, Send, Sparkles } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import {
   Badge,
@@ -51,7 +52,9 @@ const WEBSITE = "website";
 
 export function StudioScreen({ kind, id }: { kind: "product" | "drop"; id: string }) {
   const { data, isPending, error } = useStudioDetail(kind, id);
-  const [tab, setTab] = useState<string>("");
+  // `?kenh=facebook` (từ Hồ sơ bán của sản phẩm) mở thẳng tab kênh đó
+  const initial = useSearchParams().get("kenh");
+  const [tab, setTab] = useState<string>(initial ?? "");
   const drafts = useMemo(() => [...(data?.drafts ?? [])].sort((a, b) => ORDER.indexOf(a.channel) - ORDER.indexOf(b.channel)), [data]);
   const done = drafts.filter(isDone).length;
   const isProduct = kind === "product";

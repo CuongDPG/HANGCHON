@@ -692,3 +692,322 @@ class DeskReview(ReviewOut):
 
 class DeskFindRequest(FindRequestOut):
     public_status: PublicStatus
+
+
+# ---- theo dõi hai chiều một sản phẩm ở desk (tracking.py) ----------------------------------------------------------
+
+
+class TrailHunt(BaseModel):
+    brief_id: uuid.UUID | None
+    brief_title: str | None
+    brief_text: str | None
+    brief_created_at: datetime | None
+    price_max_vnd: int | None
+    origin: str
+    platform: str
+    source_url: str | None
+    seller_name: str | None
+    title_original: str | None
+    source_price_vnd: int | None
+    source_rating: float | None
+    source_review_count: int | None
+    found_at: datetime
+
+
+class TrailScore(BaseModel):
+    label: str
+    score: float | None
+    weight: float | None
+
+
+class TrailAssessment(BaseModel):
+    status: str
+    summary: str | None
+    score_total: float | None
+    score_confirmed: bool
+    ai_score: int | None
+    scores: list[TrailScore]
+    strengths: list[str]
+    weaknesses: list[str]
+    safety_status: str
+    safety_label: str
+    safety_notes: str | None
+    counterfeit_risk: str
+    fake_review_risk: str
+    generated_at: datetime | None
+
+
+class TrailSample(BaseModel):
+    id: uuid.UUID
+    code: str
+    status: str
+    status_label: str
+    total_vnd: int
+    sent_at: datetime | None
+    received_at: datetime | None
+
+
+class TrailNote(BaseModel):
+    text: str | None
+    recorded_at: datetime
+    trial_day: int | None
+    kind: str
+    author: str | None
+    sentiment: str | None
+
+
+class TrailTrial(BaseModel):
+    trial_days: int | None
+    started_at: datetime | None
+    ended_at: datetime | None
+    note_count: int
+    tester_count: int
+    notes: list[TrailNote]
+
+
+class TrailDecision(BaseModel):
+    decided_at: datetime
+    decided_by: str | None
+    reason_selected: str | None
+    not_satisfied: str | None
+    wording_pending: bool
+
+
+class TrailCostLine(BaseModel):
+    label: str
+    amount_vnd: int
+
+
+class TrailCost(BaseModel):
+    landed_cost_vnd: int | None
+    breakdown: list[TrailCostLine]
+    price_vnd: int
+    margin_pct: float | None
+    proposed_price_vnd: int | None
+    approved_at: datetime | None
+
+
+class SelectionTrailOut(BaseModel):
+    """Hồ sơ chọn — phần «dấu vết» (đề, thẩm định, mẫu, thử, quyết định, giá vốn). Dải số sàng lọc ở `/dossier`."""
+
+    candidate_id: uuid.UUID | None
+    hunt: TrailHunt | None
+    assessment: TrailAssessment | None
+    samples: list[TrailSample]
+    trial: TrailTrial | None
+    decision: TrailDecision | None
+    cost: TrailCost
+
+
+class SalesChannelContent(BaseModel):
+    channel: str
+    label: str
+    state: str  # none | drafting | pending | approved
+    state_label: str
+    updated_at: datetime | None
+
+
+class SalesWebsiteContent(BaseModel):
+    state: str
+    state_label: str
+    status: str
+    updated_at: datetime
+
+
+class SalesContent(BaseModel):
+    website: SalesWebsiteContent
+    channels: list[SalesChannelContent]
+    ready: int
+    total: int
+
+
+class PostMetricsOut(BaseModel):
+    captured_at: datetime
+    reach: int
+    clicks: int
+    interactions: int
+    messages: int
+    orders: int
+    revenue_vnd: int
+
+
+class SalesPost(BaseModel):
+    id: uuid.UUID
+    channel: str
+    label: str
+    status: str
+    status_label: str
+    scheduled_at: datetime
+    published_at: datetime | None
+    url: str | None
+    simulated: bool
+    metrics: PostMetricsOut | None
+
+
+class SalesWebsiteLive(BaseModel):
+    status: str
+    published: bool
+    published_at: datetime | None
+    url: str | None
+
+
+class SalesDrop(BaseModel):
+    id: uuid.UUID
+    code: str
+    title: str
+    status: str
+    status_label: str
+    opens_at: datetime | None
+    closes_at: datetime | None
+    slots_total: int | None
+    slots_reserved: int
+    price_vnd: int
+    reminders: int
+
+
+class SalesListing(BaseModel):
+    marketplace: str
+    label: str
+    status: str
+    status_label: str
+    external_id: str | None
+    price_vnd: int | None
+    synced_stock: int | None
+    last_synced_at: datetime | None
+
+
+class SalesLive(BaseModel):
+    website: SalesWebsiteLive
+    posts: list[SalesPost]
+    drops: list[SalesDrop]
+    marketplaces: list[SalesListing]
+    marketplaces_simulated: bool
+    channels_live: list[str]
+
+
+class PostSignals(BaseModel):
+    measured_posts: int
+    reach: int
+    clicks: int
+    interactions: int
+    messages: int
+    orders_from_posts: int
+    revenue_from_posts_vnd: int
+    simulated: bool
+    last_captured_at: datetime | None
+
+
+class InboxThreadBrief(BaseModel):
+    id: uuid.UUID
+    channel: str
+    channel_label: str
+    name: str | None
+    snippet: str | None
+    last_message_at: datetime | None
+
+
+class InboxSignals(BaseModel):
+    threads: int
+    needs_owner: int
+    recent: list[InboxThreadBrief]
+
+
+class AssistantSignals(BaseModel):
+    conversations: int
+    handed_off: int
+    messages: int
+
+
+class FindSignal(BaseModel):
+    title: str
+    votes: int
+    status: str
+
+
+class ReorderSignals(BaseModel):
+    scheduled: int
+    sent: int
+    converted: int
+
+
+class CountRow(BaseModel):
+    label: str
+    count: int
+    status: str | None = None
+    channel: str | None = None
+
+
+class OrderBrief(BaseModel):
+    id: uuid.UUID
+    code: str
+    status: str
+    status_label: str
+    placed_at: datetime
+    channel_label: str
+    quantity: int
+    amount_vnd: int
+    name: str
+
+
+class OrderSignals(BaseModel):
+    count: int
+    units: int
+    revenue_vnd: int
+    unpaid_vnd: int
+    customers: int
+    repeat_buyers: int
+    drafts: int
+    cancelled: int
+    by_status: list[CountRow]
+    by_channel: list[CountRow]
+    recent: list[OrderBrief]
+
+
+class StockSignals(BaseModel):
+    sale_mode: str
+    tracked: bool
+    on_hand: int
+    reserved: int
+    available: int
+    low: bool
+
+
+class ReviewSignals(BaseModel):
+    published: int
+    rating_avg: float | None
+    waiting_owner: int
+    requested: int
+
+
+class SalesCustomers(BaseModel):
+    posts: PostSignals
+    inbox: InboxSignals
+    assistant: AssistantSignals
+    finds: list[FindSignal]
+    reorder: ReorderSignals
+    orders: OrderSignals
+    stock: StockSignals
+    reviews: ReviewSignals
+
+
+class SalesOut(BaseModel):
+    """Hồ sơ bán: nội dung → lên kênh → khách hàng."""
+
+    product_id: uuid.UUID
+    content: SalesContent
+    live: SalesLive
+    customers: SalesCustomers
+
+
+class ProductPipelineRow(BaseModel):
+    """Một dòng ở danh sách sản phẩm: chọn ngày nào / thử bao lâu · nội dung x/6 → kênh đang bán → đơn."""
+
+    product_id: uuid.UUID
+    chosen_at: datetime | None
+    trial_days: int | None
+    content_ready: int
+    content_total: int
+    channels_live: list[str]
+    orders: int
+    units: int
+    revenue_vnd: int

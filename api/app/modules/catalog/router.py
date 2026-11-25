@@ -21,7 +21,7 @@ from app.modules.catalog import dossier as dossier_svc
 from app.modules.catalog import drops as drop_svc
 from app.modules.catalog import finds as find_svc
 from app.modules.catalog import products as product_svc
-from app.modules.catalog import public
+from app.modules.catalog import public, tracking
 from app.modules.catalog import reviews as review_svc
 from app.modules.catalog.images import MAX_UPLOAD_BYTES
 from app.modules.catalog.models import (
@@ -66,13 +66,16 @@ from app.modules.catalog.schemas import (
     ProductDetail,
     ProductOut,
     ProductPatch,
+    ProductPipelineRow,
     PublicStatus,
     ReminderIn,
     ReminderOut,
     ReviewInvite,
     ReviewReplyIn,
     RewriteIn,
+    SalesOut,
     SelectableCandidate,
+    SelectionTrailOut,
     ShelfOut,
     SitemapEntry,
     VoiceIssue,
@@ -345,6 +348,13 @@ async def from_candidate(body: FromCandidateIn, _: CurrentUser, db: DbSession) -
     return await _desk_product(db, p)
 
 
+@desk.get("/products/pipeline", response_model=list[ProductPipelineRow])
+async def products_pipeline(_: CurrentUser, db: DbSession) -> Any:
+    """Tình trạng hai chiều của mọi món (danh sách Sản phẩm): đã chọn ngày nào, thử bao lâu · nội dung x/6 →
+    kênh đang bán → đơn."""
+    return await tracking.pipeline_rows(db)
+
+
 @desk.get("/categories", response_model=list[CategoryOut])
 async def categories(_: CurrentUser, db: DbSession) -> Any:
     return list((await db.execute(select(Category).order_by(Category.position, Category.name))).scalars())
@@ -359,6 +369,18 @@ async def get_product(product_id: uuid.UUID, _: CurrentUser, db: DbSession) -> A
 async def product_dossier(product_id: uuid.UUID, _: CurrentUser, db: DbSession) -> Any:
     """Hồ sơ chọn (e2) — chỉ ở desk: website không hiện quá trình chọn."""
     return await dossier_svc.dossier_view(db, await product_svc.get_product(db, product_id))
+
+
+@desk.get("/products/{product_id}/selection", response_model=SelectionTrailOut)
+async def product_selection(product_id: uuid.UUID, _: CurrentUser, db: DbSession) -> Any:
+    """Hồ sơ chọn — dấu vết từng bước: đề săn hàng, thẩm định, mua mẫu, thử, quyết định, giá vốn (chỉ đọc)."""
+    return await tracking.selection_trail(db, await product_svc.get_product(db, product_id))
+
+
+@desk.get("/products/{product_id}/sales", response_model=SalesOut)
+async def product_sales(product_id: uuid.UUID, _: CurrentUser, db: DbSession) -> Any:
+    """Hồ sơ bán: nội dung từng kênh → đã lên kênh nào → khách phản hồi và đặt (chỉ đọc)."""
+    return await tracking.sales_view(db, await product_svc.get_product(db, product_id))
 
 
 @desk.patch("/products/{product_id}", response_model=DeskProduct)

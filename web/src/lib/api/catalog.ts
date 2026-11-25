@@ -584,3 +584,160 @@ export function siteUrl(path = ""): string {
   const base = (process.env.SITE_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3010").replace(/\/$/, "");
   return `${base}${path}`;
 }
+
+/* ---------- theo dõi hai chiều một sản phẩm (desk): Hồ sơ chọn · Hồ sơ bán · dòng danh sách ---------- */
+
+export type SelectionTrail = {
+  candidate_id: string | null;
+  hunt: {
+    brief_id: string | null;
+    brief_title: string | null;
+    brief_text: string | null;
+    brief_created_at: string | null;
+    price_max_vnd: number | null;
+    origin: string;
+    platform: string;
+    source_url: string | null;
+    seller_name: string | null;
+    title_original: string | null;
+    source_price_vnd: number | null;
+    source_rating: number | null;
+    source_review_count: number | null;
+    found_at: string;
+  } | null;
+  assessment: {
+    status: string;
+    summary: string | null;
+    score_total: number | null;
+    score_confirmed: boolean;
+    ai_score: number | null;
+    scores: { label: string; score: number | null; weight: number | null }[];
+    strengths: string[];
+    weaknesses: string[];
+    safety_status: "unchecked" | "ok" | "warning" | "blocked";
+    safety_label: string;
+    safety_notes: string | null;
+    counterfeit_risk: string;
+    fake_review_risk: string;
+    generated_at: string | null;
+  } | null;
+  samples: { id: string; code: string; status: string; status_label: string; total_vnd: number; sent_at: string | null; received_at: string | null }[];
+  trial: {
+    trial_days: number | null;
+    started_at: string | null;
+    ended_at: string | null;
+    note_count: number;
+    tester_count: number;
+    notes: { text: string | null; recorded_at: string; trial_day: number | null; kind: string; author: string | null; sentiment: string | null }[];
+  } | null;
+  decision: { decided_at: string; decided_by: string | null; reason_selected: string | null; not_satisfied: string | null; wording_pending: boolean } | null;
+  cost: {
+    landed_cost_vnd: number | null;
+    breakdown: { label: string; amount_vnd: number }[];
+    price_vnd: number;
+    margin_pct: number | null;
+    proposed_price_vnd: number | null;
+    approved_at: string | null;
+  };
+};
+
+export type ContentState = "none" | "drafting" | "pending" | "approved";
+export type PostMetrics = { captured_at: string; reach: number; clicks: number; interactions: number; messages: number; orders: number; revenue_vnd: number };
+export type CountRow = { label: string; count: number; status?: string | null; channel?: string | null };
+
+export type SalesDossier = {
+  product_id: string;
+  content: {
+    website: { state: ContentState; state_label: string; status: ProductStatus; updated_at: string };
+    channels: { channel: "facebook" | "instagram" | "threads" | "tiktok" | "zalo_oa"; label: string; state: ContentState; state_label: string; updated_at: string | null }[];
+    ready: number;
+    total: number;
+  };
+  live: {
+    website: { status: ProductStatus; published: boolean; published_at: string | null; url: string | null };
+    posts: {
+      id: string;
+      channel: string;
+      label: string;
+      status: string;
+      status_label: string;
+      scheduled_at: string;
+      published_at: string | null;
+      url: string | null;
+      simulated: boolean;
+      metrics: PostMetrics | null;
+    }[];
+    drops: {
+      id: string;
+      code: string;
+      title: string;
+      status: string;
+      status_label: string;
+      opens_at: string | null;
+      closes_at: string | null;
+      slots_total: number | null;
+      slots_reserved: number;
+      price_vnd: number;
+      reminders: number;
+    }[];
+    marketplaces: { marketplace: string; label: string; status: string; status_label: string; external_id: string | null; price_vnd: number | null; synced_stock: number | null; last_synced_at: string | null }[];
+    marketplaces_simulated: boolean;
+    channels_live: string[];
+  };
+  customers: {
+    posts: {
+      measured_posts: number;
+      reach: number;
+      clicks: number;
+      interactions: number;
+      messages: number;
+      orders_from_posts: number;
+      revenue_from_posts_vnd: number;
+      simulated: boolean;
+      last_captured_at: string | null;
+    };
+    inbox: { threads: number; needs_owner: number; recent: { id: string; channel: string; channel_label: string; name: string | null; snippet: string | null; last_message_at: string | null }[] };
+    assistant: { conversations: number; handed_off: number; messages: number };
+    finds: { title: string; votes: number; status: string }[];
+    reorder: { scheduled: number; sent: number; converted: number };
+    orders: {
+      count: number;
+      units: number;
+      revenue_vnd: number;
+      unpaid_vnd: number;
+      customers: number;
+      repeat_buyers: number;
+      drafts: number;
+      cancelled: number;
+      by_status: CountRow[];
+      by_channel: CountRow[];
+      recent: { id: string; code: string; status: string; status_label: string; placed_at: string; channel_label: string; quantity: number; amount_vnd: number; name: string }[];
+    };
+    stock: { sale_mode: DeskProduct["sale_mode"]; tracked: boolean; on_hand: number; reserved: number; available: number; low: boolean };
+    reviews: { published: number; rating_avg: number | null; waiting_owner: number; requested: number };
+  };
+};
+
+export type ProductPipeline = {
+  product_id: string;
+  chosen_at: string | null;
+  trial_days: number | null;
+  content_ready: number;
+  content_total: number;
+  channels_live: string[];
+  orders: number;
+  units: number;
+  revenue_vnd: number;
+};
+
+export function useSelectionTrail(id: string) {
+  return useQuery({ queryKey: ["catalog", "selection-trail", id], queryFn: () => api.get<SelectionTrail>(`${D}/products/${id}/selection`) });
+}
+
+export function useSalesDossier(id: string) {
+  return useQuery({ queryKey: ["catalog", "sales", id], queryFn: () => api.get<SalesDossier>(`${D}/products/${id}/sales`) });
+}
+
+export function useProductPipeline() {
+  return useQuery({ queryKey: ["catalog", "pipeline"], queryFn: () => api.get<ProductPipeline[]>(`${D}/products/pipeline`) });
+}

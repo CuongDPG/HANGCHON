@@ -498,6 +498,8 @@ class Story:
         )
         await self.publish_posts("p_den", ("facebook",), publish=False)
         await self.content_week()
+        # cron số liệu bài đã đăng chạy một lượt (driver mock → số giả lập; đơn gắn bài theo mã nguồn là thật)
+        self.bump("post_metrics", await JOBS["content.pull_metrics"](job_context()))
         with at(6, 9):  # ba món đang thử
             for key in ("c_mini", "c_lancan", "c_aochoang"):
                 await self.sample_and_trial(key)
