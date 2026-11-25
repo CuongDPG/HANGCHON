@@ -170,7 +170,8 @@ test("một món hàng từ đề tìm tới đánh giá của khách", async ({
   await page.context().clearCookies();
   await page.goto(`/san-pham/${product.slug}?src=${postId.replace(/-/g, "").slice(0, 8)}`);
   await expect(main.getByRole("heading", { level: 1, name: product.name })).toBeVisible();
-  await expect(main.getByRole("img", { name: /Đã chọn 1 trong/ }).first()).toBeVisible();
+  await expect(main.getByRole("img", { name: "Đã chọn", exact: true }).first()).toBeVisible();
+  await expect(main.getByRole("img", { name: /Đã chọn \d+ trong/ })).toHaveCount(0);
   await expect(main.getByText("Giữ ấm tới chiều.").first()).toBeVisible();
   await expect(main.getByRole("link", { name: "Xem hồ sơ chọn" })).toHaveCount(0);
   await page.getByRole("region", { name: "Đặt mua" }).filter({ visible: true }).first().getByRole("button", { name: /Đặt ngay|Đặt mua chung/ }).click();

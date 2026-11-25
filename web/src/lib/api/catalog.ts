@@ -41,7 +41,6 @@ export type ProductCard = {
   list_price_vnd: number;
   compare_at_price_vnd: number | null;
   image: ImageSet | null;
-  seal: SealInfo;
   trial_days: number | null;
   origin: string | null;
   proof: string | null;
@@ -169,7 +168,6 @@ export type About = {
   not_selling_rules: string[];
   ai_help: string;
   how_we_choose: string[];
-  stats: { viewed: number; chosen: number; published: number; ratio_pct: number | null };
 };
 
 export type FindStatusKey = "new" | "threshold" | "searching" | "trying" | "found" | "none" | "pending" | "rejected";

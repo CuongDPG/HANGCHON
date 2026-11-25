@@ -51,13 +51,8 @@ def product_facts(p: Product) -> ProductFacts:
         compare_at_price_vnd=p.compare_at_price_vnd,
         specs=[s for s in p.specs if isinstance(s, dict)],
         trial_days=p.trial_days,
-        selected_count=p.selected_count,
-        considered_count=p.considered_count,
         reason_selected=p.reason_selected,
         not_satisfied=p.not_satisfied,
-        rejected_alternatives=[
-            f"{a.get('title')}: {a.get('reason')}" for a in p.rejected_alternatives if isinstance(a, dict)
-        ][:5],
         image_count=len(imgs),
         image_alts=[i.alt or "" for i in imgs],
         url=store_url(product_path(p)),

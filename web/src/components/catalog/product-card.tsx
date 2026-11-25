@@ -19,7 +19,7 @@ export function ProductCard({ product, priority = false }: { product: Card; prio
         priority={priority}
         placeholder="Ảnh mình tự chụp"
         imgClassName="transition-transform duration-300 group-hover:scale-[1.02]"
-        overlay={p.seal.total ? <Seal chosen={p.seal.chosen} total={p.seal.total} size={46} /> : <Seal size={46} />}
+        overlay={<Seal size={46} />}
       />
       <span className="mt-1 line-clamp-2 text-[15px] leading-snug font-semibold [text-wrap:pretty] group-hover:underline">
         {p.name}

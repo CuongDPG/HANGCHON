@@ -43,7 +43,7 @@ hoặc mở tay trên máy dev với dữ liệu mẫu `uv run python -m app.see
 | d6 | Nhắn hỏi nhà cung cấp | chạy với AI giả (soạn/dịch); chưa gửi tự động qua WeChat/1688 | `/desk/nguon-cung/ncc/[id]` |
 | d7 | Theo dõi lô hàng về | chạy thật (mốc nhập tay); tự dò qua `shipping` mock, có mốc mới thì ghi nhật ký AI | `/desk/nguon-cung/lo/[id]` |
 | e1 | Tự dựng trang sản phẩm | chạy với AI giả (viết trang ở worker); chị sửa lời, AI viết lại, đăng lên website ở tab «Website» của xưởng nội dung (chạy thật, 25/11); giá và cách bán ở `/desk/san-pham/[id]`, thiếu giá thì nút đăng chỉ sang đó | `/desk/noi-dung/san-pham/[id]` (tab Website), `/desk/san-pham/[id]` |
-| e2 | Con dấu và hồ sơ chọn | chạy thật — website chỉ hiện con dấu + lý do chọn; hồ sơ chọn đầy đủ (dải số, món đã loại) chỉ ở desk, trên trang chi tiết món đã chọn ở Bàn chọn (25/11), kèm nút «Làm nội dung các kênh»; link cũ `/san-pham/[slug]/ho-so-chon` chuyển hẳn (308) về trang sản phẩm | `/san-pham/[slug]`, `/desk/ban-chon/[id]` |
+| e2 | Con dấu và hồ sơ chọn | chạy thật — website chỉ hiện con dấu «ĐÃ CHỌN» (không số n/m) + lý do chọn, không còn số liệu nào của quá trình chọn (đầu kệ, chú thích con dấu, «Về người chọn», mô tả meta, JSON-LD; API công khai bỏ `seal` và `stats`, 25/11); hồ sơ chọn đầy đủ (tỉ lệ chọn, dải số, món đã loại) chỉ ở desk, trên trang chi tiết món đã chọn ở Bàn chọn (25/11), kèm nút «Làm nội dung các kênh»; link cũ `/san-pham/[slug]/ho-so-chon` chuyển hẳn (308) về trang sản phẩm | `/san-pham/[slug]`, `/desk/ban-chon/[id]` |
 | e3 | Mở bán theo đợt | chạy thật (hẹn giờ, hết hạn/hết suất tự đóng, chốt sớm từ màn Đơn hàng) | `/dot`, `/dot/[slug]`, `/desk/san-pham/dot` |
 | e4 | Đặt hàng một trang | chạy thật (COD); chuyển khoản VietQR chạy với mock, cần tài khoản SePay | `/gio-hang`, `/dat-hang` |
 | e5 | Theo dõi đơn | chạy thật | `/don`, `/don/[code]` |
@@ -52,11 +52,11 @@ hoặc mở tay trên máy dev với dữ liệu mẫu `uv run python -m app.see
 | e8 | Đánh giá có ảnh của khách | chạy thật phần xin/gửi/duyệt (link «Viết đánh giá» trên trang theo dõi đơn); lọc bằng AI giả; tin xin đánh giá gửi qua `notify` mock | `/danh-gia/[token]`, `/desk/san-pham/danh-gia` |
 | e9 | Trang Nhờ tìm | chạy thật (AI gợi ý, chị duyệt mới hiện; đủ người thì AI đề xuất mở đề, chị duyệt — mức thận trọng đã chốt 25/11) | `/nho-tim`, `/desk/san-pham/nho-tim` |
 | e10 | Để AI đọc được | chạy thật (JSON-LD Product/Offer, sitemap, `/feed.xml`) | trang sản phẩm |
-| f1 | Một sản phẩm, nhiều bản | chạy với AI giả — xưởng có mọi món đã chọn (cả món chưa lên website); tab đầu là Website, bài Facebook/Instagram/Threads/TikTok/Zalo AI soạn khi trang website được đăng (sự kiện `product.published`), trước đó tab các kênh báo «Đăng trang website trước» | `/desk/noi-dung/san-pham/[id]`, `/desk/noi-dung/dot/[id]` |
+| f1 | Một sản phẩm, nhiều bản | chạy với AI giả — xưởng có mọi món đã chọn (cả món chưa lên website); tab đầu là Website, bài Facebook/Instagram/Threads/TikTok/Zalo AI soạn khi trang website được đăng (sự kiện `product.published`), trước đó tab các kênh báo «Đăng trang website trước»; bài nào cũng có phần «Vì sao mình chọn», không nhắc hồ sơ chọn/mẫu bị loại/số món đã thử, AI không còn nhận số món đã xem và mẫu bị loại (25/11) | `/desk/noi-dung/san-pham/[id]`, `/desk/noi-dung/dot/[id]` |
 | f2 | Giọng của chị | chạy với AI giả; học từ bài dán, ghi chú và **giọng nói** (nút «Nói», Web Speech vi-VN) | `/desk/noi-dung/giong` |
 | f3 | Lịch đăng | chạy thật (xếp, đổi giờ, huỷ); AI xếp tuần bằng AI giả | `/desk/noi-dung/lich` |
 | f4 | Đăng tự động | chạy với mock, cần ứng dụng Meta (Facebook/Instagram/Threads), Zalo OA, TikTok (đẩy nháp) | `/desk/noi-dung/lich` |
-| f5 | Soát lời quảng cáo | chạy thật (luật số liệu/nói quá) + AI giả | xưởng nội dung |
+| f5 | Soát lời quảng cáo | chạy thật (luật số liệu/nói quá/kể quá trình chọn) + AI giả | xưởng nội dung |
 | f6 | Dựng video ngắn | một phần — dựng bằng ffmpeg trên máy (cần `ffmpeg`), kế hoạch cắt bằng AI giả; chưa thử với clip thật | `/desk/noi-dung/video` |
 | f7 | Đo và học | chạy với mock (số liệu bài giả lập); đơn theo bài qua `?src=` chạy thật | `/desk/noi-dung/so-lieu` |
 | f8 | Kịch bản livestream | chạy với AI giả | `/desk/noi-dung/livestream` |

@@ -10,7 +10,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.enums import SourcePlatform
@@ -373,13 +373,6 @@ def unsupported_numbers(text: str | None, sources: list[str]) -> set[str]:
 def overclaims(text: str | None) -> list[str]:
     t = normalize_vi(text)
     return [w for w in OVERCLAIM_WORDS if w in t]
-
-
-async def count_candidates(db: AsyncSession) -> tuple[int, int]:
-    """(số ứng viên đã xem, số được chọn) — cho trang Về người chọn."""
-    total = (await db.execute(select(func.count()).select_from(Candidate))).scalar_one()
-    chosen = (await db.execute(select(func.count()).where(Candidate.stage == CandidateStage.SELECTED))).scalar_one()
-    return total, chosen
 
 
 async def dossier_view(db: AsyncSession, p: Product) -> dict[str, Any]:

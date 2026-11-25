@@ -34,7 +34,6 @@ export function productJsonLd(p: ProductDetail): Record<string, unknown>[] {
     ...(p.weight_grams ? { weight: { "@type": "QuantitativeValue", value: p.weight_grams, unitCode: "GRM" } } : {}),
     additionalProperty: [
       ...p.specs.map((s) => ({ "@type": "PropertyValue", name: s.label, value: s.value })),
-      ...(p.seal.total ? [{ "@type": "PropertyValue", name: "Tỉ lệ chọn", value: `${p.seal.chosen}/${p.seal.total}` }] : []),
       ...(p.trial_days ? [{ "@type": "PropertyValue", name: "Thời gian dùng thử", value: `${p.trial_days} ngày` }] : []),
     ],
     offers: {

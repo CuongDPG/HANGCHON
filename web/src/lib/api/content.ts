@@ -14,7 +14,7 @@ export type PostStatus = "planned" | "approved" | "publishing" | "published" | "
 export type DisplayStatus = "published" | "draft_pushed" | "approved" | "pending" | "needs_fix" | "failed" | "publishing";
 
 export type CheckFinding = {
-  key: "numbers" | "claims" | "length" | "voice" | "ai_label";
+  key: "numbers" | "claims" | "length" | "voice" | "process" | "ai_label";
   label: string;
   ok: boolean;
   detail: string;

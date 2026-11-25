@@ -66,7 +66,7 @@ Nơi khách đọc kỹ, đặt hàng và theo dõi đơn.
 | Mã | Chức năng | Mức | GĐ | Mô tả |
 |---|---|---|---|---|
 | e1 | Tự dựng trang sản phẩm | AI làm, chị duyệt | 1 | Từ hồ sơ đã chọn, AI viết tên, mô tả, thông số, phần hỏi đáp. Chị sửa và đăng ở tab Website của xưởng nội dung (website là kênh đầu tiên). |
-| e2 | Con dấu và hồ sơ chọn | AI tự làm | 1 | Website hiện con dấu tỉ lệ chọn, thời gian thử, lý do chọn, điều chưa ưng. Quá trình chọn (dải số sàng lọc, các món đã loại kèm lý do) là dữ liệu nội bộ, chỉ xem ở desk, trên trang món đó ở Bàn chọn. |
+| e2 | Con dấu và hồ sơ chọn | AI tự làm | 1 | Website hiện con dấu «ĐÃ CHỌN» (không kèm số), thời gian thử, lý do chọn, điều chưa ưng. Quá trình chọn (tỉ lệ chọn n/m, dải số sàng lọc, các món đã loại kèm lý do) là dữ liệu nội bộ, chỉ xem ở desk, trên trang món đó ở Bàn chọn. |
 | e3 | Mở bán theo đợt | AI làm, chị duyệt | 1 | Đợt gom đơn có hạn chót, số suất, ngày hàng về dự kiến. |
 | e4 | Đặt hàng một trang | AI tự làm | 1 | Không cần tạo tài khoản. Chuyển khoản bằng mã QR tự xác nhận, hoặc trả tiền khi nhận. |
 | e5 | Theo dõi đơn | AI tự làm | 1 | Khách xem hành trình đơn bằng số điện thoại và mã đơn. |
@@ -82,11 +82,11 @@ Món «Đã chọn» ở Bàn chọn chuyển sang đây để làm nội dung c
 
 | Mã | Chức năng | Mức | GĐ | Mô tả |
 |---|---|---|---|---|
-| f1 | Một sản phẩm, nhiều bản | AI làm, chị duyệt | 1 | AI soạn bài Facebook, bộ ảnh Instagram, kịch bản TikTok, tin Zalo. Mỗi kênh một cách viết. |
+| f1 | Một sản phẩm, nhiều bản | AI làm, chị duyệt | 1 | AI soạn bài Facebook, bộ ảnh Instagram, kịch bản TikTok, tin Zalo. Mỗi kênh một cách viết; bài nào cũng có phần «Vì sao mình chọn món này» (lý do chọn + điều chưa ưng nếu có), không kể quá trình chọn. |
 | f2 | Giọng của chị | AI tự làm | 1 | AI học cách viết từ bài cũ và ghi âm của chị để bài mới nghe giống chị. |
 | f3 | Lịch đăng | AI làm, chị duyệt | 1 | AI xếp lịch tuần, chị đổi chỗ khi cần. |
 | f4 | Đăng tự động | AI tự làm | 1 | Facebook, Instagram, Threads đăng thẳng. TikTok đẩy bản nháp vào app để chị bấm đăng. |
-| f5 | Soát lời quảng cáo | AI tự làm | 1 | Kiểm câu chữ: đúng số liệu trong hồ sơ, không nói quá công dụng, gắn nhãn khi có phần do AI tạo. |
+| f5 | Soát lời quảng cáo | AI tự làm | 1 | Kiểm câu chữ: đúng số liệu trong hồ sơ, không nói quá công dụng, không kể quá trình chọn (hồ sơ chọn, mẫu bị loại, số món đã xem/thử), gắn nhãn khi có phần do AI tạo. |
 | f6 | Dựng video ngắn | AI làm, chị duyệt | 2 | Từ clip chị quay khi thử hàng, AI cắt, chèn phụ đề, gợi ý nhạc. |
 | f7 | Đo và học | AI tự làm | 2 | Bài nào ra đơn; AI rút ra kiểu bài nên làm tiếp. |
 | f8 | Kịch bản livestream | AI làm, chị duyệt | 3 | Dàn ý, thứ tự món, câu khách hay hỏi. Chị là người lên hình. |

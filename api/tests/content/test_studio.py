@@ -63,6 +63,14 @@ async def test_product_published_creates_one_draft_per_channel(product_factory):
     tt = next(d for d in ds if d.channel == Channel.TIKTOK)
     assert 20 <= sum(s["seconds"] for s in tt.script) <= 30
     assert all(d.ai_generated and d.check_status == CheckStatus.PASSED for d in ds)
+    # bài nào cũng có phần «Vì sao mình chọn», không kể quá trình chọn (hồ sơ chọn, số mẫu đã thử)
+    for d in ds:
+        text = " ".join([d.title or "", d.body, *(str(s.get("voiceover") or "") for s in d.script or [])])
+        assert "Vì sao mình chọn" in text, d.channel
+        assert "hồ sơ chọn" not in text.lower() and "5 mẫu" not in text, d.channel
+    assert "Hơi nặng khi bỏ túi xách nhỏ"[1:].lower() in bodies[Channel.FACEBOOK].lower()  # điều chưa ưng
+    chips = {f["key"]: f for f in ds[0].check_findings}
+    assert chips["process"]["ok"]
     # mỗi bản có một bài trên lịch (planned) và một việc chờ duyệt đăng, link mang mã bài
     async with SessionLocal() as db:
         posts = list((await db.execute(select(ScheduledPost))).scalars())
@@ -153,6 +161,7 @@ async def test_failed_check_blocks_approval_until_fixed_or_overridden(product_fa
     chips = {f["key"]: f for f in d["check_findings"]}
     assert not chips["numbers"]["ok"] and "350.000đ" in chips["numbers"]["detail"]
     assert not chips["claims"]["ok"] and "tốt nhất" in chips["claims"]["detail"]
+    assert chips["process"]["ok"]
     assert chips["ai_label"]["ok"]
     assert d["approval_item_id_pending"] is None  # rút khỏi hàng chờ
     r = await owner_client.post(f"/api/desk/content/drafts/{fb['id']}/approve", json={})

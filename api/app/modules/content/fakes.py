@@ -62,10 +62,6 @@ def _trial_text(p: ProductFacts) -> str:
     return f"{p.trial_days} ngày"
 
 
-def _tried_text(p: ProductFacts) -> str:
-    return f"{p.considered_count} mẫu" if p.considered_count and p.considered_count > 1 else "vài mẫu"
-
-
 def _tags(p: ProductFacts | None, extra: list[str]) -> list[str]:
     base = ["#hangchon", "#dathuthat"]
     if p:
@@ -79,15 +75,15 @@ def _facebook(p: ProductFacts, notes: list[str], instruction: str | None) -> Cha
     reason = _first_sentence(p.reason_selected, "dùng hằng ngày thấy tiện thật")
     meh = _first_sentence(p.not_satisfied, "")
     lines = [
-        f"Mình thử {_tried_text(p)} trong {_trial_text(p)}. {p.name} là chiếc ở lại.",
+        f"{p.name} — mình dùng {_trial_text(p)} rồi mới đưa lên kệ.",
         "",
-        f"Lý do rất đời thường: {_lower_first(reason)}.",
+        f"Vì sao mình chọn món này: {_lower_first(reason)}.",
     ]
     if notes:
         lines += ["", f"Ghi chú lúc thử: «{_first_sentence(notes[0])}.»"]
     if meh:
         lines += ["", f"Điều mình chưa ưng: {_lower_first(meh)}. Bạn cân nhắc giúp mình nhé."]
-    lines += ["", f"Giá {vnd(p.price_vnd)}. Cần thì nhắn mình, hoặc xem hồ sơ chọn ở link bên dưới."]
+    lines += ["", f"Giá {vnd(p.price_vnd)}. Cần thì nhắn mình, hoặc xem chi tiết ở link bên dưới."]
     return ChannelDraftOut(
         channel="facebook",
         title=f"{_trial_text(p).capitalize()} thử {_lower_first(p.name)}",
@@ -99,17 +95,17 @@ def _facebook(p: ProductFacts, notes: list[str], instruction: str | None) -> Cha
 def _instagram(p: ProductFacts) -> ChannelDraftOut:
     reason = _first_sentence(p.reason_selected, "dùng mỗi ngày thấy tiện")
     meh = _first_sentence(p.not_satisfied, "")
-    body = f"Giữ lại {p.name} sau {_trial_text(p)} dùng thật. {reason}."
+    body = f"{p.name}, mình dùng thật {_trial_text(p)} rồi mới chọn. Vì sao mình chọn: {_lower_first(reason)}."
     if meh:
         body += f" Chưa ưng: {_lower_first(meh)}."
-    body += " Hồ sơ chọn đầy đủ ở link trên trang cá nhân."
+    body += " Xem chi tiết ở link trên trang cá nhân."
     n = max(1, min(p.image_count or 3, 6))
     captions = [
         f"{p.name} — ảnh mình tự chụp",
         _first_sentence(p.reason_selected, "Dùng thật mỗi ngày"),
         "Chi tiết mình thích nhất",
         _first_sentence(p.not_satisfied, "Điều chưa ưng, nói thật"),
-        f"{_tried_text(p).capitalize()} đã thử, giữ lại một",
+        f"Sau {_trial_text(p)} dùng thật",
         "Kích thước so với bàn tay",
     ]
     slides = [
@@ -127,11 +123,12 @@ def _instagram(p: ProductFacts) -> ChannelDraftOut:
 
 def _threads(p: ProductFacts) -> ChannelDraftOut:
     meh = _first_sentence(p.not_satisfied, "")
-    body = f"Thử {_tried_text(p)}, giữ lại đúng {p.name}. {_first_sentence(p.reason_selected, 'Dùng thật thấy tiện')}."
+    reason = _first_sentence(p.reason_selected, "dùng thật thấy tiện")
+    body = f"{p.name}, mình dùng {_trial_text(p)} rồi mới chọn. Vì sao mình chọn: {_lower_first(reason)}."
     if meh:
         body += f" Mỗi tội {_lower_first(meh)}."
     body += " Bạn có món nào dùng mãi không chán không?"
-    return ChannelDraftOut(channel="threads", title="Thử nhiều, giữ một", body=body[:480], hashtags=[])
+    return ChannelDraftOut(channel="threads", title="Vì sao mình chọn món này", body=body[:480], hashtags=[])
 
 
 def _tiktok(p: ProductFacts) -> ChannelDraftOut:
@@ -141,9 +138,9 @@ def _tiktok(p: ProductFacts) -> ChannelDraftOut:
         Scene(
             scene=1,
             seconds=3,
-            visual=f"Bàn tay xếp {_tried_text(p)} lên bàn, đẩy một chiếc ra trước",
-            voiceover=f"Thử {_tried_text(p)}, mình giữ lại đúng một.",
-            on_screen_text="Thử nhiều, giữ một",
+            visual=f"Bàn tay đặt {p.name} lên bàn",
+            voiceover="Vì sao mình chọn món này?",
+            on_screen_text="Vì sao mình chọn",
         ),
         Scene(
             scene=2,
@@ -170,14 +167,15 @@ def _tiktok(p: ProductFacts) -> ChannelDraftOut:
             scene=5,
             seconds=4,
             visual="Đặt món hàng xuống, hiện giá",
-            voiceover="Link hồ sơ chọn ở trang cá nhân nhé.",
+            voiceover="Link chi tiết ở trang cá nhân nhé.",
             on_screen_text=f"{vnd(p.price_vnd)}",
         ),
     ]
     return ChannelDraftOut(
         channel="tiktok",
         title=f"Video {sum(s.seconds for s in scenes)} giây",
-        body=f"Thử {_tried_text(p)}, giữ lại {p.name}. Có cả điều chưa ưng.",
+        body=f"Vì sao mình chọn {p.name}: {_lower_first(reason)}."
+        + (" Có cả điều chưa ưng." if p.not_satisfied else ""),
         hashtags=["#hangchon", "#reviewthat", "#giadung"],
         scenes=scenes,
     )
@@ -185,9 +183,10 @@ def _tiktok(p: ProductFacts) -> ChannelDraftOut:
 
 def _zalo(p: ProductFacts) -> ChannelDraftOut:
     body = (
-        f"Chào cả nhà, mình vừa lên kệ {p.name}. Mình dùng {_trial_text(p)} rồi mới chọn: "
+        f"Chào cả nhà, mình vừa lên kệ {p.name}, đã dùng {_trial_text(p)}. Vì sao mình chọn: "
         f"{_lower_first(_first_sentence(p.reason_selected, 'dùng thật thấy tiện'))}. "
-        f"Giá {vnd(p.price_vnd)}. Ai cần thì nhắn mình giữ suất nhé."
+        + (f"Chưa ưng: {_lower_first(_first_sentence(p.not_satisfied))}. " if p.not_satisfied else "")
+        + f"Giá {vnd(p.price_vnd)}. Ai cần thì nhắn mình giữ suất nhé."
     )
     return ChannelDraftOut(channel="zalo_oa", title="Tin cho khách quen", body=body, hashtags=[])
 
@@ -337,7 +336,7 @@ def fake_learn_voice(inp: VoiceLearnIn) -> VoiceLearnOut:
 
 IDEA_KINDS = [
     ("Hỏi đáp: 3 câu khách hay hỏi về {name}", "Món đã lâu chưa có bài, khách hỏi nhiều trong hộp thư"),
-    ("Hồ sơ chọn: vì sao giữ {name} mà loại các mẫu khác", "Bài kể lý do chọn thường giữ người đọc lâu"),
+    ("Vì sao mình chọn {name}: lý do dùng thấy hợp và điều còn chưa ưng", "Bài kể lý do chọn thường giữ người đọc lâu"),
     ("Video ngắn: {name} sau những ngày dùng thật", "Video ngắn có lượt xem cao hơn bài chữ"),
     ("Điều chưa ưng ở {name} — nói thật", "Bài nói thật điều chưa ưng hay được chia sẻ"),
 ]
@@ -365,7 +364,7 @@ def fake_plan_video(inp: VideoPlanIn) -> VideoPlanOut:
     per = target / max(1, len(clips))
     p = inp.product
     captions = [
-        f"Thử {_tried_text(p)}, giữ một" if p else "Thử nhiều, giữ một",
+        "Vì sao mình chọn món này",
         _first_sentence(p.reason_selected, "Dùng thật mỗi ngày") if p else "Dùng thật mỗi ngày",
         f"Sau {_trial_text(p)} vẫn ổn" if p else "Dùng đều mỗi ngày",
         ("Chưa ưng: " + _lower_first(_first_sentence(p.not_satisfied, "có một điểm nhỏ"))) if p else "Có điểm chưa ưng",
@@ -486,7 +485,7 @@ def fake_livestream(inp: LiveIn) -> LiveOut:
             x
             for x in [
                 _first_sentence(p.reason_selected),
-                f"Đã thử {_trial_text(p)}, cân nhắc {_tried_text(p)}" if p.trial_days else None,
+                f"Đã dùng thử {_trial_text(p)}" if p.trial_days else None,
                 ("Chưa ưng: " + _lower_first(_first_sentence(p.not_satisfied))) if p.not_satisfied else None,
             ]
             if x

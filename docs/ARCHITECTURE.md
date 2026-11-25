@@ -140,14 +140,14 @@ drop_item → order_item → order → payment/shipment`; `candidate → cost_sh
 `customer → threads/orders/reviews`.
 
 Giai đoạn của một ứng viên (`candidates.stage`): `candidate` → `sample` (mua mẫu) → `trial` (đang thử) →
-`selected` | `rejected`. Chỉ ứng viên `selected` mới thành `product`. Con số trên con dấu («chọn 1/24»)
+`selected` | `rejected`. Chỉ ứng viên `selected` mới thành `product`. Con số trên con dấu («chọn 1/24», chỉ hiện ở desk)
 tính từ số ứng viên cùng `sourcing_brief`.
 
 ## 8. Quy ước web
 
 - Giao diện **tiếng Việt**, ưu tiên điện thoại (thiết kế ở 390px trước, rồi mới nới ra máy tính).
 - Token «Chàm» khai báo một lần trong `web/src/app/globals.css`; component dùng token, không dùng mã màu rời.
-  Chữ: Be Vietnam Pro (thân), Bricolage Grotesque (tiêu đề). Góc 4px. Con dấu «ĐÃ CHỌN n/m» là dấu hiệu nhận diện.
+  Chữ: Be Vietnam Pro (thân), Bricolage Grotesque (tiêu đề). Góc 4px. Con dấu «ĐÃ CHỌN» là dấu hiệu nhận diện (website không kèm số; desk kèm n/m).
 - Không dùng `alert/confirm/prompt` của trình duyệt: dùng `useConfirm()` và `notifySuccess/notifyError` trong `components/ui`.
 - Store: Server Components, dữ liệu sản phẩm có cấu trúc (schema.org `Product`/`Offer`), không cần tài khoản để mua.
 - Desk: 6 mục điều hướng chính (Hôm nay · Săn hàng · Bàn chọn · Sản phẩm · Nội dung · Khách) + mục «Thêm»; client gọi API

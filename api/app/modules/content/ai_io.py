@@ -10,7 +10,7 @@ ChannelKey = Literal["facebook", "instagram", "threads", "tiktok", "zalo_oa"]
 
 
 class ProductFacts(BaseModel):
-    """Hồ sơ sản phẩm + hồ sơ chọn — nguồn sự thật duy nhất cho số liệu trong bài."""
+    """Hồ sơ sản phẩm — nguồn sự thật duy nhất cho số liệu trong bài. Không kèm quá trình chọn (số món đã xem, mẫu bị loại)."""
 
     id: str
     name: str
@@ -20,11 +20,8 @@ class ProductFacts(BaseModel):
     compare_at_price_vnd: int | None = None
     specs: list[dict] = Field(default_factory=list)
     trial_days: int | None = None
-    selected_count: int = 1
-    considered_count: int | None = None
     reason_selected: str | None = None
     not_satisfied: str | None = None
-    rejected_alternatives: list[str] = Field(default_factory=list)
     image_count: int = 0
     image_alts: list[str] = Field(default_factory=list)
     url: str | None = None

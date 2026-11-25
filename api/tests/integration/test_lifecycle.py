@@ -173,8 +173,9 @@ async def test_one_product_full_lifecycle(owner_client: httpx.AsyncClient, clien
     # ---- e2: khách thấy món có con dấu và lý do chọn; hồ sơ chọn đầy đủ chỉ ở desk -----------------------------------
     slug = pub["slug"]
     page = await ok(await client.get(f"/api/store/catalog/products/{slug}"))
-    assert page["seal"]["chosen"] == 1 and page["seal"]["total"] == len(cands) and "funnel" not in page
+    assert "seal" not in page and "funnel" not in page
     dossier = await ok(await c.get(f"{D}/catalog/products/{pid}/dossier"))
+    assert dossier["product"]["seal"] == {"chosen": 1, "total": len(cands)}
     assert "Giữ nóng tới chiều." in str(dossier)
 
     # ---- e4/g2: giỏ → đặt → chuyển khoản → đã trả, khách nhận tin, sổ doanh thu ----------------------------------

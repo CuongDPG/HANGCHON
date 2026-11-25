@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import control
 from app.core.config import settings
 from app.modules.catalog import drops as drop_svc
-from app.modules.catalog.dossier import COUNTRY_LABELS, count_candidates
+from app.modules.catalog.dossier import COUNTRY_LABELS
 from app.modules.catalog.models import (
     Category,
     Drop,
@@ -125,7 +125,6 @@ def _card(
         "list_price_vnd": p.price_vnd,
         "compare_at_price_vnd": p.compare_at_price_vnd,
         "image": image_set(img) if img else None,
-        "seal": {"chosen": p.selected_count, "total": p.considered_count},
         "trial_days": p.trial_days,
         "origin": COUNTRY_LABELS.get(p.origin_country or "", p.origin_country),
         "proof": proof_line(p),
@@ -362,8 +361,6 @@ async def drop_detail(db: AsyncSession, d: Drop) -> dict[str, Any]:
 
 
 async def about(db: AsyncSession) -> dict[str, Any]:
-    viewed, chosen = await count_candidates(db)
-    published = (await db.execute(select(func.count()).where(Product.status == ProductStatus.PUBLISHED))).scalar_one()
     principles = list(
         (
             await db.execute(
@@ -384,12 +381,6 @@ async def about(db: AsyncSession) -> dict[str, Any]:
         "not_selling_rules": never,
         "ai_help": await setting(db, "store.ai_help"),
         "how_we_choose": how,
-        "stats": {
-            "viewed": viewed,
-            "chosen": chosen,
-            "published": published,
-            "ratio_pct": round(chosen * 100 / viewed, 1) if viewed else None,
-        },
     }
 
 

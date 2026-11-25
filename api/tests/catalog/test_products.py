@@ -204,7 +204,7 @@ async def test_public_product_hides_selection_process(db, client):
     r = await client.get(f"/api/store/catalog/products/{p.slug}")
     assert r.status_code == 200
     body = r.json()
-    assert body["seal"] == {"chosen": 1, "total": 6}
+    assert "seal" not in body  # không lộ tỉ lệ chọn n/m; con dấu «ĐÃ CHỌN» ở web không cần số
     assert body["reason_selected"] == ["Giữ nóng 9 tiếng", "Nắp tháo rời"]
     assert body["not_satisfied"] == "Miệng hẹp." and body["proof"] == "Thử 3 tuần · Nhật"
     assert body["available"] is False
@@ -264,7 +264,7 @@ async def test_feed_sitemap_about(db, client):
     assert {"path": f"/san-pham/{p.slug}"}.items() <= sm[0].items()
     assert not any("ho-so-chon" in row["path"] for row in sm)
     about = (await client.get("/api/store/catalog/about")).json()
-    assert about["stats"]["viewed"] == 6 and about["stats"]["chosen"] == 1
+    assert "stats" not in about  # không còn số món đã xem / được chọn trên website
     assert about["picker_name"] == "Người chọn hàng"
 
 

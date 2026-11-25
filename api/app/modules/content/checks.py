@@ -1,11 +1,12 @@
 """Soát lời quảng cáo (f5) — phần kiểm bằng luật, chạy trước và cùng với AI.
 
 Mỗi bản nháp có một danh sách mục soát (chip ✓/!):
-  numbers   «Đúng số liệu trong hồ sơ»   giá, số ngày thử, số món đã thử phải khớp hồ sơ
+  numbers   «Đúng số liệu trong hồ sơ»   giá, số ngày thử phải khớp hồ sơ
   claims    «Không nói quá công dụng»     từ cấm trong quảng cáo (chữa bệnh, tốt nhất, 100%...)
   length    «Độ dài hợp kênh»             theo giới hạn của từng kênh
   voice     «Xưng hô với khách»           người bán xưng «mình», gọi khách «bạn»; không gọi người bán là «chị»
                                          (lời khách trích trong ngoặc «…» không tính)
+  process   «Không kể quá trình chọn»     khách chỉ đọc nội dung cuối: không «hồ sơ chọn», mẫu bị loại, số món đã xem/thử
   ai_label  «Nhãn nội dung AI»            có phần do AI tạo → gắn nhãn khi đăng (luôn ✓, chỉ báo)
 
 Mục không đạt (`ok=False`) chặn nút «Duyệt» cho tới khi sửa, hoặc chị xác nhận bỏ qua có lý do (`overridden`).
@@ -14,6 +15,7 @@ Mục không đạt (`ok=False`) chặn nút «Duyệt» cho tới khi sửa, ho
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Any
 
 from app.core.enums import Channel
@@ -27,6 +29,7 @@ CHECK_LABELS = {
     "claims": "Không nói quá công dụng",
     "length": "Độ dài hợp kênh",
     "voice": "Xưng hô với khách",
+    "process": "Không kể quá trình chọn",
     "ai_label": "Nhãn nội dung AI",
 }
 
@@ -66,7 +69,17 @@ _MONEY = re.compile(
     re.IGNORECASE,
 )
 _TRIAL = re.compile(r"(?:thử|dùng)[^.\n]{0,25}?(\d+)\s*(ngày|tuần|tháng)", re.IGNORECASE)
-_TRIED = re.compile(r"thử\s+(\d+)\s+(?:chiếc|mẫu|loại|món|cái|kiểu|bộ)", re.IGNORECASE)
+# Dấu vết quá trình chọn — nội bộ ở desk, bài cho khách không nhắc (vd «hồ sơ chọn», «mẫu bị loại», «thử 6 mẫu»).
+_PROCESS = [
+    re.compile(r"hồ sơ chọn", re.IGNORECASE),
+    re.compile(r"(?:mẫu|món|chiếc|cái|loại)\s+(?:đã\s+)?bị\s+loại", re.IGNORECASE),
+    re.compile(r"\bso kỹ\b", re.IGNORECASE),
+    re.compile(r"chọn\s+\d+\s+trong\s+\d+", re.IGNORECASE),
+    re.compile(
+        r"(?:xem|thử|so sánh|so|cân nhắc|loại)\s+(?:qua\s+)?\d+\s+(?:chiếc|mẫu|loại|món|cái|kiểu|bộ|sản phẩm)",
+        re.IGNORECASE,
+    ),
+]
 
 
 def _money_value(num: str, unit: str) -> int | None:
@@ -124,11 +137,13 @@ def check_numbers(text: str, product: ProductFacts | None, drop: DropFacts | Non
             days = n * {"ngày": 1, "tuần": 7, "tháng": 30}[unit]
             if abs(days - product.trial_days) > max(3, product.trial_days * 0.25):
                 problems.append(f"Bài ghi thử «{m.group(1)} {unit}», hồ sơ ghi {product.trial_days} ngày.")
-    if product and product.considered_count:
-        for m in _TRIED.finditer(text):
-            if int(m.group(1)) != product.considered_count:
-                problems.append(f"Bài ghi «{m.group(0)}», hồ sơ ghi đã cân nhắc {product.considered_count} món.")
     return problems
+
+
+def check_process(text: str) -> list[str]:
+    """Bài nhắc quá trình chọn (hồ sơ chọn, mẫu bị loại, số món đã xem/thử) → mỗi chỗ một vấn đề."""
+    quotes = [m.group(0) for rx in _PROCESS for m in rx.finditer(unicodedata.normalize("NFC", text))]
+    return [f"«{q}» kể quá trình chọn — khách chỉ cần biết vì sao mình chọn món này." for q in dict.fromkeys(quotes)]
 
 
 def check_claims(text: str) -> list[str]:
@@ -197,6 +212,7 @@ def build_findings(
     claims = check_claims(text) + [f"{i.quote}: {i.detail}" for i in (ai.claim_issues if ai else [])]
     length = check_length(channel, body, hashtags, scenes)
     voice, voice_fix = check_voice(text)
+    process = check_process(text)
     suggestions = {
         "numbers": next((i.suggestion for i in (ai.number_issues if ai else []) if i.suggestion), None)
         or "Sửa số cho khớp hồ sơ, hoặc bỏ con số.",
@@ -204,9 +220,16 @@ def build_findings(
         or "Kể trải nghiệm thật thay cho lời khẳng định.",
         "length": "Bấm «Ngắn hơn» hoặc sửa tay cho vừa kênh.",
         "voice": voice_fix,
+        "process": "Bỏ phần kể quá trình chọn; giữ lý do chọn và điều chưa ưng.",
     }
     items = []
-    for key, problems in (("numbers", numbers), ("claims", claims), ("length", length), ("voice", voice)):
+    for key, problems in (
+        ("numbers", numbers),
+        ("claims", claims),
+        ("length", length),
+        ("voice", voice),
+        ("process", process),
+    ):
         items.append(
             {
                 "key": key,
@@ -240,6 +263,7 @@ def _ok_detail(key: str) -> str:
         "claims": "Không có lời nói quá công dụng.",
         "length": "Độ dài vừa với kênh.",
         "voice": "Xưng «mình», gọi khách «bạn».",
+        "process": "Không nhắc quá trình chọn, chỉ kể vì sao mình chọn.",
     }[key]
 
 

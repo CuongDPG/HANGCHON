@@ -17,7 +17,14 @@ from app.integrations.social.meta import Driver as MetaDriver
 from app.integrations.social.tiktok_draft import Driver as TikTokDriver
 from app.integrations.social.zalo_oa import Driver as ZaloDriver
 from app.modules.content.ai_io import ProductFacts
-from app.modules.content.checks import build_findings, check_claims, check_numbers, money_mentions, status_of
+from app.modules.content.checks import (
+    build_findings,
+    check_claims,
+    check_numbers,
+    check_process,
+    money_mentions,
+    status_of,
+)
 from app.modules.content.models import CheckStatus
 
 
@@ -186,9 +193,7 @@ async def test_zalo_creates_and_verifies_article(monkeypatch):
 
 # ---- luật soát lời -----------------------------------------------------------------------------------------------
 
-PF = ProductFacts(
-    id="1", name="Bình", price_vnd=385_000, compare_at_price_vnd=450_000, trial_days=21, considered_count=5
-)
+PF = ProductFacts(id="1", name="Bình", price_vnd=385_000, compare_at_price_vnd=450_000, trial_days=21)
 
 
 def test_money_mentions():
@@ -199,8 +204,31 @@ def test_money_mentions():
 def test_numbers_and_claims():
     assert check_numbers("Mình thử 5 chiếc trong 3 tuần, giá 385.000đ, bớt 65k", PF, None) == []
     probs = check_numbers("Mình thử 7 chiếc trong 2 tháng, giá 350k", PF, None)
-    assert len(probs) == 3
+    assert len(probs) == 2  # thời gian thử + giá; số món đã thử thuộc mục «quá trình chọn»
     assert check_claims("Không chữa bệnh gì đâu") and check_claims("Bình TỐT NHẤT") and not check_claims("Bình tốt")
+
+
+def test_process_mentions_flagged():
+    assert check_process("Mình dùng 3 tuần rồi mới chọn. Vì sao mình chọn: nắp tháo rời.") == []
+    probs = check_process(
+        "Thử 6 mẫu, chọn 1 trong 24. Xem hồ sơ chọn ở link. Mẫu bị loại thì nóng nhanh, mình đã xem 30 món, so kỹ."
+    )
+    assert len(probs) == 6
+    for q in ("Thử 6 mẫu", "hồ sơ chọn", "Mẫu bị loại", "xem 30 món", "so kỹ", "chọn 1 trong 24"):
+        assert any(q in p for p in probs), q
+    f = build_findings(
+        channel=Channel.THREADS,
+        title=None,
+        body="Thử 6 mẫu, giữ lại một chiếc. Bạn thấy sao?",
+        hashtags=[],
+        script=[],
+        product=PF,
+        drop=None,
+        ai_generated=True,
+        ai=None,
+    )
+    chip = next(x for x in f if x["key"] == "process")
+    assert not chip["ok"] and chip["suggestion"] and status_of(f) == CheckStatus.FAILED
 
 
 def test_findings_status_and_override_kept():

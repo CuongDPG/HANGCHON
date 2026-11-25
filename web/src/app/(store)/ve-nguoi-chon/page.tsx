@@ -6,7 +6,6 @@ import { Card } from "@/components/ui/card";
 import { EmptyState, Skeleton } from "@/components/ui/feedback";
 import { catalogApi, siteUrl, type About } from "@/lib/api/catalog";
 import { errorMessage } from "@/lib/api/client";
-import { formatNumber } from "@/lib/format";
 import { pickerName } from "@/lib/picker";
 
 export const metadata: Metadata = {
@@ -15,7 +14,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/ve-nguoi-chon" },
 };
 
-/** Về người chọn: trang bảo lãnh — người chọn là ai, chọn theo nguyên tắc nào, AI làm gì. Số liệu lấy thẳng từ Bàn chọn. */
+/** Về người chọn: trang bảo lãnh — người chọn là ai, chọn theo nguyên tắc nào, AI làm gì. */
 export default function AboutPage() {
   return (
     <Suspense fallback={<Skeleton className="h-96 w-full" />}>
@@ -55,7 +54,6 @@ async function AboutBody() {
       url,
     },
   ];
-  const ratio = a.stats.ratio_pct !== null ? `${a.stats.ratio_pct.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%` : "—";
   return (
     <div className="flex flex-col gap-6">
       <JsonLd data={jsonld} />
@@ -68,20 +66,6 @@ async function AboutBody() {
         </h1>
       </header>
       <p className="text-[16px] leading-relaxed">{a.intro}</p>
-
-      <dl className="grid grid-cols-3 gap-2">
-        {[
-          [formatNumber(a.stats.viewed), "món đã xem"],
-          [formatNumber(a.stats.chosen), "món được chọn"],
-          [ratio, "tỉ lệ chọn"],
-        ].map(([v, l]) => (
-          <div key={l} className="flex flex-col rounded-md border border-line bg-surface px-3 py-3">
-            <dd className="order-1 font-display text-[26px] leading-none font-extrabold tabular-nums">{v}</dd>
-            <dt className="order-2 mt-1 text-[13px] text-ink-2">{l}</dt>
-          </div>
-        ))}
-      </dl>
-      <p className="-mt-3 text-[12.5px] text-ink-3">Con số lấy thẳng từ bàn chọn của mình, tự cập nhật.</p>
 
       {a.how_we_choose.length ? (
         <Card>

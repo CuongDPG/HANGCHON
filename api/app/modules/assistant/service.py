@@ -91,8 +91,6 @@ async def product_facts(db: AsyncSession, p: Product) -> list[Fact]:
     add("not_satisfied", "Điều mình chưa ưng", p.not_satisfied)
     if p.trial_days:
         add("trial_days", "Thời gian thử", f"Mình đã dùng thử {p.trial_days} ngày trước khi chọn.")
-    if p.considered_count:
-        add("seal", "Con dấu", f"Mình xem {p.considered_count} mẫu cùng loại, chọn {p.selected_count}.")
     if p.weight_grams:
         add("weight", "Thông số · Khối lượng", f"{p.weight_grams} g")
     if p.shipping_notes:

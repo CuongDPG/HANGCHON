@@ -29,7 +29,7 @@ export async function generateMetadata({ params }: PageProps<"/san-pham/[slug]">
   const description =
     p.seo_description ||
     p.short_description ||
-    `${p.name}${p.seal.total ? ` — chọn ${p.seal.chosen} trong ${p.seal.total} mẫu` : ""}${p.proof ? `, ${p.proof.toLowerCase()}` : ""}.`;
+    `${p.name} — mình đã dùng thật rồi mới chọn${p.proof ? `. ${p.proof}` : ""}.`;
   const image = p.images[0]?.src_large ?? p.images[0]?.src ?? undefined;
   return {
     title,
@@ -82,7 +82,7 @@ async function ProductBody({ params }: { params: PageProps<"/san-pham/[slug]">["
         <div className="flex flex-col gap-4">
           <div className="flex items-start gap-3">
             <PageHeader title={p.name} description={p.subtitle ?? undefined} backHref="/" className="flex-1" />
-            {p.seal.total ? <Seal chosen={p.seal.chosen} total={p.seal.total} size={64} className="mt-1" /> : null}
+            <Seal size={64} className="mt-1" />
           </div>
           {/* giá hiện một chỗ: máy tính ở đây (khung đặt ngay bên dưới), điện thoại ở khung đặt dính đáy màn hình */}
           <div className="hidden flex-wrap items-center justify-between gap-2 md:flex">

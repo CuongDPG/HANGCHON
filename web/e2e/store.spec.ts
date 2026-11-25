@@ -15,12 +15,14 @@ test.describe("website: kệ hàng → sản phẩm → hỏi trợ lý", () => 
   test("tìm món, xem lý do chọn, hỏi trợ lý", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Món nào cũng đã dùng thử");
+    // website không hiện số của quá trình chọn: con dấu chỉ còn chữ «ĐÃ CHỌN», không «n/m», không «món đã xem»
+    await expect(page.getByRole("main").getByText(/món đã xem|1\/24/)).toHaveCount(0);
     await page.getByRole("searchbox", { name: "Tìm trên kệ" }).fill("binh giu nhiet");
     await page.getByRole("searchbox", { name: "Tìm trên kệ" }).press("Enter");
     await expect(page).toHaveURL(/q=binh/);
     // món cố định của dữ liệu mẫu (bài vòng đời chạy song song có thể đăng thêm một «Bình giữ nhiệt…» khác)
     const card = page.getByRole("main").getByRole("link", { name: /Bình giữ nhiệt nắp bật 500 ml/ }).first();
-    await expect(card.getByRole("img", { name: /Đã chọn 1 trong/ })).toBeVisible();
+    await expect(card.getByRole("img", { name: "Đã chọn", exact: true })).toBeVisible();
     await card.click();
 
     const main = page.getByRole("main");
@@ -39,9 +41,19 @@ test.describe("website: kệ hàng → sản phẩm → hỏi trợ lý", () => 
     // quá trình chọn (dải số sàng lọc, hồ sơ chọn với món đã loại) không ra website — chỉ ở desk
     await expect(main.getByRole("link", { name: "Xem hồ sơ chọn" })).toHaveCount(0);
     await expect(main.getByText("so kỹ", { exact: true })).toHaveCount(0);
+    await expect(main.getByRole("img", { name: /Đã chọn \d+ trong/ })).toHaveCount(0);
+    expect(ld).not.toContain("Tỉ lệ chọn");
+    expect(await page.locator('meta[name="description"]').getAttribute("content")).not.toMatch(/chọn \d+ trong/);
     const productPath = new URL(page.url()).pathname;
     await page.goto(`${productPath}/ho-so-chon`);
     await expect(page).toHaveURL(new RegExp(`${productPath}$`));
+  });
+
+  test("về người chọn không hiện số liệu bàn chọn", async ({ page }) => {
+    await page.goto("/ve-nguoi-chon");
+    const main = page.getByRole("main");
+    await expect(main.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(main.getByText(/món đã xem|món được chọn|tỉ lệ chọn|tự cập nhật/)).toHaveCount(0);
   });
 
   test("mua chung và nhờ tìm", async ({ page }) => {

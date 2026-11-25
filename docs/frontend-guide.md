@@ -170,7 +170,7 @@ Nhập từ một chỗ: `import { Button, Card, Money } from "@/components/ui";
 | `Chip`, `ChipRow` | `<ChipRow><Chip selected count={38}>Tất cả</Chip>…</ChipRow>` (bộ lọc bấm được) |
 | `Badge` | `<Badge tone="neutral\|accent\|success\|warning\|danger\|outline">Chờ chuyển khoản</Badge>` (nhãn tĩnh) |
 | `LevelTag`, `LevelMark`, `LEVEL_LABELS` | `<LevelTag level="owner\|review\|auto" />` · `<LevelTag level="review">Chờ duyệt</LevelTag>` — vuông đỏ son / nửa tròn vàng nâu / tròn cổ vịt |
-| `Seal` | `<Seal chosen={1} total={24} size={48} />` — con dấu «ĐÃ CHỌN 1/24», đi theo món hàng ở mọi nơi |
+| `Seal` | `<Seal size={48} />` — con dấu «ĐÃ CHỌN», đi theo món hàng ở mọi nơi; desk thêm `chosen={1} total={24}` → «ĐÃ CHỌN 1/24» (website không hiện số) |
 | `Card`, `CardLink`, `CardHeader`, `SectionLabel` | `<Card tone="default\|soft\|accent\|danger\|plain">` · `<CardHeader title="…" aside={<LevelTag … />} />` · `<SectionLabel>HÀNG ĐANG VỀ</SectionLabel>` |
 | `Sheet`, `Dialog` | `<Sheet open={o} onClose={() => setO(false)} title="Lọc" footer={<Button>Áp dụng</Button>}>…</Sheet>` (dưới lên ở điện thoại, giữa màn hình ở máy tính) |
 | `useConfirm()` | `if (await confirm({ title: "Loại món này?", message: "…", confirmLabel: "Loại", tone: "danger" })) …` |

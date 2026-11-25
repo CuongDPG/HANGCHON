@@ -422,7 +422,6 @@ class ProductCard(BaseModel):
     list_price_vnd: int
     compare_at_price_vnd: int | None
     image: ImageSet | None
-    seal: SealOut
     trial_days: int | None
     origin: str | None
     proof: str | None
@@ -573,13 +572,6 @@ class DropsOverview(BaseModel):
     closed: list[DropSummary]
 
 
-class AboutStats(BaseModel):
-    viewed: int
-    chosen: int
-    published: int
-    ratio_pct: float | None
-
-
 class AboutOut(BaseModel):
     store_name: str
     tagline: str
@@ -589,7 +581,6 @@ class AboutOut(BaseModel):
     not_selling_rules: list[str]
     ai_help: str
     how_we_choose: list[str]
-    stats: AboutStats
 
 
 class PublicStatus(BaseModel):

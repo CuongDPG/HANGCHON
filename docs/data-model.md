@@ -37,7 +37,7 @@ customer ─┬─ orders → order_items · order_events · payments · shipmen
 ```
 
 Con dấu «ĐÃ CHỌN n/m»: `m` = số `candidates` cùng `brief_id`, `n` = số ứng viên `selected` của đề đó; sản phẩm giữ
-ảnh chụp ở `products.selected_count / considered_count` để trang công khai không phải đếm lại.
+ảnh chụp ở `products.selected_count / considered_count` cho desk (hồ sơ chọn) khỏi đếm lại; website không hiện số này.
 
 ---
 
