@@ -170,7 +170,7 @@ class DemandSignalOut(ORM):
 
 
 class DemandMentionOut(ORM):
-    """Một lần khách nhắc tới nhu cầu (từ bình luận, tin nhắn, trợ lý web, trang Nhờ chị tìm)."""
+    """Một lần khách nhắc tới nhu cầu (từ bình luận, tin nhắn, trợ lý web, trang Nhờ tìm)."""
 
     id: uuid.UUID
     signal_id: uuid.UUID

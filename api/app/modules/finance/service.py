@@ -131,6 +131,26 @@ async def record_order_paid(
     )
 
 
+async def reverse_order_paid(db: AsyncSession, order_id: uuid.UUID) -> bool:
+    """Khớp tiền bị hoàn tác (đơn về chờ chuyển khoản): bỏ dòng doanh thu tự ghi của đơn.
+
+    Không phải hoàn tiền cho khách — chỉ là khớp nhầm — nên xoá hẳn dòng `order:<id>:revenue` để sổ không có doanh thu
+    ảo; khi đơn được khớp lại, `record_order_paid` ghi lại đúng khoá đó. Dòng chị tự sửa tay (source khác AUTO) thì giữ.
+    """
+    entry = (
+        await db.execute(
+            select(LedgerEntry).where(
+                LedgerEntry.source_key == f"order:{order_id}:revenue", LedgerEntry.source == LedgerSource.AUTO
+            )
+        )
+    ).scalar_one_or_none()
+    if entry is None:
+        return False
+    await db.delete(entry)
+    await db.flush()
+    return True
+
+
 async def record_order_refunded(db: AsyncSession, payload: dict[str, Any]) -> LedgerEntry | None:
     from app.modules.orders.models import Order
 

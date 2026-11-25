@@ -65,7 +65,7 @@ control.register_action(
     "Đề xuất mở đề tìm khi đủ người cùng cần",
     GROUP,
     default="ask",
-    description="Trang Nhờ chị tìm đủ người bấm «cùng cần»: duyệt để AI mở đề tìm món đó.",
+    description="Trang Nhờ tìm đủ người bấm «cùng cần»: duyệt để AI mở đề tìm món đó.",
 )
 
 control.register_setting(

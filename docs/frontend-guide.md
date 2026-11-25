@@ -204,7 +204,7 @@ Khung: `components/layout/brand.tsx` (`Brand`, `BrandMark`), `components/store/*
 | `/dot`, `/dot/[slug]` | Đợt gom đơn, chi tiết đợt | e3 |
 | `/gio-hang`, `/dat-hang` | Giỏ, đặt hàng một trang | e4 |
 | `/don`, `/don/[code]` | Tra cứu đơn, theo dõi đơn | e5, g5 |
-| `/nho-tim` | Nhờ chị tìm | e9 |
+| `/nho-tim` | Nhờ tìm | e9 |
 | `/ve-nguoi-chon` | Về người chọn | — |
 | `/hoi` | Hỏi trợ lý | e7 |
 

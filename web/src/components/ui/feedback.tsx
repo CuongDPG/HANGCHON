@@ -89,7 +89,7 @@ type EmptyStateProps = {
   icon?: ReactNode;
   title: ReactNode;
   description?: ReactNode;
-  /** Nút/link hành động, vd. <ButtonLink href="/nho-tim">Nhờ chị tìm</ButtonLink>. */
+  /** Nút/link hành động, vd. <ButtonLink href="/nho-tim">Nhờ tìm</ButtonLink>. */
   action?: ReactNode;
   tone?: "default" | "error";
   className?: string;

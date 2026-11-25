@@ -38,6 +38,8 @@ CONTRACT: dict[str, set[str]] = {
     "order.shipped": {"catalog"},
     "order.delivered": {"catalog", "crm"},
     "order.refunded": {"finance", "catalog"},
+    "order.unpaid": {"finance", "catalog"},
+    "inventory.adjust_requested": {"catalog"},
     "order.cancelled": {"catalog"},
     "inbound.arrived": {"orders", "catalog"},
     "message.received": {"crm", "sourcing", "orders"},
@@ -93,6 +95,24 @@ async def test_order_refunded_books_a_refund_once(db) -> None:
         select(func.count(LedgerEntry.id)).where(LedgerEntry.order_id == o.id, LedgerEntry.kind == LedgerKind.REFUND)
     )
     assert n == 1
+
+
+async def test_order_unpaid_removes_auto_revenue_and_repay_books_again(db) -> None:
+    from tests.finance.factory import make_order, pay
+
+    o = await make_order(db)
+    await pay(db, o)
+    revenue = select(func.count(LedgerEntry.id)).where(
+        LedgerEntry.order_id == o.id, LedgerEntry.kind == LedgerKind.REVENUE
+    )
+    assert await db.scalar(revenue) == 1
+    for _ in range(2):  # lặp lại không lỗi
+        await events.emit("order.unpaid", {"order_id": str(o.id)}, db=db)
+    await db.commit()
+    assert await db.scalar(revenue) == 0  # khớp nhầm bị hoàn tác: không còn doanh thu ảo
+    await events.emit("order.paid", {"order_id": str(o.id)}, db=db)
+    await db.commit()
+    assert await db.scalar(revenue) == 1  # khớp lại thì ghi lại
 
 
 async def test_expense_recorded_from_supply_payload_and_monthly_ai_cost(db) -> None:

@@ -73,7 +73,7 @@ Nơi khách đọc kỹ, đặt hàng và theo dõi đơn.
 | e6 | Xử lý ảnh sản phẩm | AI tự làm | 1 | Ảnh thật chị chụp là chính. AI cắt, cân sáng, làm sạch nền; không tạo ảnh giả. |
 | e7 | Trợ lý hỏi đáp trên web | AI tự làm | 2 | Trả lời từ hồ sơ thẩm định, có dẫn nguồn. Không biết thì nói không biết và chuyển chị. |
 | e8 | Đánh giá có ảnh của khách | AI làm, chị duyệt | 2 | Tự xin đánh giá sau khi khách nhận hàng. AI lọc, chị duyệt hiển thị. |
-| e9 | Trang Nhờ chị tìm | AI tự làm | 2 | Khách gửi nhu cầu, người khác bấm cùng cần. Đủ số người thì mở tìm. |
+| e9 | Trang Nhờ tìm | AI tự làm | 2 | Khách gửi nhu cầu, người khác bấm cùng cần. Đủ số người thì mở tìm. |
 | e10 | Để AI đọc được | AI tự làm | 2 | Dữ liệu sản phẩm có cấu trúc và nguồn cấp cho Google, sẵn sàng cho các trợ lý mua sắm AI. |
 
 ## Xưởng nội dung và đăng bài

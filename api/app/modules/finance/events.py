@@ -33,6 +33,13 @@ async def on_order_paid(db: AsyncSession, payload: dict[str, Any]) -> None:
             log.info("Không tự soạn hoá đơn cho đơn %s: %s", order_id, e)
 
 
+@events.on("order.unpaid")
+async def on_order_unpaid(db: AsyncSession, payload: dict[str, Any]) -> None:
+    order_id = _uuid(payload.get("order_id"))
+    if order_id is not None:
+        await service.reverse_order_paid(db, order_id)
+
+
 @events.on("order.refunded")
 async def on_order_refunded(db: AsyncSession, payload: dict[str, Any]) -> None:
     if payload.get("order_id"):

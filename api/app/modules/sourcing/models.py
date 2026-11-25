@@ -76,7 +76,7 @@ class TrendStatus(StrEnum):
 class DemandSource(StrEnum):
     COMMENT = "comment"
     MESSAGE = "message"
-    FIND_REQUEST = "find_request"  # trang Nhờ chị tìm (e9)
+    FIND_REQUEST = "find_request"  # trang Nhờ tìm (e9)
     ASSISTANT = "assistant"  # trợ lý web (e7)
     MANUAL = "manual"
 
@@ -251,7 +251,7 @@ class DemandSignal(UUIDPk, Timestamps, Base):
 
 
 class DemandMention(UUIDPk, CreatedAt, Base):
-    """Một lần khách nhắc tới nhu cầu (từ bình luận, tin nhắn, trợ lý web, trang Nhờ chị tìm)."""
+    """Một lần khách nhắc tới nhu cầu (từ bình luận, tin nhắn, trợ lý web, trang Nhờ tìm)."""
 
     __tablename__ = "demand_mentions"
 

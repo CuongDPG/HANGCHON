@@ -11,7 +11,7 @@ import { RunProgress } from "./run-progress";
 const SOURCE: Record<string, string> = {
   message: "tin nhắn",
   comment: "bình luận",
-  find_request: "Nhờ chị tìm",
+  find_request: "Nhờ tìm",
   assistant: "trợ lý web",
   manual: "ghi tay",
 };
@@ -97,7 +97,7 @@ export function DemandPanel() {
       >
         Khách đang hỏi
       </SectionLabel>
-      <p className="-mt-1 text-[13px] text-ink-2">Từ tin nhắn, bình luận và trang Nhờ chị tìm. Xếp theo số người hỏi.</p>
+      <p className="-mt-1 text-[13px] text-ink-2">Từ tin nhắn, bình luận và trang Nhờ tìm. Xếp theo số người hỏi.</p>
       {run.data ? <RunProgress run={run.data} /> : null}
       {isPending ? (
         <SkeletonList rows={3} />
