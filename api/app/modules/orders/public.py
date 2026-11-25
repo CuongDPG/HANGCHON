@@ -3,7 +3,7 @@ của đợt, chỉ đọc), thông tin chuyển khoản VietQR, đổi địa c
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -135,24 +135,25 @@ async def timeline(
             meta=None if closed else (f"Đợt chốt {to_local(drop.closes_at).strftime('%d/%m')}" if drop.closes_at else None),
         ))  # fmt: skip
         lot = refs.slowest(lots)
+        lot_in_at: datetime | None = None
         if lot is not None and lot.status != InboundStatus.ORDERED:
-            brief = refs.inbound_brief(lot)
-            done = lot.status == InboundStatus.DELIVERED or arrived
-            steps.append(
-                TimelineStep(
-                    key="inbound",
-                    title=brief.last_note or brief.status_label,
-                    status="done" if done else "current",
-                    at=brief.last_at,
-                )
-            )
-            if not done:
+            if lot.status != InboundStatus.DELIVERED and not arrived:
+                brief = refs.inbound_brief(lot)
+                steps.append(TimelineStep(key="inbound", title=brief.last_note or brief.status_label,
+                                          status="current", at=brief.last_at))  # fmt: skip
                 headline = brief.status_label
+            else:
+                # Hàng đã về: mốc «về tới kho» thuộc bước «arrived» bên dưới (một mốc chỉ ghi một lần);
+                # chặng đường về chỉ còn phần vận chuyển.
+                lot_in_at = refs.last_milestone_at(lot, {InboundStatus.DELIVERED})
+                transit_at = refs.last_milestone_at(lot, refs.TRANSIT_STATUSES)
+                if transit_at is not None:
+                    steps.append(TimelineStep(key="inbound", title="Hàng đã về Việt Nam", status="done", at=transit_at))
         elif not arrived:
             steps.append(TimelineStep(key="inbound", title="Hàng trên đường về Việt Nam", status="todo"))
         steps.append(TimelineStep(
             key="arrived", title="Về tới kho, chị kiểm từng món", status="done" if arrived else "todo",
-            at=next((e.occurred_at for e in evs if e.status == OrderStatus.READY_TO_SHIP), None),
+            at=next((e.occurred_at for e in evs if e.status == OrderStatus.READY_TO_SHIP), None) or lot_in_at,
             meta=None if arrived else (f"Dự kiến {_d(eta)}" if eta else None),
         ))  # fmt: skip
     else:

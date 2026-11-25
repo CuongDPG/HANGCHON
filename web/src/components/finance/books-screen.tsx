@@ -2,7 +2,7 @@
 
 import { Download, FileText, Paperclip, Plus, Receipt, RotateCw, Trash2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { ApprovalSheet } from "@/components/control/approval-sheet";
 import {
   Badge,
@@ -47,6 +47,8 @@ import { periodOptions } from "./period";
 type Tab = "so" | "chi-phi" | "hoa-don";
 
 /** Sổ sách (k1, k5): sổ doanh thu/chi phí theo kỳ + bảng kê CSV, chi phí nhập tay, hoá đơn điện tử. */
+const noopSubscribe = () => () => {};
+
 export function BooksScreen() {
   const params = useSearchParams();
   const initial = params.get("tab");
@@ -54,7 +56,9 @@ export function BooksScreen() {
   const periods = periodOptions();
   const [period, setPeriod] = useState(periods[0].value);
   const { user } = useSession();
-  const owner = isOwner(user);
+  // lúc hydrate dùng đúng như máy chủ (chưa biết phiên), tránh lệch HTML khi phiên về trước khi khối này hydrate
+  const hydrated = useSyncExternalStore(noopSubscribe, () => true, () => false);
+  const owner = hydrated && isOwner(user);
   return (
     <div className="flex flex-col gap-4">
       <PageHeader title="Sổ sách" description="Sổ doanh thu, chi phí hộ kinh doanh, bảng kê khai thuế, hoá đơn điện tử." />

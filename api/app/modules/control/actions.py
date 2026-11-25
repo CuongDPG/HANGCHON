@@ -84,10 +84,7 @@ register_setting("ai.monthly_budget_vnd", "Trần chi phí AI mỗi tháng (VND)
                  description="Bỏ trống = dùng AI_MONTHLY_BUDGET_VND. 0 = không giới hạn.")  # fmt: skip
 register_setting("store.name", "Tên cửa hàng", "Hàng Chọn", group="Cửa hàng")
 register_setting("store.tagline", "Câu giới thiệu", "Đồ gia dụng nhỏ, chọn từng món", group="Cửa hàng")
-register_setting("store.curator_name", "Tên người chọn", "", group="Cửa hàng",
-                 description="Tên hiện ở trang «Về người chọn» và cuối bài đăng.")  # fmt: skip
-register_setting("store.curator_bio", "Lời giới thiệu", "", group="Cửa hàng",
-                 description="Vài câu chị tự giới thiệu: chọn hàng thế nào, thử bao lâu.")  # fmt: skip
+# tên và lời giới thiệu người chọn: `store.picker_name`, `store.picker_intro` (catalog đăng ký, trang «Về người chọn» đọc)
 register_setting("store.bank_code", "Ngân hàng nhận chuyển khoản", "", group="Thanh toán",
                  description="Mã ngân hàng theo VietQR, vd VCB, TCB, MB.")  # fmt: skip
 register_setting("store.bank_account_no", "Số tài khoản", "", group="Thanh toán")

@@ -150,14 +150,14 @@ async def test_audit_has_actor_name_and_multi_filter(actions: list, owner_client
 
 async def test_bulk_settings(owner_client: httpx.AsyncClient, helper_client: httpx.AsyncClient) -> None:
     vals = {
-        "store.curator_name": "Chị Thử",
+        "store.picker_name": "Chị Thử",
         "store.bank_account_no": "0123456789",
         "store.default_shipping_fee_vnd": 25000,
     }
     r = await owner_client.patch("/api/desk/control/settings", json={"values": vals})
     assert r.status_code == 200
     rows = {s["key"]: s for s in r.json()}
-    assert rows["store.curator_name"]["value"] == "Chị Thử" and rows["store.default_shipping_fee_vnd"]["value"] == 25000
+    assert rows["store.picker_name"]["value"] == "Chị Thử" and rows["store.default_shipping_fee_vnd"]["value"] == 25000
     assert rows["store.name"]["is_default"] is True
     bad = await owner_client.patch(
         "/api/desk/control/settings", json={"values": {"store.default_shipping_fee_vnd": -1}}

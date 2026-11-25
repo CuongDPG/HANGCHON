@@ -106,7 +106,7 @@ function PaymentsTab() {
                   <span className="min-w-0">
                     <span className="block truncate">{p.content || "(không nội dung)"}</span>
                     <span className="text-[12.5px] text-ink-2">
-                      <DateTime value={p.received_at} format="dateTime" /> · {p.order_code ?? "chưa khớp"} · {p.provider}
+                      <DateTime value={p.received_at} format="dateTime" /> · {p.order_code ?? "chưa khớp"} · {PROVIDER[p.provider] ?? "Chuyển khoản"}
                     </span>
                   </span>
                   <span className="flex shrink-0 flex-col items-end gap-0.5">
@@ -139,6 +139,14 @@ function PaymentsTab() {
     </div>
   );
 }
+
+/** Nguồn tiền vào, gọi bằng lời thường (không lộ tên tích hợp như «mock», «sepay»). */
+const PROVIDER: Record<string, string> = {
+  manual: "Chị ghi tay",
+  cod: "Thu hộ khi giao",
+  tiktok_shop: "TikTok Shop",
+  shopee: "Shopee",
+};
 
 const STATUS: Record<string, string> = { matched: "Đã khớp", needs_review: "Cần xem", ignored: "Bỏ qua", received: "Mới về", refunded: "Hoàn", failed: "Lỗi" };
 

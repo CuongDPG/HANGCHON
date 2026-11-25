@@ -490,6 +490,15 @@ async def audience(db: AsyncSession) -> list[Customer]:
     return out
 
 
+UNSENT = (BroadcastStatus.DRAFT, BroadcastStatus.PENDING_REVIEW, BroadcastStatus.APPROVED, BroadcastStatus.SCHEDULED,
+          BroadcastStatus.FAILED)  # fmt: skip
+
+
+async def reachable_count(db: AsyncSession) -> int:
+    """Số khách quen nhận được tin lúc này (có kênh nhận). Tin chưa gửi luôn hiện con số này, không phải số lúc soạn."""
+    return len([c for c in await audience(db) if await recipient(db, c)])
+
+
 async def draft_drop_announcement(db: AsyncSession, drop_id: uuid.UUID) -> Broadcast | None:
     """AI soạn tin báo đợt mới cho khách quen (nghe `drop.opened`). Mỗi đợt một tin — chạy lại không soạn trùng."""
     existing = (
@@ -554,7 +563,7 @@ async def propose_broadcast(db: AsyncSession, b: Broadcast, *, run_id: uuid.UUID
         {"broadcast_id": str(b.id), "body": b.body},
         {"body": b.body, "recipient_count": b.recipient_count, "href": "/desk/khach/khach-quen"},
         db=db,
-        summary=f"Gửi {b.recipient_count} khách quen",
+        summary="Gửi tin cho khách quen",  # số người nhận tính lại lúc xem / gửi, không ghi cứng vào hàng chờ
         ref_type="broadcasts",
         ref_id=b.id,
         ai_run_id=run_id,

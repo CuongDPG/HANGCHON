@@ -350,8 +350,9 @@ export function ProductEditor({ id }: { id: string }) {
       </Section>
 
       {dirty ? (
-        <div className="fixed inset-x-0 bottom-[calc(var(--spacing-tabbar)+env(safe-area-inset-bottom,0px))] z-20 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur md:bottom-0 md:pl-[calc(var(--spacing-sidebar)+1.5rem)]">
-          <div className="mx-auto flex max-w-page items-center justify-between gap-3">
+        // dính trên nút nổi «Nói với AI» (như thanh quyết định ở hồ sơ thẩm định) để nút nổi không che «Lưu»
+        <div className="sticky bottom-[calc(var(--spacing-tabbar)+env(safe-area-inset-bottom,0px)+72px)] z-10 md:bottom-24">
+          <div className="flex items-center justify-between gap-3 rounded-md border border-line bg-surface p-2 pl-3 shadow-pop">
             <span className="text-[14px] text-ink-2">Có thay đổi chưa lưu</span>
             <div className="flex gap-2">
               <Button variant="ghost" onClick={() => setDraft(toDraft(p))}>

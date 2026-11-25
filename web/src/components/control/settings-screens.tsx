@@ -73,8 +73,8 @@ function OwnerOnly({ title }: { title: string }) {
 const STORE_KEYS = [
   "store.name",
   "store.tagline",
-  "store.curator_name",
-  "store.curator_bio",
+  "store.picker_name",
+  "store.picker_intro",
   "store.bank_code",
   "store.bank_account_no",
   "store.bank_account_name",
@@ -84,8 +84,8 @@ const STORE_KEYS = [
 const storeSchema = z.object({
   "store.name": z.string().trim().min(1, "Cửa hàng cần có tên").max(80),
   "store.tagline": z.string().max(160),
-  "store.curator_name": z.string().max(80),
-  "store.curator_bio": z.string().max(1500),
+  "store.picker_name": z.string().max(80),
+  "store.picker_intro": z.string().max(1500),
   "store.bank_code": z.string().max(20),
   "store.bank_account_no": z.string().regex(/^\d{0,20}$/, "Số tài khoản chỉ gồm chữ số"),
   "store.bank_account_name": z.string().max(80),
@@ -149,8 +149,8 @@ function StoreForm({ values }: { values: Record<string, unknown> }) {
       </fieldset>
       <fieldset disabled={!owner} className="flex flex-col gap-3">
         <SectionLabel>Người chọn</SectionLabel>
-        <Input label="Tên người chọn" placeholder="Vd: Chị Mai" {...register("store.curator_name")} />
-        <Textarea label="Lời giới thiệu" rows={4} placeholder="Chị chọn hàng thế nào, thử bao lâu, vì sao bán…" {...register("store.curator_bio")} />
+        <Input label="Tên người chọn" placeholder="Vd: Chị Mai" hint="Hiện ở trang «Về người chọn»." {...register("store.picker_name")} />
+        <Textarea label="Lời giới thiệu" rows={4} placeholder="Chị chọn hàng thế nào, thử bao lâu, vì sao bán…" {...register("store.picker_intro")} />
       </fieldset>
       <fieldset disabled={!owner} className="flex flex-col gap-3">
         <SectionLabel>Nhận chuyển khoản</SectionLabel>
@@ -386,11 +386,28 @@ function ResetPasswordSheet({ user, onClose }: { user: SessionUser | null; onClo
 
 /* ---------- tích hợp ---------- */
 
+/** Tên dịch vụ dễ hiểu thay cho tên driver trong cấu hình. */
+const DRIVER_LABELS: Record<string, string> = {
+  sepay: "SePay (chuyển khoản tự khớp)",
+  ghn: "Giao Hàng Nhanh",
+  ghtk: "Giao Hàng Tiết Kiệm",
+  onebound: "Onebound (1688, Taobao)",
+  web: "AI đọc trang web",
+  local: "Lưu trên máy chủ",
+  s3: "Kho lưu trữ đám mây",
+  meta: "Facebook, Instagram",
+  threads: "Threads",
+  zalo_oa: "Zalo OA",
+  tiktok_draft: "TikTok",
+  smtp: "Email",
+  anthropic: "Claude",
+};
+
 export function IntegrationsScreen() {
   const { data, isPending, error } = useIntegrations();
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader backHref="/desk/cai-dat" title="Tích hợp" description="Driver nào đang chạy. «Giả lập» nghĩa là chưa nối tài khoản thật, không gửi gì ra ngoài." />
+      <PageHeader backHref="/desk/cai-dat" title="Tích hợp" description="Các dịch vụ bên ngoài cửa hàng nối tới. «Giả lập» nghĩa là chưa nối tài khoản thật, không gửi gì ra ngoài." />
       {isPending ? (
         <SkeletonList rows={4} />
       ) : error ? (
@@ -402,8 +419,7 @@ export function IntegrationsScreen() {
               <div className="min-w-0">
                 <p className="text-[15px] font-semibold">{i.label}</p>
                 <p className="text-[13px] text-ink-2">
-                  Đang dùng <code>{i.driver}</code>
-                  {i.available.filter((a) => a !== i.driver).length ? ` · có sẵn: ${i.available.filter((a) => a !== i.driver).join(", ")}` : ""}
+                  {i.is_mock ? "Đang chạy thử, chưa nối tài khoản thật" : `Đang nối: ${DRIVER_LABELS[i.driver] ?? i.driver}`}
                 </p>
               </div>
               <Badge tone={i.is_mock ? "warning" : "success"}>{i.is_mock ? "Giả lập" : "Thật"}</Badge>
@@ -412,7 +428,7 @@ export function IntegrationsScreen() {
         </ul>
       )}
       <p className="text-[13px] text-ink-2">
-        Đổi driver bằng biến môi trường trên máy chủ (vd <code>PAYMENTS_DRIVER=sepay</code>) rồi khởi động lại API.
+        Muốn nối tài khoản thật (ngân hàng, hãng giao, Facebook, Zalo…), chị gửi thông tin tài khoản cho người cài máy chủ; họ bật theo tài liệu triển khai.
       </p>
     </div>
   );

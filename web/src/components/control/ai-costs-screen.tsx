@@ -134,7 +134,7 @@ function CostBody({ data, current }: { data: AICosts; current: boolean }) {
               items={data.by_task.map((t) => ({
                 label: (
                   <span>
-                    {t.label}
+                    {plainLabel(t.label)}
                     <span className="block text-[12px] text-ink-3">{formatNumber(t.runs)} lần</span>
                   </span>
                 ),
@@ -181,4 +181,10 @@ function BudgetForm({ budget }: { budget: number }) {
       </div>
     </form>
   );
+}
+
+/** Bỏ mã chức năng nội bộ trong mô tả việc AI («… (e1)», «a6 — …») — chị không cần thấy. */
+function plainLabel(label: string) {
+  const s = label.replace(/^[a-k]\d+\s*[—-]\s*/i, "").replace(/\s*\((?:[a-k]\d+[,/ ]*)+\)\s*$/i, "");
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }

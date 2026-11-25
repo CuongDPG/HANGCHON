@@ -73,9 +73,17 @@ Viết:
 Tuyệt đối không:
 - thêm công dụng, số liệu, chứng nhận, chất liệu không có trong dữ kiện;
 - dùng từ nói quá: «tốt nhất», «số 1», «thần thánh», «chữa», «trị», «diệt khuẩn 99%», «an toàn tuyệt đối»;
-- hứa hẹn về sức khoẻ; giấu «điều mình chưa ưng» — nếu có, nhắc lại trung thực trong description.
+- hứa hẹn về sức khoẻ; giấu «điều mình chưa ưng» — nếu có, nhắc lại trung thực trong description;
+- nhắc giá vốn, giá về tay, giá nhập hay biên lợi nhuận (số nội bộ của chị, khách không được thấy).
 Không biết thì bỏ trống phần đó, không đoán.""",
 )
+
+
+_INTERNAL = re.compile(r"biên|về tay|giá vốn|giá nhập|\blãi\b", re.IGNORECASE)
+
+
+def split_reason(text: str) -> list[str]:
+    return [x.strip() for x in text.splitlines() if x.strip()]
 
 
 def _spec_facts(facts: list[FactIn]) -> list[FactIn]:
@@ -86,6 +94,32 @@ def _first(facts: list[FactIn], prefix: str) -> FactIn | None:
     return next((f for f in facts if f.ref.startswith(prefix)), None)
 
 
+# câu khách hay hỏi theo nhãn thông số (khớp theo từ khoá, không dấu); nhãn lạ thì hỏi «… thế nào?»
+_SPEC_QUESTIONS: list[tuple[str, str]] = [
+    ("chat lieu", "Món này làm bằng chất liệu gì?"), ("dung tich", "Dung tích bao nhiêu?"),
+    ("khoi luong", "Món này nặng bao nhiêu?"), ("can nang", "Món này nặng bao nhiêu?"),
+    ("khi gap", "Gấp lại thì gọn cỡ nào?"), ("kich thuoc mo", "Mở ra thì rộng bao nhiêu?"),
+    ("kich thuoc", "Kích thước bao nhiêu?"), ("giu nong", "Giữ nóng được bao lâu?"), ("so ngan", "Có mấy ngăn?"),
+    ("so luong", "Một bộ có mấy cái?"), ("nguon dien", "Dùng pin hay cắm điện?"), ("anh sang", "Ánh sáng thế nào?"),
+    ("day", "Dây dài bao nhiêu?"), ("tai", "Chịu được nặng bao nhiêu?"), ("giat", "Giặt thế nào?"),
+    ("go ra", "Gỡ ra có để lại vết keo không?"), ("do mo", "Kẹp mở rộng bao nhiêu?"),
+]  # fmt: skip
+
+
+def _spec_question(label: str) -> str | None:
+    key = normalize_vi(label)
+    q = next((q for k, q in _SPEC_QUESTIONS if re.search(rf"\b{k}\b", key)), None)
+    return q or (f"{label.strip()} thế nào?" if label.strip() else None)
+
+
+def _sentence(text: str) -> str:
+    t = text.strip()
+    if not t:
+        return t
+    t = t[0].upper() + t[1:]
+    return t if t[-1] in ".!?…)" else f"{t}."
+
+
 @ai.fake("catalog.write_product_page")
 def _fake_write_page(inp: WritePageIn) -> WritePageOut:
     facts = inp.facts
@@ -94,9 +128,13 @@ def _fake_write_page(inp: WritePageIn) -> WritePageOut:
     reason = _first(facts, "decision.reason_selected")
     not_ok = _first(facts, "decision.not_satisfied")
     trial = _first(facts, "decision.trial_days")
-    strengths = [f for f in facts if f.ref.startswith("assessment.strengths")]
+    # điểm mạnh / tóm tắt thẩm định có cả số nội bộ (về tay, biên) — trang cho khách thì bỏ những câu đó
+    strengths = [f for f in facts if f.ref.startswith("assessment.strengths") and not _INTERNAL.search(f.text)]
     sub = " · ".join(s.text for s in specs[:3])[:160]
-    short = (summary.text if summary else (reason.text if reason else inp.working_title))[:300]
+    public_summary = (
+        " ".join(x for x in re.split(r"(?<=\.)\s+", summary.text) if not _INTERNAL.search(x)) if summary else ""
+    )
+    short = (" ".join(split_reason(reason.text)) if reason else public_summary or inp.working_title)[:300]
     lines = []
     if reason:
         lines.append(f"Vì sao mình chọn: {reason.text}")
@@ -111,8 +149,9 @@ def _fake_write_page(inp: WritePageIn) -> WritePageOut:
         )
     if not_ok:
         faq.append(FaqLine(q="Món này có điểm gì chưa tốt?", a=not_ok.text[:600], refs=[not_ok.ref]))
-    for s in specs[:2]:
-        faq.append(FaqLine(q=f"{s.label.replace('Thông số · ', '')} là bao nhiêu?", a=s.text[:600], refs=[s.ref]))
+    asked = [(q, s) for s in specs if (q := _spec_question(s.label.replace("Thông số · ", "")))]
+    for q, s in asked[:2]:
+        faq.append(FaqLine(q=q, a=_sentence(s.text)[:600], refs=[s.ref]))
     return WritePageOut(
         name=inp.working_title[:90],
         subtitle=sub or inp.working_title[:160],

@@ -63,7 +63,7 @@ export function DeskShell({ children }: { children: ReactNode }) {
     <div className="min-h-dvh">
       <DeskSidebar activeKey={active?.key} userName={user?.name} userEmail={user?.email} />
       <div className="md:pl-sidebar">
-        <main id="noi-dung" className={MAIN_CLASS}>
+        <main id="noi-dung" className={cn(MAIN_CLASS, isWide(pathname) && "max-w-none")}>
           {gate}
           <div hidden={!ready} inert={!ready}>
             {children}
@@ -75,6 +75,12 @@ export function DeskShell({ children }: { children: ReactNode }) {
       <MoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} activeKey={active?.key} user={user} />
     </div>
   );
+}
+
+/** Màn dạng bảng (nhiều cột) dùng hết bề rộng; màn danh sách/biểu mẫu giữ cột đọc vừa phải. */
+const WIDE_ROUTES = [/^\/desk\/ban-chon\/?$/, /^\/desk\/noi-dung\/lich\/?$/, /^\/desk\/san-hang\/so-sanh\/[^/]+\/?$/];
+function isWide(pathname: string) {
+  return WIDE_ROUTES.some((r) => r.test(pathname));
 }
 
 const MAIN_CLASS =

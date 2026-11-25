@@ -117,6 +117,18 @@ def _last_milestone(s: InboundShipment) -> tuple[str | None, datetime | None]:
     return (last.get("note") or None), at_dt
 
 
+def last_milestone_at(s: InboundShipment, statuses: Iterable[InboundStatus]) -> datetime | None:
+    """Thời điểm mốc gần nhất của lô thuộc một trong các trạng thái cho trước."""
+    wanted = {st.value for st in statuses}
+    for m in reversed([m for m in (s.milestones or []) if isinstance(m, dict)]):
+        if m.get("status") in wanted and isinstance(m.get("at"), str):
+            try:
+                return datetime.fromisoformat(m["at"])
+            except ValueError:
+                return None
+    return None
+
+
 def inbound_brief(s: InboundShipment) -> InboundBrief:
     note, at = _last_milestone(s)
     return InboundBrief(

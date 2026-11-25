@@ -13,6 +13,10 @@ export type BuyBoxProps = {
   slug: string;
   name: string;
   priceVnd: number;
+  /** Giá niêm yết (gạch ngang) khi giá trong đợt thấp hơn. */
+  listPriceVnd?: number;
+  /** false = bỏ dòng giá + trạng thái (trang đã hiện giá ngay dưới tên món, vd. máy tính). */
+  showSummary?: boolean;
   imageUrl?: string;
   /** Có = đặt trong đợt gom đang mở; không = hàng giữ sẵn. */
   dropId?: string;
@@ -27,7 +31,7 @@ export type BuyBoxProps = {
  * Khối mua trên trang sản phẩm: chọn số lượng, thêm vào giỏ hoặc đặt ngay (đặt trong đợt nếu có `dropId`).
  * Giỏ lưu ở trình duyệt; trang đặt hàng hỏi lại máy chủ giá và suất thật.
  */
-export function BuyBox({ productId, slug, name, priceVnd, imageUrl, dropId, dropLabel, slotsLeft, available }: BuyBoxProps) {
+export function BuyBox({ productId, slug, name, priceVnd, listPriceVnd, showSummary = true, imageUrl, dropId, dropLabel, slotsLeft, available }: BuyBoxProps) {
   const router = useRouter();
   const [qty, setQty] = useState(1);
   const max = Math.max(1, Math.min(99, slotsLeft ?? 99));
@@ -39,8 +43,11 @@ export function BuyBox({ productId, slug, name, priceVnd, imageUrl, dropId, drop
 
   return (
     <section aria-label="Đặt mua" className="flex flex-col gap-3 rounded-md border border-line bg-surface p-4">
-      <div className="flex items-baseline justify-between gap-3">
-        <Money value={priceVnd} className="font-display text-[24px] font-extrabold" />
+      <div className={cn("flex items-baseline justify-between gap-3", !showSummary && "hidden")}>
+        <span className="flex items-baseline gap-2">
+          <Money value={priceVnd} className="font-display text-[24px] font-extrabold" />
+          {listPriceVnd && listPriceVnd > priceVnd ? <Money value={listPriceVnd} strike className="text-[15px]" /> : null}
+        </span>
         {dropId ? (
           <Badge tone="accent" icon={<Hourglass />}>
             {dropLabel ?? "Đặt trong đợt"}

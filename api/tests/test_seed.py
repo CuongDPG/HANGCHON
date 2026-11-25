@@ -64,6 +64,12 @@ async def test_demo_story_covers_every_module_and_is_idempotent(owner, monkeypat
         assert await s.scalar(select(func.count(AIActivity.id))) > 20
         assert await s.scalar(select(func.count(LedgerEntry.id)).where(LedgerEntry.kind == "revenue")) >= 8
         assert await s.scalar(select(func.count(WeeklyReport.id))) >= 3
+        from app.modules.control.models import AppSetting, User
+        from app.modules.selection.models import TasteProfile
+
+        assert (await s.get(AppSetting, "store.picker_name")).value == "Thu (tên ví dụ)"
+        assert await s.scalar(select(func.count(User.id)).where(User.role == "helper")) == 1
+        assert max((await s.execute(select(TasteProfile.sample_count))).scalars()) >= 10
 
 
 async def test_demo_refuses_prod_without_explicit_flag(monkeypatch, caplog) -> None:

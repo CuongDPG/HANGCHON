@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { ShelfResults, ShelfSkeleton } from "@/components/catalog/shelf";
 import { Seal } from "@/components/ui/seal";
+import { catalogApi } from "@/lib/api/catalog";
+import { formatNumber } from "@/lib/format";
 
 export const metadata: Metadata = {
   title: { absolute: "Hàng Chọn · Kệ hàng đã chọn, món nào cũng đã dùng thử" },
@@ -22,7 +24,9 @@ export default function ShelfPage({ searchParams }: PageProps<"/">) {
             Ít món thôi. Món nào cũng đã dùng thử.
           </h1>
         </div>
-        <Seal size={56} className="hidden shrink-0 sm:inline-grid" />
+        <Suspense fallback={null}>
+          <ShelfSeal />
+        </Suspense>
       </header>
       <Suspense fallback={<ShelfSkeleton />}>
         <ShelfBody searchParams={searchParams} />
@@ -42,4 +46,25 @@ async function ShelfBody({ searchParams }: { searchParams: PageProps<"/">["searc
   const sp = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? null;
   return <ShelfResults q={one(sp.q)?.trim() || null} nhom={one(sp.nhom)} />;
+}
+
+/** Con dấu ở đầu kệ mang số thật của Bàn chọn: đã chọn bao nhiêu món trong bao nhiêu món đã xem. */
+async function ShelfSeal() {
+  const stats = await catalogApi
+    .about()
+    .then((a) => a.stats)
+    .catch(() => null);
+  if (!stats || !stats.viewed || !stats.chosen) return null;
+  return (
+    <div className="hidden shrink-0 items-center gap-3 sm:flex">
+      <p className="text-right text-[13px] leading-snug text-ink-2">
+        <span className="block">
+          Đã chọn <span className="font-semibold text-ink">{formatNumber(stats.chosen)}</span> món
+        </span>
+        <span className="block">trong {formatNumber(stats.viewed)} món đã xem</span>
+      </p>
+      {/* tỉ lệ dài (vd. 38/1240) không vừa lòng dấu: chữ bên cạnh đã ghi đủ số */}
+      {`${stats.chosen}/${stats.viewed}`.length <= 5 ? <Seal chosen={stats.chosen} total={stats.viewed} size={64} /> : <Seal size={64} />}
+    </div>
+  );
 }
