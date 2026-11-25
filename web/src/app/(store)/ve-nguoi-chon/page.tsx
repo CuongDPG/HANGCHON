@@ -58,7 +58,7 @@ async function AboutBody() {
   ];
   const ratio = a.stats.ratio_pct !== null ? `${a.stats.ratio_pct.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%` : "—";
   return (
-    <div className="flex flex-col gap-6 md:mx-auto md:max-w-[44rem]">
+    <div className="flex flex-col gap-6">
       <JsonLd data={jsonld} />
       <header className="flex items-center gap-4">
         <span className="grid size-16 shrink-0 place-items-center rounded-full bg-soft text-ink-2" aria-hidden>

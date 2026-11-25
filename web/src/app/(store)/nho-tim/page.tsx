@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 /** Nhờ chị tìm (e9). Danh sách đọc kèm cookie thiết bị để biết bạn đã bấm «cùng cần» món nào. */
 export default function FindPage({ searchParams }: PageProps<"/nho-tim">) {
   return (
-    <div className="flex flex-col gap-5 md:mx-auto md:w-full md:max-w-[44rem]">
+    <div className="flex flex-col gap-5">
       <PageHeader title="Bạn cần món gì mà chưa tìm được loại ưng?" description="Người khác cũng cần thì bấm «mình cũng cần». Đây là cộng đồng." />
       <Suspense fallback={<SkeletonList rows={4} />}>
         <FindBody searchParams={searchParams} />

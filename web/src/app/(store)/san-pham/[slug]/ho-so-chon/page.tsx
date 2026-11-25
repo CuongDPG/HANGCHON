@@ -54,7 +54,7 @@ async function DossierBody({ params }: { params: PageProps<"/san-pham/[slug]/ho-
   const f = d.funnel;
   const title = `${shortName(p.name)}: xem ${f.viewed ?? "?"}, mua thử ${f.tried ?? 0}, chọn ${f.selected ?? 1}`;
   return (
-    <div className="flex flex-col gap-6 md:mx-auto md:max-w-[44rem]">
+    <div className="flex flex-col gap-6">
       <PageHeader title={title} eyebrow="Hồ sơ chọn" backHref={`/san-pham/${p.slug}`} />
       <FunnelStrip funnel={f} />
 

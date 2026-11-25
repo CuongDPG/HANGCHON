@@ -110,9 +110,12 @@ class Driver(SourcesDriver):
             url=url,
             description="Mô tả gốc (giả lập) của sản phẩm.",
             images=[placeholder_image(url, i) for i in range(4)],
+            # chỉ thông số đúng với mọi loại hàng (trước đây ra «Dung tích» cho cả đèn, móc treo…)
             specs={
-                "Chất liệu": r.choice(["Inox 304", "Silicon", "Nhựa PP", "Tre"]),
-                "Dung tích": f"{r.randint(3, 10)}00ml",
+                "Xuất xứ": "Nhật Bản"
+                if platform in (SourcePlatform.RAKUTEN, SourcePlatform.AMAZON_JP)
+                else "Trung Quốc",
+                "Quy cách đóng gói": r.choice(["1 cái/túi", "1 cái/hộp giấy"]),
             },
             variants=[{"Màu": c} for c in r.sample(["Trắng", "Xám", "Xanh chàm", "Be"], 2)],
             moq=r.choice([1, 2, 10, 50]),

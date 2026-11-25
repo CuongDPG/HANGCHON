@@ -16,7 +16,7 @@ const SUGGESTIONS = ["Có bình giữ nhiệt nào nhẹ không?", "Món nào d�
 /** Hỏi trợ lý (e7). `?mon=<slug>` → hỏi về đúng một món. */
 export default function AskPage({ searchParams }: PageProps<"/hoi">) {
   return (
-    <div className="flex flex-col gap-5 md:mx-auto md:w-full md:max-w-[40rem]">
+    <div className="flex flex-col gap-5">
       <Suspense fallback={<PageHeader title="Hỏi trợ lý" />}>
         <AskBody searchParams={searchParams} />
       </Suspense>

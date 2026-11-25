@@ -63,7 +63,7 @@ export function DeskShell({ children }: { children: ReactNode }) {
     <div className="min-h-dvh">
       <DeskSidebar activeKey={active?.key} userName={user?.name} userEmail={user?.email} />
       <div className="md:pl-sidebar">
-        <main id="noi-dung" className={cn(MAIN_CLASS, isWide(pathname) && "max-w-none")}>
+        <main id="noi-dung" className={MAIN_CLASS}>
           {gate}
           <div hidden={!ready} inert={!ready}>
             {children}
@@ -77,14 +77,9 @@ export function DeskShell({ children }: { children: ReactNode }) {
   );
 }
 
-/** Màn dạng bảng (nhiều cột) dùng hết bề rộng; màn danh sách/biểu mẫu giữ cột đọc vừa phải. */
-const WIDE_ROUTES = [/^\/desk\/ban-chon\/?$/, /^\/desk\/noi-dung\/lich\/?$/, /^\/desk\/san-hang\/so-sanh\/[^/]+\/?$/];
-function isWide(pathname: string) {
-  return WIDE_ROUTES.some((r) => r.test(pathname));
-}
-
+/** Mọi màn bàn làm việc cùng một bề rộng (tới 1440px) để chuyển màn không bị nhảy khung. */
 const MAIN_CLASS =
-  "mx-auto w-full max-w-[60rem] px-4 pt-[max(16px,env(safe-area-inset-top))] pb-[calc(var(--spacing-tabbar)+env(safe-area-inset-bottom,0px)+88px)] md:px-8 md:pt-8 md:pb-28";
+  "mx-auto w-full max-w-[90rem] px-4 pt-[max(16px,env(safe-area-inset-top))] pb-[calc(var(--spacing-tabbar)+env(safe-area-inset-bottom,0px)+88px)] md:px-8 md:pt-8 md:pb-28";
 
 function ContentLoading() {
   return (

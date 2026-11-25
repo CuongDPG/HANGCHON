@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Đánh giá món đã nhận", robot
 /** Đánh giá có ảnh (e8): link mã một lần gửi cho khách sau khi nhận hàng. */
 export default function ReviewPage({ params }: PageProps<"/danh-gia/[token]">) {
   return (
-    <div className="flex flex-col gap-5 md:mx-auto md:w-full md:max-w-[36rem]">
+    <div className="flex flex-col gap-5">
       <Suspense fallback={<Skeleton className="h-80 w-full" />}>
         <ReviewBody params={params} />
       </Suspense>
