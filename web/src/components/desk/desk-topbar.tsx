@@ -24,7 +24,7 @@ const TOP_NAV = DESK_NAV.filter((i) => TOP_KEYS.includes(i.key));
 const MORE_NAV = DESK_NAV.filter((i) => !TOP_KEYS.includes(i.key));
 
 /** Lề ngang của hàng menu = lề của nội dung (MAIN_CLASS) để logo thẳng mép nội dung. */
-export const DESK_FRAME = "mx-auto w-full max-w-[90rem] md:px-8";
+export const DESK_FRAME = "mx-auto w-full max-w-[120rem] md:px-8"; // bàn làm việc ưu tiên máy tính: dùng gần hết màn rộng (tới 1920px)
 
 const ITEM = "relative flex h-header shrink-0 items-center gap-1.5 px-3 text-[15px] whitespace-nowrap transition-colors";
 const ACTIVE_MARK = "after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-accent";
