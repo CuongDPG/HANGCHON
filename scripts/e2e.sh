@@ -31,6 +31,9 @@ docker exec "$PG" psql -U "$PG_USER" -d postgres -qc "DROP DATABASE IF EXISTS $D
 
 export DATABASE_URL="postgresql+asyncpg://hangchon:hangchon@localhost:5442/$DB"
 export APP_ENV=dev AI_PROVIDER=fake ANTHROPIC_API_KEY= JOBS_EAGER=false JOBS_QUEUE_NAME="arq:hangchon:e2e:$WT"
+# mỗi lần chạy là một hệ thống mới (CSDL mới) → xoá luôn bộ đếm giới hạn tần suất của lần trước (khoá theo hàng đợi)
+docker compose -f "$ROOT/docker-compose.yml" exec -T redis sh -c \
+  "redis-cli --scan --pattern 'rl:$JOBS_QUEUE_NAME:*' | xargs -r redis-cli del" >/dev/null
 export SOURCES_DRIVER=mock SOCIAL_DRIVER=mock SOCIAL_CHANNEL_DRIVERS= PAYMENTS_DRIVER=mock SHIPPING_DRIVER=mock
 export NOTIFY_DRIVER=mock MARKETPLACES_DRIVER=mock EINVOICE_DRIVER=mock STORAGE_DRIVER=local
 export STORAGE_LOCAL_DIR="$RUN/storage" STORAGE_PUBLIC_BASE_URL="http://localhost:$WEB_PORT/api/files"
