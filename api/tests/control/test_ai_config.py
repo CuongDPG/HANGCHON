@@ -184,8 +184,11 @@ async def test_validation(owner_client: httpx.AsyncClient):
 
 
 def test_encryption_roundtrip_and_wrong_key(monkeypatch: pytest.MonkeyPatch):
+    from app.core.config import DEV_SECRETS_ENCRYPTION_KEY
     from app.core.secrets import encrypt, mask, redact
 
+    # không phụ thuộc SECRETS_ENCRYPTION_KEY trong api/.env của máy chạy test
+    monkeypatch.setattr(settings, "secrets_encryption_key", DEV_SECRETS_ENCRYPTION_KEY)
     token = encrypt(ANTHROPIC_KEY)
     assert ANTHROPIC_KEY not in token and decrypt(token) == ANTHROPIC_KEY
     assert encrypt(ANTHROPIC_KEY) != token  # IV ngẫu nhiên
@@ -194,8 +197,6 @@ def test_encryption_roundtrip_and_wrong_key(monkeypatch: pytest.MonkeyPatch):
         decrypt(token)
     assert "SECRETS_ENCRYPTION_KEY" in e.value.message
     # xoay khoá: khoá mới đứng đầu, khoá cũ vẫn giải mã được
-    from app.core.config import DEV_SECRETS_ENCRYPTION_KEY
-
     monkeypatch.setattr(settings, "secrets_encryption_key", f"{OTHER_FERNET_KEY},{DEV_SECRETS_ENCRYPTION_KEY}")
     assert decrypt(token) == ANTHROPIC_KEY
     assert mask(OPENROUTER_KEY) == "sk-or-v…9ZZZ" and mask(None) is None

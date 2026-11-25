@@ -126,7 +126,7 @@ function PODetail({ po }: { po: PurchaseOrder }) {
         {editable ? (
           <Textarea aria-label="Nội dung đơn" value={message} onChange={(e) => setMessage(e.target.value)} rows={6} />
         ) : (
-          <pre className="rounded-md border border-line bg-surface p-3 font-sans text-[15px] whitespace-pre-wrap">{po.message_draft ?? "—"}</pre>
+          <pre className="rounded-md border border-line bg-surface p-3 font-sans text-[15px] whitespace-pre-wrap [overflow-wrap:anywhere]">{po.message_draft ?? "—"}</pre>
         )}
         <div className="flex flex-wrap gap-2">
           <Button
@@ -146,7 +146,7 @@ function PODetail({ po }: { po: PurchaseOrder }) {
             </Button>
           ) : null}
         </div>
-        {po.notes ? <p className="text-[14px] whitespace-pre-line text-ink-2">{po.notes}</p> : null}
+        {po.notes ? <p className="text-[14px] whitespace-pre-line text-ink-2 [overflow-wrap:anywhere]">{po.notes}</p> : null}
       </section>
 
       {/* hành động theo trạng thái */}
