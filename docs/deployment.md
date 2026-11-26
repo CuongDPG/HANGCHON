@@ -282,10 +282,11 @@ dùng image GHCR theo `IMAGE_TAG`, thêm `cloudflared`), [`scripts/server-bootst
   image GHCR luôn trỏ `http://hangchon-api:8000`; `docker-compose.server.yml` gắn bí danh mạng `hangchon-api` cho API để địa chỉ
   đó luôn đúng. Không cần biến nào ở GitHub cho web.
 - Image **không chứa bí mật**: dựng từ bản checkout git (chỉ tệp đã commit — repo vốn công khai), `.dockerignore` loại `.env*`,
-  không build-arg bí mật. Vì vậy hai gói GHCR để **công khai** (máy chủ pull không cần đăng nhập). Gói mới tạo trên GHCR mặc
-  định *Private*: lần đầu vào GitHub → hồ sơ → *Packages* → `hangchon-api` / `hangchon-web` → *Package settings* →
-  *Change visibility* → *Public* (GitHub không có API đổi việc này). Để private thì trên máy chủ chạy một lần
-  `docker login ghcr.io` bằng token *read:packages* dưới user deploy.
+  không build-arg bí mật. Vì vậy hai gói GHCR để **công khai** (máy chủ pull không cần đăng nhập) — lần đẩy đầu 26/11 gói
+  đã tự công khai theo repo (kiểm: pull ẩn danh được). Nếu có lúc thấy *Private*: GitHub → hồ sơ → *Packages* → gói →
+  *Package settings* → *Change visibility* → *Public*; hoặc giữ private và chạy một lần `docker login ghcr.io` (token
+  *read:packages*) dưới user deploy. Danh sách nền tảng có thêm mục `unknown/unknown`: đó là attestation (provenance) của
+  buildx, không phải image. Cỡ image (arm64, 26/11): api ≈ 1,3 GB, web ≈ 450 MB — lần pull đầu mất vài phút.
 
 ### 10.2 Khai trên GitHub (Settings → Environments → `production` → Environment secrets)
 
