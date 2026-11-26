@@ -30,12 +30,15 @@ services:
     image: ${IMAGE_REPO:-ghcr.io/cuongdpg/hangchon}-web:${IMAGE_TAG:-latest}
 
   cloudflared:
+    # chỉ chạy khi .env có COMPOSE_PROFILES=tunnel (đặt cùng lúc với CLOUDFLARE_TUNNEL_TOKEN); chưa có tunnel thì máy chủ
+    # vẫn deploy được và kiểm qua SSH (ssh -L), xem docs/deployment.md mục 10.7
+    profiles: [tunnel]
     image: cloudflare/cloudflared:2026.11.2
     container_name: ${CONTAINER_PREFIX:-hangchon}-cloudflared
     restart: unless-stopped
     command: ["tunnel", "--no-autoupdate", "run"]
     environment:
-      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?CLOUDFLARE_TUNNEL_TOKEN bắt buộc (Cloudflare Zero Trust → Networks → Tunnels)}
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}  # Cloudflare → Networking → Tunnels
     depends_on:
       web:
         condition: service_healthy

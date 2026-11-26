@@ -342,6 +342,7 @@ Rồi tạo `/opt/hangchon/.env` (chủ `deploy`, `chmod 600`) với các biến
 
 ```bash
 CLOUDFLARE_TUNNEL_TOKEN=…                 # mục 10.5
+COMPOSE_PROFILES=tunnel                   # bật container cloudflared; chưa có tunnel thì bỏ hai dòng này (kiểm qua ssh -L, mục 10.7)
 COMPOSE_FILE=docker-compose.prod.yml:docker-compose.server.yml   # để gõ tay `docker compose ps/logs` trong thư mục này
 # IMAGE_TAG do server-deploy.sh tự ghi, không đặt tay
 ```
@@ -349,7 +350,8 @@ COMPOSE_FILE=docker-compose.prod.yml:docker-compose.server.yml   # để gõ tay
 ### 10.5 Cloudflare: tên miền, Tunnel
 
 1. Tên miền dùng nameserver của Cloudflare. *SSL/TLS → Edge Certificates*: bật *Always Use HTTPS*.
-2. *Zero Trust → Networks → Tunnels → Create a tunnel* (loại Cloudflared) → chép **token** vào `CLOUDFLARE_TUNNEL_TOKEN`.
+2. *Networking → Tunnels → Create a tunnel* (bảng điều khiển cũ: *Zero Trust → Networks → Tunnels*; loại Cloudflared) → chép
+   **token** vào `CLOUDFLARE_TUNNEL_TOKEN` và thêm `COMPOSE_PROFILES=tunnel` vào `.env`, rồi chạy lại `./server-deploy.sh <tag đang chạy>`.
    Bỏ qua bước cài cloudflared trên máy (đã có container `hangchon-cloudflared`).
 3. *Public hostnames* của tunnel, **dòng `/api` đứng trước** (Cloudflare xét từ trên xuống):
 
@@ -394,6 +396,14 @@ S3_SECRET_KEY=…
    trong `.env`, `pull`, `up -d --wait` (lần đầu API tự migrate và tạo tài khoản chị), kiểm `/api/health`. Dịch vụ nào không
    healthy trong 7 phút → job đỏ, in log.
 3. Mở `https://<tên miền>/api/health`, đăng nhập, làm danh sách kiểm mục 8.
+
+**Kiểm trước khi có tên miền/tunnel:** bỏ `COMPOSE_PROFILES=tunnel` khỏi `.env` (không chạy cloudflared), deploy như trên, rồi
+nối qua SSH — không mở cổng nào trên máy chủ:
+
+```bash
+ssh -N -L 3999:$(ssh deploy@<IP> "docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' hangchon-web"):3000 deploy@<IP>
+# mở http://localhost:3999 — Chrome/Firefox coi localhost là ngữ cảnh an toàn nên cookie Secure vẫn đăng nhập được
+```
 
 **Quay về bản cũ:** trên máy chủ `cd /opt/hangchon && ./server-deploy.sh sha-<bản trước>` (lịch sử ở `.deploy-history`).
 Script không tự quay về: bản mới có thể đã migrate CSDL — xem migration trước khi lùi.
