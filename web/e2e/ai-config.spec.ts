@@ -31,7 +31,7 @@ test("chị nhập khoá, lưu, thấy khoá bị che; kiểm tra kết nối v�
   await login(page, OWNER.email, OWNER.password);
 
   await page.goto("/desk/cai-dat");
-  await main(page).getByRole("link", { name: /AI và khoá API/ }).click();
+  await main(page).getByRole("navigation", { name: "Mục cài đặt" }).getByRole("link", { name: "AI", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "AI và khoá API" })).toBeVisible();
   await expect(main(page).getByText("Đang dùng: AI giả")).toBeVisible();
 
@@ -83,8 +83,11 @@ test("người phụ giúp không thấy, không vào được cấu hình AI", 
   const helper = await ctx.newPage();
   await login(helper, email, password);
   await helper.goto("/desk/cai-dat");
-  await expect(helper.getByRole("heading", { level: 1, name: "Cài đặt" })).toBeVisible();
-  await expect(main(helper).getByRole("link", { name: /AI và khoá API/ })).toHaveCount(0);
+  await expect(helper.getByRole("heading", { level: 1, name: "Cửa hàng" })).toBeVisible();
+  const tabs = main(helper).getByRole("navigation", { name: "Mục cài đặt" });
+  await expect(tabs.getByRole("link", { name: "Tích hợp" })).toBeVisible();
+  await expect(tabs.getByRole("link", { name: "AI", exact: true })).toHaveCount(0);
+  await expect(tabs.getByRole("link", { name: "Mạng xã hội" })).toHaveCount(0);
   await helper.goto("/desk/cai-dat/ai");
   await expect(main(helper).getByText("Chỉ chị (chủ cửa hàng) xem được phần này")).toBeVisible();
   expect((await helper.request.get("/api/desk/control/ai/config")).status()).toBe(403);

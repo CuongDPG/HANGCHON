@@ -77,3 +77,12 @@ async def ai_cost_expense(ctx: dict[str, Any]) -> int:
         total = await record_ai_cost(db, month_key(start - timedelta(days=1)))
         await db.commit()
         return total
+
+
+@cron("control.refresh_channel_tokens", hour={4}, minute={20})
+async def refresh_channel_tokens(ctx: dict[str, Any]) -> dict[str, str]:
+    """Hằng ngày 4:20: làm mới token các kênh đã «Kết nối» (TikTok, Shopee, TikTok Shop) và mã Threads cũ hơn 7 ngày,
+    để token không chết khi lâu không đăng (refresh token Shopee chỉ sống 30 ngày)."""
+    from app.integrations.channel_oauth import refresh_due_tokens
+
+    return await refresh_due_tokens()

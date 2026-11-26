@@ -7,6 +7,7 @@ from datetime import date, datetime, time, timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Query, Request, Response, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 
 from app.ai import config as ai_config
@@ -18,8 +19,9 @@ from app.core.errors import BadRequest, Conflict, NotFound, Unauthorized
 from app.core.pagination import Page, Paginated, paginate
 from app.core.security import create_access_token, hash_password, verify_password
 from app.core.timeutil import VN_TZ, now_utc
+from app.integrations import channel_config
 from app.integrations.base import KINDS, driver_name
-from app.modules.control import ai_settings, links, service
+from app.modules.control import ai_settings, channels, links, service
 from app.modules.control.models import (
     ActivityMode,
     AIActivity,
@@ -48,6 +50,11 @@ from app.modules.control.schemas import (
     BatchApproveIn,
     BatchApproveOut,
     BudgetUpdate,
+    ChannelAccountIn,
+    ChannelAccountOut,
+    ChannelCheckIn,
+    ChannelCheckOut,
+    ChannelConnectOut,
     CommandIn,
     CommandOut,
     IntegrationOut,
@@ -425,6 +432,39 @@ async def list_audit(
     return await paginate(db, q.order_by(AuditLog.created_at.desc()), page, _row, scalars=False)
 
 
+# tài khoản kênh: Cài đặt → Mạng xã hội — chỉ owner (khoá chỉ trả dạng che)
+
+
+@router.get("/channels", response_model=list[ChannelAccountOut], summary="Tài khoản từng kênh + công tắc thật/giả lập")
+async def list_channel_accounts(_: OwnerUser, db: DbSession) -> list[dict]:
+    return await channels.list_views(db)
+
+
+@router.patch("/channels/{channel}", response_model=ChannelAccountOut, summary="Lưu khoá / công tắc của một kênh")
+async def save_channel_account(channel: str, body: ChannelAccountIn, user: OwnerUser, db: DbSession) -> dict:
+    return await channels.save(db, channel, mode=body.mode, values=body.values, clear=body.clear, user=user)
+
+
+@router.post("/channels/{channel}/check", response_model=ChannelCheckOut, summary="Kiểm tra kết nối với nền tảng")
+async def check_channel_account(channel: str, body: ChannelCheckIn, user: OwnerUser, db: DbSession) -> dict:
+    return await channels.run_check(db, channel, body.values, user)
+
+
+@router.post("/channels/{channel}/connect", response_model=ChannelConnectOut, summary="Link cấp quyền (OAuth)")
+async def connect_channel_account(channel: str, user: OwnerUser, db: DbSession) -> dict:
+    return await channels.start_connect(db, channel, user)
+
+
+oauth_hooks = APIRouter(prefix="/api/hooks/oauth", tags=["hooks"])
+
+
+@oauth_hooks.get("/{channel}", include_in_schema=False)
+async def oauth_callback(channel: str, request: Request, db: DbSession) -> RedirectResponse:
+    """Nền tảng chuyển chị về đây sau khi cấp quyền; xác thực bằng `state` một lần (15 phút) do chị tạo."""
+    url = await channels.finish_connect(db, channel, dict(request.query_params))
+    return RedirectResponse(url, status_code=status.HTTP_303_SEE_OTHER)
+
+
 INTEGRATION_LABELS = {
     "sources": "Nguồn hàng (săn hàng)",
     "social": "Mạng xã hội",
@@ -454,6 +494,15 @@ async def list_integrations(_: CurrentUser) -> list[IntegrationOut]:
             available = []
         name = driver_name(kind)
         used = settings.integration_drivers(kind) if kind in MOCKABLE_INTEGRATIONS else [name]
+        if kind in ("social", "marketplaces"):  # công tắc từng kênh ở Cài đặt → Mạng xã hội thắng biến môi trường
+            chans = channel_config.SOCIAL_CHANNELS if kind == "social" else channel_config.MARKETPLACE_CHANNELS
+            if any(channel_config.mode(c) for c in chans):
+                used = list(
+                    dict.fromkeys(
+                        channel_config.SPECS[c].driver if channels.effective_mode(c) == "real" else "mock"
+                        for c in chans
+                    )
+                )
         any_mock = "mock" in used
         out.append(
             IntegrationOut(
@@ -486,4 +535,4 @@ async def command(body: CommandIn, user: CurrentUser, db: DbSession) -> dict:
     return await service.run_command(db, user, body.text, body.context)
 
 
-routers = [auth_router, users_router, router]
+routers = [auth_router, users_router, router, oauth_hooks]

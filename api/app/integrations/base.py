@@ -50,5 +50,8 @@ def get_driver(kind: str, name: str | None = None) -> Any:
 
 
 def reset_drivers() -> None:
-    """Xoá bộ nhớ đệm driver (test)."""
+    """Xoá bộ nhớ đệm driver và bản chụp cấu hình kênh (test)."""
+    from app.integrations import channel_config
+
     _instances.clear()
+    channel_config.reset()

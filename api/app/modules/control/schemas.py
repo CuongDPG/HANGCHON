@@ -463,3 +463,85 @@ class IntentOut(BaseModel):
     label: str
     description: str
     examples: list[str]
+
+
+# ---- tài khoản kênh (Cài đặt → Mạng xã hội) ----------------------------------------------------------------------
+
+
+class ChannelFieldOut(BaseModel):
+    key: str
+    label: str
+    secret: bool
+    required: bool
+    oauth: bool = Field(description="Do nút «Kết nối» điền")
+    hint: str = ""
+    value: str | None = Field(default=None, description="Chỉ có với ô không bí mật")
+    masked: str | None = Field(default=None, description="Bí mật: chỉ 4 ký tự cuối")
+    is_set: bool
+    source: Literal["settings", "env"] | None = None
+
+
+class ChannelSharedOut(BaseModel):
+    channel: str
+    key: str
+    label: str
+    is_set: bool
+
+
+class ChannelCheckOut(BaseModel):
+    ok: bool
+    message: str
+    account_name: str | None = None
+    at: str | None = None
+
+
+class ChannelOAuthOut(BaseModel):
+    supported: bool
+    redirect_uri: str | None = None
+    connected: bool = False
+    expires_at: float | None = None
+    refresh_expires_at: float | None = None
+
+
+class ChannelLinkOut(BaseModel):
+    label: str
+    url: str
+
+
+class ChannelGuideOut(BaseModel):
+    needs: list[str]
+    steps: list[str]
+    limits: list[str]
+    links: list[ChannelLinkOut]
+
+
+class ChannelAccountOut(BaseModel):
+    channel: str
+    label: str
+    kind: Literal["social", "marketplaces", "manual"]
+    driver: str
+    mode: Literal["mock", "real"]
+    mode_source: Literal["settings", "env"]
+    status: Literal["manual", "mock", "connected", "not_connected"]
+    ready: bool = Field(description="Đã đủ các ô bắt buộc")
+    account_name: str | None = None
+    fields: list[ChannelFieldOut]
+    shared: list[ChannelSharedOut]
+    check: ChannelCheckOut | None = None
+    oauth: ChannelOAuthOut
+    guide: ChannelGuideOut
+
+
+class ChannelAccountIn(BaseModel):
+    mode: Literal["mock", "real"] | None = None
+    values: dict[str, str] = Field(default_factory=dict, description="Ô bí mật để trống = giữ giá trị cũ")
+    clear: list[str] = Field(default_factory=list, description="Xoá giá trị đã lưu (về biến môi trường)")
+
+
+class ChannelCheckIn(BaseModel):
+    values: dict[str, str] = Field(default_factory=dict, description="Giá trị đang nhập, chưa lưu")
+
+
+class ChannelConnectOut(BaseModel):
+    url: str
+    redirect_uri: str

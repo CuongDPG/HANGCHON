@@ -12,7 +12,7 @@ trả lời bình luận, nhắn riêng từ bình luận (private reply), gửi
   `POST /{page-id}/messages` (Instagram Messaging qua Facebook Login, dùng Page token)
 
 Cấu hình (settings): META_APP_SECRET, META_PAGE_ID, META_PAGE_TOKEN, META_IG_USER_ID, META_WEBHOOK_VERIFY_TOKEN,
-META_GRAPH_VERSION. Token không lưu trong CSDL. Lớp `MetaMessaging` được gộp vào driver `meta` (`meta.py`).
+META_GRAPH_VERSION. Cài đặt → Mạng xã hội ghi đè các biến này (`channel_config`, khoá mã hoá trong CSDL). Lớp `MetaMessaging` được gộp vào driver `meta` (`meta.py`).
 """
 
 from __future__ import annotations
@@ -28,6 +28,7 @@ from app.core.config import settings
 from app.core.enums import Channel
 from app.core.security import verify_hmac_sha256
 from app.core.timeutil import now_utc
+from app.integrations import channel_config as cc
 from app.integrations.base import IntegrationError, IntegrationNotConfigured
 from app.integrations.social import InboundEvent, SentMessage
 
@@ -69,14 +70,14 @@ class MetaMessaging:
         return settings.meta_graph_version
 
     def _token(self) -> str:
-        if not settings.meta_page_token:
+        if not cc.value("facebook", "page_token"):
             raise IntegrationNotConfigured("Chưa cấu hình META_PAGE_TOKEN cho trang Facebook.")
-        return settings.meta_page_token
+        return cc.value("facebook", "page_token")
 
     def _page_id(self) -> str:
-        if not settings.meta_page_id:
+        if not cc.value("facebook", "page_id"):
             raise IntegrationNotConfigured("Chưa cấu hình META_PAGE_ID.")
-        return settings.meta_page_id
+        return cc.value("facebook", "page_id")
 
     async def _post(self, path: str, body: dict[str, Any]) -> dict[str, Any]:
         url = f"{GRAPH}/{self.version}/{path.lstrip('/')}"
@@ -112,13 +113,13 @@ class MetaMessaging:
 
     def verify_subscription(self, params: dict[str, str]) -> str | None:
         """GET đăng ký webhook: trả `hub.challenge` khi verify token khớp, None nếu sai."""
-        token = settings.meta_webhook_verify_token
+        token = cc.value("facebook", "webhook_verify_token")
         if params.get("hub.mode") == "subscribe" and token and params.get("hub.verify_token") == token:
             return params.get("hub.challenge", "")
         return None
 
     def check_signature(self, headers: dict[str, str], body: bytes) -> None:
-        secret = settings.meta_app_secret
+        secret = cc.value("facebook", "app_secret")
         if not secret:
             raise IntegrationNotConfigured("Chưa cấu hình META_APP_SECRET để kiểm chữ ký webhook.")
         sig = {k.lower(): v for k, v in headers.items()}.get("x-hub-signature-256", "")
@@ -191,7 +192,7 @@ class MetaMessaging:
             if field != "comments":
                 return None
             author = v.get("from") or {}
-            if settings.meta_ig_user_id and str(author.get("id", "")) == settings.meta_ig_user_id:
+            if cc.value("instagram", "ig_user_id") and str(author.get("id", "")) == cc.value("instagram", "ig_user_id"):
                 return None
             comment_id = str(v.get("id", ""))
             post_id = str((v.get("media") or {}).get("id", "")) or None
@@ -216,7 +217,7 @@ class MetaMessaging:
         if user_id in self._names:
             return self._names[user_id]
         fallback = "Khách Instagram" if channel == Channel.INSTAGRAM else "Khách Facebook"
-        if not settings.meta_page_token:
+        if not cc.value("facebook", "page_token"):
             return fallback
         fields = "name,username" if channel == Channel.INSTAGRAM else "first_name,last_name,name"
         data = await self._get(user_id, {"fields": fields})

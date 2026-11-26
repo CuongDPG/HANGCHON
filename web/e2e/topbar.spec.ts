@@ -56,8 +56,39 @@ test("đi bằng menu trên và «Thêm», đánh dấu mục đang mở, dùng 
   await page.keyboard.press("End");
   await expect(items.last()).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(page).toHaveURL(/\/desk\/cai-dat/);
+  await expect(page).toHaveURL(/\/desk\/so-sach/);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+});
+
+test("một cụm menu canh phải; Cài đặt chỉ ở menu tài khoản; không còn nút sáng/tối", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/desk");
+  await expect(page.getByRole("heading", { level: 1, name: "Hôm nay" })).toBeVisible();
+  const banner = page.getByRole("banner");
+  await expect(banner.getByRole("button", { name: /^Giao diện/ })).toHaveCount(0);
+
+  // logo trái, mục chính + «Thêm» + ảnh đại diện dồn về phải thành một cụm
+  const account = banner.getByRole("button", { name: /^Tài khoản/ });
+  const logo = (await banner.getByRole("link", { name: /Hàng Chọn/ }).boundingBox())!;
+  const first = (await nav(page).getByRole("link").first().boundingBox())!;
+  const moreBox = (await more(page).boundingBox())!;
+  const accBox = (await account.boundingBox())!;
+  expect(accBox.x - (moreBox.x + moreBox.width)).toBeLessThan(24);
+  expect(first.x - (logo.x + logo.width)).toBeGreaterThan(120);
+
+  // «Thêm» không còn Cài đặt
+  await more(page).click();
+  await expect(page.getByRole("menu", { name: /^Thêm/ }).getByRole("menuitem", { name: "Cài đặt" })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+
+  // menu tài khoản: tên/email, Cài đặt, Bộ giao diện, Đăng xuất — Cài đặt mở tab đầu
+  await account.click();
+  const menu = page.getByRole("menu", { name: /^Tài khoản/ });
+  await expect(menu.getByRole("menuitem")).toHaveText(["Cài đặt", "Bộ giao diện", "Đăng xuất"]);
+  await menu.getByRole("menuitem", { name: "Cài đặt" }).click();
+  await expect(page).toHaveURL(/\/desk\/cai-dat\/cua-hang$/);
+  await account.click();
+  await expect(menu.getByRole("menuitem", { name: "Cài đặt" })).toHaveAttribute("aria-current", "page");
 });
 
 test("1024px: mục thừa dồn vào «Thêm», hàng menu một dòng, không cuộn ngang", async ({ page }) => {

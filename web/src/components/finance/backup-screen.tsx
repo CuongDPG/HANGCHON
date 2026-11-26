@@ -16,6 +16,7 @@ import {
   notifyError,
   notifySuccess,
 } from "@/components/ui";
+import { SettingsNav } from "@/components/control/settings-nav";
 import { isOwner, useSession } from "@/lib/api/auth";
 import { useSaveSettings } from "@/lib/api/control";
 import { backupDownloadUrl, useBackupConfig, useBackups, useRunBackup, useVerifyBackup, type Backup, type BackupConfig } from "@/lib/api/finance";
@@ -41,7 +42,8 @@ export function BackupScreen() {
   if (user && !owner) {
     return (
       <div className="flex flex-col gap-4">
-        <PageHeader backHref="/desk/cai-dat" title="Sao lưu" />
+        <PageHeader title="Sao lưu" />
+        <SettingsNav />
         <EmptyState title="Chỉ chị (chủ cửa hàng) xem được phần này" />
       </div>
     );
@@ -63,7 +65,6 @@ export function BackupScreen() {
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
-        backHref="/desk/cai-dat"
         title="Sao lưu"
         description="Sao lưu toàn bộ dữ liệu cửa hàng mỗi đêm. «Kiểm khôi phục» chỉ mở bản sao ra đọc thử, không ghi đè dữ liệu đang dùng."
         actions={
@@ -72,6 +73,7 @@ export function BackupScreen() {
           </Button>
         }
       />
+      <SettingsNav />
 
       {cfg.data && !cfg.data.pg_dump ? (
         <Card tone="danger" className="flex items-start gap-3">

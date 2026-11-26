@@ -1,6 +1,6 @@
 # Sổ trạng thái chức năng
 
-Cập nhật 25/11/2026 (chiều), sau đợt rà đối chiếu thiết kế và 4 lát cắt bù phần thiếu (`feat/gu-chon`, `feat/don-khach`, `feat/nguon-noidung`, `feat/dieu-khien`). Danh mục gốc: [features.md](features.md).
+Cập nhật 26/11/2026 (thêm Cài đặt → Mạng xã hội); 25/11/2026 (chiều), sau đợt rà đối chiếu thiết kế và 4 lát cắt bù phần thiếu (`feat/gu-chon`, `feat/don-khach`, `feat/nguon-noidung`, `feat/dieu-khien`). Danh mục gốc: [features.md](features.md).
 
 **Cách đọc cột «Trạng thái»** (chỉ ghi «chạy thật» cho thứ đã tự thấy chạy — trong bài test tích hợp
 `api/tests/integration/test_lifecycle.py`, bài Playwright `web/e2e/lifecycle.spec.ts`, bài rà route `web/e2e/routes.spec.ts`
@@ -56,7 +56,7 @@ hoặc mở tay trên máy dev với dữ liệu mẫu `uv run python -m app.see
 | f1 | Một sản phẩm, nhiều bản | chạy với AI giả — xưởng có mọi món đã chọn (cả món chưa lên website); tab đầu là Website, bài Facebook/Instagram/Threads/TikTok/Zalo AI soạn khi trang website được đăng (sự kiện `product.published`), trước đó tab các kênh báo «Đăng trang website trước»; bài nào cũng có phần «Vì sao mình chọn», không nhắc hồ sơ chọn/mẫu bị loại/số món đã thử, AI không còn nhận số món đã xem và mẫu bị loại (25/11) | `/desk/noi-dung/san-pham/[id]`, `/desk/noi-dung/dot/[id]` |
 | f2 | Giọng của chị | chạy với AI giả; học từ bài dán, ghi chú và **giọng nói** (nút «Nói», Web Speech vi-VN) | `/desk/noi-dung/giong` |
 | f3 | Lịch đăng | chạy thật (xếp, đổi giờ, huỷ); AI xếp tuần bằng AI giả | `/desk/noi-dung/lich` |
-| f4 | Đăng tự động | chạy với mock, cần ứng dụng Meta (Facebook/Instagram/Threads), Zalo OA, TikTok (đẩy nháp) | `/desk/noi-dung/lich` |
+| f4 | Đăng tự động | chạy với mock, cần ứng dụng Meta (Facebook/Instagram/Threads), Zalo OA, TikTok (đẩy nháp) — chị nối và bật từng kênh ở *Cài đặt → Mạng xã hội* | `/desk/noi-dung/lich` |
 | f5 | Soát lời quảng cáo | chạy thật (luật số liệu/nói quá/kể quá trình chọn) + AI giả | xưởng nội dung |
 | f6 | Dựng video ngắn | một phần — dựng bằng ffmpeg trên máy (cần `ffmpeg`), kế hoạch cắt bằng AI giả; chưa thử với clip thật | `/desk/noi-dung/video` |
 | f7 | Đo và học | chạy với mock (số liệu bài giả lập); đơn theo bài qua `?src=` chạy thật | `/desk/noi-dung/so-lieu` |
@@ -70,7 +70,7 @@ hoặc mở tay trên máy dev với dữ liệu mẫu `uv run python -m app.see
 | g7 | Đổi trả, hoàn tiền | chạy thật (luôn chờ chị); AI kiểm điều kiện bằng AI giả; hoàn tiền thật phải chị chuyển tay | `/don/[code]`, `/desk/don-hang/[id]` |
 | g8 | Tồn kho nhỏ | chạy thật (giữ hàng khi đã trả, trừ khi giao hãng, nhập khi lô về; nhập tồn đầu kỳ, điều chỉnh tay có lý do và lịch sử, ngưỡng báo theo từng món; báo sắp hết tự làm) | `/desk/don-hang/van-hanh` |
 | g9 | Bán trên TikTok Shop, Shopee | chạy với mock, cần tài khoản TikTok Shop / Shopee Open Platform; đơn sàn có vận đơn/đã giao thì tự đẩy trạng thái lên sàn (không trùng, cron đẩy lại). Shopee viết theo tài liệu; **TikTok Shop chưa đối chiếu được tài liệu «Mark Package As Shipped»** — kiểm trước khi bật | `/desk/don-hang/van-hanh` |
-| h1 | Hộp thư gộp | chạy với mock, cần ứng dụng Meta + Zalo OA (webhook) | `/desk/khach`, `/desk/khach/hoi-thoai/[id]` |
+| h1 | Hộp thư gộp | chạy với mock, cần ứng dụng Meta + Zalo OA (webhook; khoá nhập ở *Cài đặt → Mạng xã hội*) | `/desk/khach`, `/desk/khach/hoi-thoai/[id]` |
 | h2 | AI soạn sẵn câu trả lời | chạy với AI giả | hội thoại |
 | h3 | Chuyển cho chị | chạy thật (luật khiếu nại/sức khoẻ) + AI giả | hội thoại, hàng chờ |
 | h4 | Sổ khách | chạy thật (hồ sơ ngay từ tin nhắn đầu); tóm tắt bằng AI giả | `/desk/khach/so-khach` |
@@ -88,23 +88,26 @@ hoặc mở tay trên máy dev với dữ liệu mẫu `uv run python -m app.see
 | k2 | Trần chi phí AI | chạy thật phần đếm/chặn; đổi nhà cung cấp/khoá/model/trần ngay ở Cài đặt (Anthropic, OpenRouter, AI giả). Anthropic đã gọi thật được với `claude-haiku-5-5`, `claude-opus-5-5`; OpenRouter mới kiểm bằng máy chủ giả, chưa gọi thật. Model ngoài bảng giá: OpenRouter lấy chi phí nó tự báo (`usage.cost`), provider khác tính theo giá model «việc khó» (có cảnh báo trong log) | `/desk/tu-chu/chi-phi-ai`, `/desk/cai-dat/ai` |
 | k3 | Nhãn AI và lưu vết | chạy thật; lưu vết cả việc đổi khoá API / cấu hình AI (ai đổi, lúc nào, đổi trường nào — không ghi giá trị khoá) | nhật ký AI, bài đăng |
 | k4 | Sao lưu và phân quyền | chạy thật phần tài khoản phụ; sao lưu chạy được khi máy có `pg_dump` hoặc container Postgres (`docker exec`), image prod có `postgresql-client-16`; chép ra S3/R2 khi điền `S3_*` (driver `s3` chưa thử thật); kiểm khôi phục (checksum + giải nén + cấu trúc, không ghi đè) | `/desk/cai-dat/sao-luu`, `/desk/cai-dat/nguoi-phu-giup` |
+| f4, h1, g9 | Tài khoản kênh (26/11) | chạy thật phần lưu/che khoá, công tắc giả lập ↔ thật mà driver tuân theo, lưu vết; **chưa thử với tài khoản thật** phần «Kiểm tra kết nối», «Kết nối» (OAuth TikTok, Shopee, TikTok Shop) và tự làm mới token (TikTok, Shopee, TikTok Shop, Threads, Zalo OA) — mới kiểm bằng máy chủ giả. Zalo: chưa có OAuth, chưa lấy tên OA (tài liệu không tải lại được). Hướng dẫn từng kênh: [channel-accounts.md](channel-accounts.md) | `/desk/cai-dat/mang-xa-hoi` |
 | k5 | Hoá đơn điện tử | một phần — luồng soạn/duyệt/chống trùng chạy với mock (prod từ chối phát hành bằng mock); **chưa có driver nhà cung cấp hoá đơn thật** | `/desk/so-sach` |
 
 ## Cần chị/anh cung cấp để bật driver thật
 
-Đặt vào `api/.env` (xem `api/.env.example`); chọn kênh mạng xã hội bằng `SOCIAL_CHANNEL_DRIVERS`.
+Mạng xã hội và sàn (Facebook, Instagram, Threads, TikTok, Zalo OA, Shopee, TikTok Shop): chị nhập ở *Cài đặt → Mạng xã hội*
+(thắng biến môi trường; hướng dẫn từng kênh ở [channel-accounts.md](channel-accounts.md)). Phần còn lại đặt vào `api/.env`
+(xem `api/.env.example`).
 
 | Việc | Cần | Biến |
 |---|---|---|
 | AI thật (mọi chức năng «AI giả») | Khoá Claude API hoặc OpenRouter, đặt trần chi phí tháng — nhập ở *Cài đặt → AI và khoá API* (mã hoá trong CSDL) | `SECRETS_ENCRYPTION_KEY` (bắt buộc ở prod); hoặc qua env: `AI_PROVIDER=anthropic`/`openrouter`, `ANTHROPIC_API_KEY`/`OPENROUTER_API_KEY`, `AI_MONTHLY_BUDGET_VND` |
 | Săn hàng 1688/Taobao | Tài khoản Onebound (key + secret) | `SOURCES_DRIVER=onebound`, `ONEBOUND_API_KEY`, `ONEBOUND_API_SECRET` (hoặc `SOURCES_DRIVER=web` chỉ cần khoá Anthropic) |
-| Facebook Page, Instagram, Threads (đăng bài + hộp thư) | Ứng dụng Meta đã duyệt quyền `pages_manage_posts`, `pages_messaging`, `instagram_content_publish`, `instagram_manage_messages`; Page token dài hạn; webhook trỏ về `/api/hooks/social/facebook` | `META_APP_ID`, `META_APP_SECRET`, `META_PAGE_ID`, `META_PAGE_TOKEN`, `META_IG_USER_ID`, `META_WEBHOOK_VERIFY_TOKEN`, `THREADS_USER_ID`, `THREADS_ACCESS_TOKEN` |
-| Zalo OA (tin nhắn, bài viết OA) | OA đã xác thực + ứng dụng Zalo, access token OA (làm mới định kỳ), webhook `/api/hooks/social/zalo_oa` | `ZALO_APP_ID`, `ZALO_OA_ID`, `ZALO_OA_ACCESS_TOKEN`, `ZALO_OA_SECRET` |
-| TikTok (đẩy bản nháp) | Ứng dụng TikTok for Developers có Content Posting API, token người dùng | `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET`, `TIKTOK_ACCESS_TOKEN` |
+| Facebook Page, Instagram, Threads (đăng bài + hộp thư) | *Cài đặt → Mạng xã hội* hoặc env. Ứng dụng Meta đã duyệt quyền `pages_manage_posts`, `pages_messaging`, `instagram_content_publish`, `instagram_manage_messages`; Page token dài hạn; webhook trỏ về `/api/hooks/social/facebook` | `META_APP_ID`, `META_APP_SECRET`, `META_PAGE_ID`, `META_PAGE_TOKEN`, `META_IG_USER_ID`, `META_WEBHOOK_VERIFY_TOKEN`, `THREADS_USER_ID`, `THREADS_ACCESS_TOKEN` |
+| Zalo OA (tin nhắn, bài viết OA) | *Cài đặt → Mạng xã hội* hoặc env. OA đã xác thực + ứng dụng Zalo, access token OA (làm mới định kỳ), webhook `/api/hooks/social/zalo_oa` | `ZALO_APP_ID`, `ZALO_OA_ID`, `ZALO_OA_ACCESS_TOKEN`, `ZALO_OA_SECRET` |
+| TikTok (đẩy bản nháp) | *Cài đặt → Mạng xã hội* (bấm «Kết nối TikTok», token 2 giờ tự làm mới). Ứng dụng TikTok for Developers có Login Kit + Content Posting API | `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET`, `TIKTOK_ACCESS_TOKEN` |
 | Chuyển khoản VietQR tự khớp | Tài khoản SePay nối tài khoản ngân hàng, webhook `/api/hooks/payments/sepay` | `PAYMENTS_DRIVER=sepay`, `SEPAY_API_KEY`, `SEPAY_WEBHOOK_SECRET`, `BANK_CODE`, `BANK_ACCOUNT_NO`, `BANK_ACCOUNT_NAME` |
 | Giao hàng | Tài khoản GHN (token + shop id) hoặc GHTK (token + địa chỉ lấy hàng) | `SHIPPING_DRIVER=ghn`/`ghtk`, `GHN_TOKEN`, `GHN_SHOP_ID`, `GHTK_TOKEN`, `GHTK_PICK_*` |
 | Báo tin cho khách (g5) | Zalo: OA đã xác thực + ứng dụng Zalo có quyền «Gửi tin qua số điện thoại», tài khoản ZBS có số dư, các mẫu tin đã được duyệt (mỗi mốc đơn một mẫu); email: máy chủ SMTP | `NOTIFY_CHANNEL_DRIVERS=zalo_oa=zalo_zns,email=email`, `ZALO_APP_ID`, `ZALO_APP_SECRET`, `ZALO_OA_ACCESS_TOKEN`, `ZALO_OA_REFRESH_TOKEN`, `ZALO_ZNS_TEMPLATES`, `SMTP_*` (xem [deployment.md](deployment.md) mục 6) |
-| Sàn TikTok Shop / Shopee | Tài khoản Partner, quyền API shop | `MARKETPLACES_DRIVER`, `TIKTOK_SHOP_*`, `SHOPEE_*` |
+| Sàn TikTok Shop / Shopee | *Cài đặt → Mạng xã hội* (bấm «Kết nối», token tự làm mới). Tài khoản Partner, quyền API shop | `MARKETPLACES_DRIVER`, `TIKTOK_SHOP_*`, `SHOPEE_*` |
 | Hoá đơn điện tử (k5) | Chọn nhà cung cấp (VNPT, Viettel, MISA…) — **driver chưa viết**, xem mục dưới | `EINVOICE_DRIVER` |
 | Lưu ảnh/sao lưu trên S3/R2 | Bucket + khoá | `STORAGE_DRIVER=s3`, `S3_*` |
 

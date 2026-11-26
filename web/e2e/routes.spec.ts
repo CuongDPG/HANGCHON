@@ -134,6 +134,8 @@ const DESK = (i: Ids) => [
   "/desk/cai-dat/sao-luu",
   "/desk/cai-dat/tai-khoan",
   "/desk/cai-dat/tich-hop",
+  "/desk/cai-dat/mang-xa-hoi",
+  "/desk/cai-dat/ai",
 ];
 
 function watch(page: Page) {

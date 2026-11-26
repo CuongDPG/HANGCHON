@@ -270,6 +270,7 @@ export const controlKeys = {
   audit: (q: object) => ["control", "audit", q] as const,
   integrations: () => ["control", "integrations"] as const,
   aiConfig: () => ["control", "ai-config"] as const,
+  channels: () => ["control", "channels"] as const,
   intents: () => ["control", "intents"] as const,
   users: () => ["control", "users"] as const,
 };
@@ -427,6 +428,78 @@ export function useAudit(query: { actions?: string[]; page?: number }, enabled =
 
 export function useIntegrations() {
   return useQuery({ queryKey: controlKeys.integrations(), queryFn: () => api.get<Integration[]>(`${BASE}/integrations`) });
+}
+
+/* ---------- tài khoản kênh: Cài đặt → Mạng xã hội (chỉ chị) ---------- */
+
+export type ChannelField = {
+  key: string;
+  label: string;
+  secret: boolean;
+  required: boolean;
+  /** do nút «Kết nối» điền */
+  oauth: boolean;
+  hint: string;
+  /** chỉ có với ô không bí mật */
+  value: string | null;
+  /** bí mật: chỉ 4 ký tự cuối */
+  masked: string | null;
+  is_set: boolean;
+  source: "settings" | "env" | null;
+};
+
+export type ChannelAccount = {
+  channel: string;
+  label: string;
+  kind: "social" | "marketplaces" | "manual";
+  driver: string;
+  mode: "mock" | "real";
+  mode_source: "settings" | "env";
+  status: "manual" | "mock" | "connected" | "not_connected";
+  ready: boolean;
+  account_name: string | null;
+  fields: ChannelField[];
+  shared: { channel: string; key: string; label: string; is_set: boolean }[];
+  check: { ok: boolean; message: string; account_name: string | null; at: string | null } | null;
+  oauth: { supported: boolean; redirect_uri: string | null; connected: boolean; expires_at: number | null; refresh_expires_at: number | null };
+  guide: { needs: string[]; steps: string[]; limits: string[]; links: { label: string; url: string }[] };
+};
+
+export type ChannelAccountInput = { mode?: "mock" | "real"; values?: Record<string, string>; clear?: string[] };
+
+export function useChannelAccounts(enabled: boolean) {
+  return useQuery({ queryKey: controlKeys.channels(), queryFn: () => api.get<ChannelAccount[]>(`${BASE}/channels`), enabled });
+}
+
+function useChannelsInvalidate() {
+  const qc = useQueryClient();
+  return () => {
+    void qc.invalidateQueries({ queryKey: controlKeys.channels() });
+    void qc.invalidateQueries({ queryKey: controlKeys.integrations() });
+  };
+}
+
+export function useSaveChannelAccount() {
+  const done = useChannelsInvalidate();
+  return useMutation({
+    mutationFn: ({ channel, ...input }: ChannelAccountInput & { channel: string }) => api.patch<ChannelAccount>(`${BASE}/channels/${channel}`, input),
+    onSuccess: done,
+  });
+}
+
+export function useCheckChannelAccount() {
+  const done = useChannelsInvalidate();
+  return useMutation({
+    mutationFn: ({ channel, values }: { channel: string; values?: Record<string, string> }) =>
+      api.post<{ ok: boolean; message: string; account_name: string | null }>(`${BASE}/channels/${channel}/check`, { values: values ?? {} }),
+    onSuccess: done,
+  });
+}
+
+export function useConnectChannelAccount() {
+  return useMutation({
+    mutationFn: (channel: string) => api.post<{ url: string; redirect_uri: string }>(`${BASE}/channels/${channel}/connect`),
+  });
 }
 
 /* ---------- cấu hình AI: nhà cung cấp, khoá API, model (chỉ chị) ---------- */

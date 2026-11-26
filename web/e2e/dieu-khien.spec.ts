@@ -58,10 +58,9 @@ test("Sao lưu: sao lưu ngay, kiểm khôi phục, thấy lần thành công v�
 test("Cài đặt: thẻ cho biết tích hợp nào chạy thật, cái nào còn giả lập", async ({ page }) => {
   await login(page);
   await page.goto("/desk/cai-dat");
-  const card = page.getByRole("link", { name: "Xem trạng thái tích hợp" });
-  await expect(card).toContainText("còn giả lập");
-  await expect(card).toContainText("Báo tin cho khách");
-  await card.click();
+  await page.getByRole("navigation", { name: "Mục cài đặt" }).getByRole("link", { name: "Tích hợp" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Tích hợp" })).toBeVisible();
+  await expect(page.getByRole("main").getByText(/còn giả lập/).first()).toBeVisible();
+  await expect(page.getByRole("main").getByText(/Còn giả lập: .*Báo tin cho khách/)).toBeVisible();
   await expect(page.getByText("Tin báo khách ghi là đã gửi nhưng không tới khách.")).toBeVisible();
 });

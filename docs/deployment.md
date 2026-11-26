@@ -150,13 +150,25 @@ Cài đặt thì lấy biến môi trường. Đang chạy bằng biến môi tr
 `docker exec hangchon-api python -m app.ai.import_env_config` (máy dev: `cd api && uv run python -m app.ai.import_env_config`) (chép `AI_PROVIDER`, khoá, model, effort vào CSDL đã mã
 hoá; chạy lại không sinh trùng, không in khoá), rồi có thể xoá khoá khỏi env của Dokploy. Chỉ chị (owner) xem/sửa được màn này.
 
-Token Meta, sàn hết hạn theo thời gian; làm mới token là việc của người vận hành (đổi biến rồi Redeploy).
-Riêng access token Zalo OA (25 giờ): driver báo tin `zalo_zns` tự làm mới bằng `ZALO_OA_REFRESH_TOKEN` và lưu token mới ở
+**Mạng xã hội và sàn: chị tự nối ở *Cài đặt → Mạng xã hội* (từ 26/11).** Mỗi kênh (Facebook, Instagram, Threads, TikTok,
+Zalo OA, Shopee, TikTok Shop) có thẻ nhập khoá (mã hoá bằng `SECRETS_ENCRYPTION_KEY`, chỉ hiện 4 ký tự cuối), nút *Kiểm
+tra kết nối*, nút *Kết nối* cho kênh phải cấp quyền OAuth (TikTok, Shopee, TikTok Shop — Redirect URI là
+`$WEB_BASE_URL/api/hooks/oauth/<kênh>`, nên `WEB_BASE_URL` phải đúng tên miền thật, https) và công tắc *Giả lập ↔ Chạy thật*.
+**Giá trị ở Cài đặt thắng biến môi trường** ở bảng trên: công tắc của một kênh thắng `SOCIAL_CHANNEL_DRIVERS` /
+`SOCIAL_DRIVER` / `MARKETPLACES_DRIVER`; ô nào để trống ở Cài đặt thì lấy biến `META_*`, `THREADS_*`, `TIKTOK_*`,
+`ZALO_*`, `SHOPEE_*`, `TIKTOK_SHOP_*` như cũ. Có hiệu lực ngay ở API, worker thấy trước job kế tiếp; không cần Redeploy.
+Chi tiết từng kênh (cần gì, token sống bao lâu, nguồn tài liệu): [channel-accounts.md](channel-accounts.md).
+
+Token tự làm mới khi khoá lưu ở Cài đặt: TikTok (2 giờ), Shopee (4 giờ), TikTok Shop (7 ngày) làm mới khi dùng và bằng
+việc nền hằng ngày `control.refresh_channel_tokens` (4:20); mã Threads (60 ngày) làm mới khi cũ hơn 7 ngày; Zalo OA làm
+mới khi hết hạn và lưu cặp token mới vào Cài đặt. Token chỉ đặt bằng biến môi trường thì vẫn phải làm mới bằng tay
+(đổi biến rồi Redeploy), trừ Zalo OA dưới đây.
+Access token Zalo OA (25 giờ) đặt bằng env: kho token tự làm mới bằng `ZALO_OA_REFRESH_TOKEN` và lưu token mới ở
 `/data/secrets/zalo_oa_token.json` (volume `apidata`, không phục vụ qua `/api/files`). Refresh token chỉ dùng một lần và
-hết hạn sau 3 tháng: khi màn Mẫu tin báo «không làm mới được access token», cấp refresh token mới vào
-`ZALO_OA_REFRESH_TOKEN` rồi Redeploy (giá trị mới trong env thắng tệp đã lưu). Driver `social/zalo_oa` (đăng bài, hộp
-thư) **chưa** dùng kho token này mà vẫn đọc `ZALO_OA_ACCESS_TOKEN`: nếu cùng một ứng dụng Zalo thì sau lần làm mới đầu
-tiên token trong env của nó hết hiệu lực.
+hết hạn sau 3 tháng: khi màn Mẫu tin báo «không làm mới được access token», cấp refresh token mới (ở *Cài đặt → Mạng xã
+hội → Zalo OA*, hoặc vào `ZALO_OA_REFRESH_TOKEN` rồi Redeploy). Khi Zalo OA cấu hình bằng env, driver `social/zalo_oa`
+(đăng bài, hộp thư) đọc `ZALO_OA_ACCESS_TOKEN` nên sau lần làm mới đầu token đó hết hiệu lực — nhập Zalo OA ở Cài đặt để
+mọi phần dùng chung token mới.
 
 Tin quảng cáo (nhắc mua lại, báo đợt cho khách quen) chỉ gửi cho khách đã tích «đồng ý nhận tin» khi đặt hàng và chưa
 từ chối; cuối tin có câu hướng dẫn nhắn «TỪ CHỐI», khách nhắn vậy qua hộp thư thì hệ thống tự gắn nhãn từ chối.

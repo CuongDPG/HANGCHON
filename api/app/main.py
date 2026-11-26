@@ -19,6 +19,7 @@ from app.core.errors import Forbidden, Unauthorized, install_error_handlers
 from app.core.jobs import close_pool
 from app.core.security import decode_access_token
 from app.core.storage import get_storage, is_public_key
+from app.integrations.channel_config import RefreshMiddleware as ChannelConfigRefresh
 from app.modules.control.models import UserRole
 
 log = logging.getLogger("app")
@@ -101,6 +102,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     logging.basicConfig(level=settings.log_level)
+    logging.getLogger("httpx").setLevel(logging.WARNING)  # URL gọi Meta/Shopee có access_token: không ghi log
     app = FastAPI(
         title="Hàng Chọn API",
         version="0.1.0",
@@ -111,6 +113,7 @@ def create_app() -> FastAPI:
         openapi_url=None if settings.app_env == "prod" else "/openapi.json",
     )
     install_error_handlers(app)
+    app.add_middleware(ChannelConfigRefresh)  # tài khoản kênh lưu ở Cài đặt: driver thấy thay đổi ≤ 5 giây
     app.add_middleware(DeskAuthGuard)
     app.add_middleware(
         CORSMiddleware,

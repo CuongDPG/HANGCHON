@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, LogOut, Monitor, Moon, Palette, Settings, Sun } from "lucide-react";
+import { ChevronDown, LogOut, Palette, Settings } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -11,17 +11,19 @@ import { api, type Paginated } from "@/lib/api/client";
 import { controlKeys, type ApprovalItem } from "@/lib/api/control";
 import { cn } from "@/lib/cn";
 import { DESK_NAV, DESK_PUBLIC_ROUTES, type DeskNavItem } from "@/lib/desk-nav";
-import { useThemePreference } from "@/lib/use-theme";
-import type { ThemePreference } from "@/lib/theme";
 
 /**
  * Hàng menu trên cùng của bàn làm việc (máy tính, ≥ md). Điện thoại dùng thanh tab dưới + «Thêm» (desk-shell).
- * Các khu hiện thẳng trên hàng: TOP_KEYS (theo thứ tự trong desk-nav). Mọi khu khác desk-nav khai báo → menu «Thêm».
+ * Logo bên trái; mục chính + «Thêm» + ảnh đại diện là MỘT cụm canh phải.
+ * Các khu hiện thẳng trên hàng: TOP_KEYS (theo thứ tự trong desk-nav). Mọi khu khác desk-nav khai báo → menu «Thêm»,
+ * trừ Cài đặt: Cài đặt chỉ nằm ở menu tài khoản (ảnh đại diện) cùng tên/email, Bộ giao diện, Đăng xuất.
+ * Sáng/tối đổi ở Cài đặt → Tài khoản → Giao diện (hoặc Bộ giao diện), không có nút riêng trên hàng.
  * Hàng hẹp không đủ chỗ thì các mục cuối tự dồn vào «Thêm» (đo bề rộng thật, không xuống dòng, không cuộn ngang).
  */
 const TOP_KEYS = ["today", "sourcing", "selection", "products", "content", "customers", "orders", "approvals"];
+const ACCOUNT_KEYS = ["settings"];
 const TOP_NAV = DESK_NAV.filter((i) => TOP_KEYS.includes(i.key));
-const MORE_NAV = DESK_NAV.filter((i) => !TOP_KEYS.includes(i.key));
+const MORE_NAV = DESK_NAV.filter((i) => !TOP_KEYS.includes(i.key) && !ACCOUNT_KEYS.includes(i.key));
 
 /** Lề ngang của hàng menu = lề của nội dung (MAIN_CLASS) để logo thẳng mép nội dung. */
 export const DESK_FRAME = "mx-auto w-full max-w-[120rem] md:px-8"; // bàn làm việc ưu tiên máy tính: dùng gần hết màn rộng (tới 1920px)
@@ -76,8 +78,8 @@ export function DeskTopBar({ activeKey, user, ready }: { activeKey?: string; use
         <Link href="/desk" aria-label="Hàng Chọn · Bàn làm việc" className="-ml-1 shrink-0 rounded-md px-1 py-1">
           <Brand />
         </Link>
-        <nav aria-label="Điều hướng" className="relative ml-2 flex min-w-0 flex-1 items-center">
-          <div ref={navRef} className="flex min-w-0 flex-1 items-center overflow-hidden">
+        <nav aria-label="Điều hướng" className="relative ml-4 flex min-w-0 flex-1 items-center">
+          <div ref={navRef} className="flex min-w-0 flex-1 items-center justify-end overflow-hidden">
             {shown.map((item) => (
               <TopLink key={item.key} item={item} active={item.key === activeKey} count={item.key === "approvals" ? pending : undefined} />
             ))}
@@ -120,8 +122,7 @@ export function DeskTopBar({ activeKey, user, ready }: { activeKey?: string; use
             </span>
           </div>
         </nav>
-        <ThemeButton />
-        <AccountMenu user={user} />
+        <AccountMenu user={user} active={!!activeKey && ACCOUNT_KEYS.includes(activeKey)} />
       </div>
     </header>
   );
@@ -151,41 +152,28 @@ function CountPill({ count, label }: { count: number; label?: string }) {
   );
 }
 
-const THEME_NEXT: Record<ThemePreference, ThemePreference> = { system: "light", light: "dark", dark: "system" };
-const THEME_LABEL: Record<ThemePreference, string> = { system: "theo máy", light: "sáng", dark: "tối" };
-
-function ThemeButton() {
-  const [pref, setPref] = useThemePreference();
-  const Icon = pref === "dark" ? Moon : pref === "light" ? Sun : Monitor;
-  const label = `Giao diện: ${THEME_LABEL[pref]} (bấm để đổi sang ${THEME_LABEL[THEME_NEXT[pref]]})`;
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      onClick={() => setPref(THEME_NEXT[pref])}
-      className="grid size-9 shrink-0 place-items-center rounded-md text-ink-2 transition-colors hover:bg-soft-2 hover:text-ink"
-    >
-      <Icon className="size-[18px]" aria-hidden />
-    </button>
-  );
-}
-
-function AccountMenu({ user }: { user?: SessionUser | null }) {
+function AccountMenu({ user, active }: { user?: SessionUser | null; active: boolean }) {
   const logout = useLogout();
   return (
     <Menu
       label={`Tài khoản${user?.name ? ` · ${user.name}` : ""}`}
       align="end"
-      trigger={() => (
-        <span className="grid size-9 place-items-center rounded-full bg-accent-wash text-[13px] font-bold text-accent">{initial(user?.name)}</span>
+      trigger={(open) => (
+        <span
+          className={cn(
+            "ml-1 grid size-9 place-items-center rounded-full bg-accent-wash text-[13px] font-bold text-accent",
+            (active || open) && "ring-2 ring-accent ring-offset-2 ring-offset-paper",
+          )}
+        >
+          {initial(user?.name)}
+        </span>
       )}
     >
       <div className="border-b border-line px-3 pt-1.5 pb-2.5" role="none">
         <p className="truncate text-sm font-semibold">{user?.name ?? "—"}</p>
         <p className="truncate text-[12px] text-ink-2">{user?.email}</p>
       </div>
-      <MenuLink href="/desk/cai-dat" icon={<Settings />}>
+      <MenuLink href="/desk/cai-dat" icon={<Settings />} active={active}>
         Cài đặt
       </MenuLink>
       <MenuLink href={DESK_PUBLIC_ROUTES.kit} icon={<Palette />}>

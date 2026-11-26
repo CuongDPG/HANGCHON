@@ -3,7 +3,8 @@
 Driver: `mock` (mặc định), `meta` (Facebook Page, Instagram, Threads), `tiktok_draft`, `zalo_oa`. Mỗi driver thật gộp
 phần đăng bài + phần nhắn tin trong một lớp `Driver`. Chọn driver theo kênh bằng một cấu hình chung cho đăng bài và
 hộp thư: `SOCIAL_CHANNEL_DRIVERS="facebook=meta,instagram=meta,threads=meta,zalo_oa=zalo_oa,tiktok=tiktok_draft"`;
-kênh không khai dùng `SOCIAL_DRIVER` (mặc định `mock`). Xem `driver_name_for(channel)`."""
+kênh không khai dùng `SOCIAL_DRIVER` (mặc định `mock`). Công tắc «Chạy thật / Giả lập» của từng kênh ở Cài đặt → Mạng xã hội
+(`app.integrations.channel_config`) thắng biến môi trường. Xem `driver_name_for(channel)`."""
 
 from __future__ import annotations
 
@@ -82,10 +83,16 @@ def canonical_driver(name: str | None) -> str:
 
 
 def driver_name_for(channel: Channel | str) -> str:
-    """Driver cho một kênh: `SOCIAL_CHANNEL_DRIVERS` → `SOCIAL_DRIVER` → `mock`."""
+    """Driver cho một kênh: công tắc ở Cài đặt → Mạng xã hội → `SOCIAL_CHANNEL_DRIVERS` → `SOCIAL_DRIVER` → `mock`."""
     from app.core.config import settings
+    from app.integrations import channel_config
 
     key = channel.value if isinstance(channel, Channel) else str(channel)
+    chosen = channel_config.mode(key)
+    if chosen == "mock":
+        return "mock"
+    if chosen == "real" and key in channel_config.SPECS:
+        return channel_config.SPECS[key].driver
     spec = settings.social_channel_drivers.replace(" ", "")
     mapping = dict(p.split("=", 1) for p in spec.split(",") if "=" in p)
     return canonical_driver(mapping.get(key) or settings.social_driver or "mock")

@@ -11,7 +11,7 @@
   /{threads-user-id}/threads_publish `creation_id`. Hạn mức 250 bài / 24 giờ, chữ tối đa 500 ký tự.
 
 Cấu hình (settings): META_PAGE_ID, META_PAGE_TOKEN, META_IG_USER_ID, THREADS_USER_ID, THREADS_ACCESS_TOKEN,
-META_GRAPH_VERSION. Token không lưu trong CSDL. Lớp `MetaPublisher` được gộp vào driver `meta` (`meta.py`).
+META_GRAPH_VERSION. Cài đặt → Mạng xã hội ghi đè các biến này (`channel_config`, khoá mã hoá trong CSDL). Lớp `MetaPublisher` được gộp vào driver `meta` (`meta.py`).
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ import httpx
 from app.core.config import settings
 from app.core.enums import Channel
 from app.core.timeutil import now_utc
+from app.integrations import channel_config as cc
 from app.integrations.base import IntegrationError, IntegrationNotConfigured
 from app.integrations.social import PostMetrics, PublishResult, SocialPost
 from app.integrations.social._ratelimit import RateLimited, limiter
@@ -57,19 +58,19 @@ class MetaPublisher:
         return value
 
     def _page(self) -> tuple[str, str]:
-        return self._need(settings.meta_page_id, "META_PAGE_ID"), self._need(
-            settings.meta_page_token, "META_PAGE_TOKEN"
+        return self._need(cc.value("facebook", "page_id"), "META_PAGE_ID"), self._need(
+            cc.value("facebook", "page_token"), "META_PAGE_TOKEN"
         )
 
     def _ig(self) -> tuple[str, str]:
-        return self._need(settings.meta_ig_user_id, "META_IG_USER_ID"), self._need(
-            settings.meta_page_token, "META_PAGE_TOKEN"
+        return self._need(cc.value("instagram", "ig_user_id"), "META_IG_USER_ID"), self._need(
+            cc.value("facebook", "page_token"), "META_PAGE_TOKEN"
         )
 
     def _threads(self) -> tuple[str, str]:
         return (
-            self._need(settings.threads_user_id, "THREADS_USER_ID"),
-            self._need(settings.threads_access_token, "THREADS_ACCESS_TOKEN"),
+            self._need(cc.value("threads", "user_id"), "THREADS_USER_ID"),
+            self._need(cc.value("threads", "access_token"), "THREADS_ACCESS_TOKEN"),
         )
 
     # ---- HTTP ----------------------------------------------------------------------------------------------------

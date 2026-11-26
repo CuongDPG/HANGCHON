@@ -68,7 +68,7 @@ export function ApprovalsScreen() {
 - Mỗi trang đúng một `PageHeader` (một `<h1>`). Nút quay lại chỉ là mũi tên (`backHref`).
 - Trang gốc bọc nội dung trong `<div className="flex flex-col gap-4">` (hoặc `gap-6`); khung đã lo lề và khoảng chừa cho thanh điều hướng.
 - Website cho khách: thiết kế ở **390px trước**, rồi nới bằng `md:` (768px). Bàn làm việc: **máy tính trước** (1280/1440/1920, 1024 vẫn phải dùng được); điện thoại chỉ giữ thanh tab dưới như hiện có.
-  `md:` cũng là mốc điều hướng chuyển từ thanh dưới sang hàng menu trên (`DeskTopBar`: mục chính + «Thêm» lấy từ `desk-nav.ts`, mục không đủ chỗ tự dồn vào «Thêm»).
+  `md:` cũng là mốc điều hướng chuyển từ thanh dưới sang hàng menu trên (`DeskTopBar`: logo trái; mục chính + «Thêm» + ảnh đại diện là một cụm canh phải, lấy từ `desk-nav.ts`, mục không đủ chỗ tự dồn vào «Thêm»; Cài đặt chỉ ở menu ảnh đại diện; sáng/tối chọn ở *Cài đặt → Tài khoản*).
 - Chỉ dùng token màu (mục 4). Bảng màu mặc định của Tailwind đã tắt: `bg-red-500` sẽ không có tác dụng.
 - Không dùng `alert/confirm/prompt` và không dùng `<select>` thuần: dùng `useConfirm()`, `notifySuccess/notifyError`, `InlineSelect`.
 - Tiền luôn qua `<Money>`/`formatVnd` (số nguyên VND). Ngày giờ qua `<DateTime>`/`format*` (giờ Việt Nam).
@@ -228,7 +228,7 @@ Nguồn duy nhất: `src/lib/desk-nav.ts` (`DESK_PRIMARY_NAV`, `DESK_MORE_NAV`, 
 | `/desk/nhat-ky-ai` | Nhật ký AI *(Thêm)* | i4, k3 |
 | `/desk/bao-cao` | Báo cáo *(Thêm)* | i5, f7 |
 | `/desk/so-sach` | Sổ sách *(Thêm)* | k1, k5 |
-| `/desk/cai-dat` | Cài đặt *(Thêm)* | k4 |
+| `/desk/cai-dat` | Cài đặt *(menu tài khoản)* — chuyển tới tab đầu; tab theo URL (`SettingsNav`): `cua-hang` · `mang-xa-hoi` · `tich-hop` · `ai` · `nguoi-phu-giup` · `tai-khoan` (gồm chọn sáng/tối) · `sao-luu` | k4, f4, h1, g9 |
 | `/desk/dang-nhap` | Đăng nhập (ngoài khung, không cần đăng nhập) | — |
 | `/desk/kit` | Trưng bày hệ thiết kế (ngoài khung, không cần đăng nhập) | — |
 | `/desk/manifest.webmanifest` | Manifest PWA (phạm vi `/desk`) | — |

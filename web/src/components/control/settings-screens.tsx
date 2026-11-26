@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Bot, ChevronRight, DatabaseBackup, KeyRound, Plug, RotateCw, Store, UserPlus, UsersRound } from "lucide-react";
+import { ChevronRight, Plug, RotateCw, Share2, UserPlus, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -16,6 +16,7 @@ import {
   Input,
   PageHeader,
   SectionLabel,
+  Segmented,
   Sheet,
   SkeletonList,
   Textarea,
@@ -33,47 +34,18 @@ import {
   type Integration,
 } from "@/lib/api/control";
 import { formatNumber } from "@/lib/format";
+import type { ThemePreference } from "@/lib/theme";
+import { useThemePreference } from "@/lib/use-theme";
 import { useMutation } from "@tanstack/react-query";
+import { SettingsNav } from "./settings-nav";
 
-/* ---------- mục lục ---------- */
-
-const SECTIONS = [
-  { href: "/desk/cai-dat/cua-hang", icon: Store, title: "Cửa hàng", description: "Tên, người chọn, lời giới thiệu, tài khoản nhận tiền, phí giao" },
-  { href: "/desk/cai-dat/tai-khoan", icon: KeyRound, title: "Tài khoản của chị", description: "Đổi mật khẩu đăng nhập" },
-  { href: "/desk/cai-dat/nguoi-phu-giup", icon: UsersRound, title: "Người phụ giúp", description: "Tạo, khoá, đặt lại mật khẩu tài khoản phụ", owner: true },
-  { href: "/desk/cai-dat/sao-luu", icon: DatabaseBackup, title: "Sao lưu", description: "Sao lưu dữ liệu hằng ngày, tải bản sao về máy", owner: true },
-  { href: "/desk/cai-dat/ai", icon: Bot, title: "AI và khoá API", description: "Nhà cung cấp AI, khoá API, model, trần chi phí tháng", owner: true },
-  { href: "/desk/cai-dat/tich-hop", icon: Plug, title: "Tích hợp", description: "Mạng xã hội, thanh toán, vận chuyển… đang chạy giả lập hay thật" },
-];
-
-export function SettingsIndex() {
-  const { user } = useSession();
-  return (
-    <div className="flex flex-col gap-4">
-      <PageHeader title="Cài đặt" description="Cửa hàng, tài khoản, người phụ giúp, sao lưu, AI, tích hợp." />
-      <IntegrationStatusCard />
-      <ul className="flex flex-col divide-y divide-line rounded-md border border-line bg-surface">
-        {SECTIONS.filter((s) => !s.owner || isOwner(user)).map((s) => (
-          <li key={s.href}>
-            <Link href={s.href} className="flex items-center gap-3 p-3.5 transition-colors hover:bg-soft-2">
-              <s.icon className="size-5 shrink-0 text-accent" aria-hidden />
-              <span className="min-w-0 flex-1">
-                <span className="block text-[15px] font-semibold">{s.title}</span>
-                <span className="block text-[13px] text-ink-2">{s.description}</span>
-              </span>
-              <ChevronRight className="size-4 shrink-0 text-ink-3" aria-hidden />
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
+/* ---------- khung chung ---------- */
 
 export function OwnerOnly({ title }: { title: string }) {
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader backHref="/desk/cai-dat" title={title} />
+      <PageHeader title={title} />
+      <SettingsNav />
       <EmptyState title="Chỉ chị (chủ cửa hàng) xem được phần này" />
     </div>
   );
@@ -110,7 +82,8 @@ export function StoreSettingsScreen() {
   const { data, isPending, error, refetch } = useSettings();
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader backHref="/desk/cai-dat" title="Cửa hàng" description="Hiện trên website và trong tin nhắn gửi khách." />
+      <PageHeader title="Cửa hàng" description="Hiện trên website và trong tin nhắn gửi khách." />
+      <SettingsNav />
       {isPending ? (
         <SkeletonList rows={4} />
       ) : error ? (
@@ -225,7 +198,8 @@ export function AccountScreen() {
   });
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader backHref="/desk/cai-dat" title="Tài khoản của chị" />
+      <PageHeader title="Tài khoản của chị" />
+      <SettingsNav />
       {user ? (
         <Card flush className="px-4 py-2">
           <DataList
@@ -246,7 +220,30 @@ export function AccountScreen() {
           Đổi mật khẩu
         </Button>
       </form>
+      <ThemeSection />
     </div>
+  );
+}
+
+/** Giao diện sáng/tối (lưu trên máy này). Xem trước cả hai ở «Bộ giao diện». */
+function ThemeSection() {
+  const [theme, setTheme] = useThemePreference();
+  return (
+    <section className="flex flex-col gap-3" aria-label="Giao diện">
+      <SectionLabel>Giao diện</SectionLabel>
+      <Segmented<ThemePreference>
+        aria-label="Giao diện"
+        value={theme}
+        onChange={setTheme}
+        options={[
+          { value: "system", label: "Theo máy" },
+          { value: "light", label: "Sáng" },
+          { value: "dark", label: "Tối" },
+        ]}
+        className="self-start"
+      />
+      <p className="text-[13px] text-ink-2">Chỉ đổi trên máy này. «Theo máy» tự sáng/tối theo cài đặt của điện thoại hoặc máy tính.</p>
+    </section>
   );
 }
 
@@ -274,11 +271,8 @@ export function HelpersScreen() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        backHref="/desk/cai-dat"
-        title="Người phụ giúp"
-        description="Người phụ xem được mọi thứ, ghi chi phí; không duyệt, không đổi cài đặt."
-      />
+      <PageHeader title="Người phụ giúp" description="Người phụ xem được mọi thứ, ghi chi phí; không duyệt, không đổi cài đặt." />
+      <SettingsNav />
       <Button icon={<UserPlus className="size-4" />} onClick={() => setCreating(true)} className="self-start">
         Thêm người phụ giúp
       </Button>
@@ -463,17 +457,13 @@ export function IntegrationSummary({ items, href }: { items: Integration[]; href
   );
 }
 
-function IntegrationStatusCard() {
-  const { data } = useIntegrations();
-  return data ? <IntegrationSummary items={data} href="/desk/cai-dat/tich-hop" /> : null;
-}
-
 export function IntegrationsScreen() {
   const { data, isPending, error } = useIntegrations();
   const { user } = useSession();
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader backHref="/desk/cai-dat" title="Tích hợp" description="Các dịch vụ bên ngoài cửa hàng nối tới. «Giả lập» nghĩa là chưa nối tài khoản thật, không gửi gì ra ngoài." />
+      <PageHeader title="Tích hợp" description="Các dịch vụ bên ngoài cửa hàng nối tới. «Giả lập» nghĩa là chưa nối tài khoản thật, không gửi gì ra ngoài." />
+      <SettingsNav />
       {isPending ? (
         <SkeletonList rows={4} />
       ) : error ? (
@@ -497,17 +487,20 @@ export function IntegrationsScreen() {
         </>
       )}
       {isOwner(user) ? (
-        <Link href="/desk/cai-dat/ai" className="flex items-center gap-3 rounded-md border border-line bg-surface p-3.5 transition-colors hover:bg-soft-2">
-          <Bot className="size-5 shrink-0 text-accent" aria-hidden />
+        <Link
+          href="/desk/cai-dat/mang-xa-hoi"
+          className="flex items-center gap-3 rounded-md border border-line bg-surface p-3.5 transition-colors hover:bg-soft-2"
+        >
+          <Share2 className="size-5 shrink-0 text-accent" aria-hidden />
           <span className="min-w-0 flex-1">
-            <span className="block text-[15px] font-semibold">AI và khoá API</span>
-            <span className="block text-[13px] text-ink-2">Chị tự đổi nhà cung cấp AI, khoá và model ở đây.</span>
+            <span className="block text-[15px] font-semibold">Mạng xã hội và sàn</span>
+            <span className="block text-[13px] text-ink-2">Chị tự nối Facebook, Instagram, Threads, TikTok, Zalo OA, Shopee, TikTok Shop và bật chạy thật từng kênh.</span>
           </span>
           <ChevronRight className="size-4 shrink-0 text-ink-3" aria-hidden />
         </Link>
       ) : null}
       <p className="text-[13px] text-ink-2">
-        Muốn nối tài khoản thật (ngân hàng, hãng giao, Facebook, Zalo…), chị gửi thông tin tài khoản cho người cài máy chủ; họ bật theo tài liệu triển khai.
+        Thanh toán, vận chuyển, báo tin, hoá đơn điện tử: chị gửi thông tin tài khoản cho người cài máy chủ; họ bật theo tài liệu triển khai.
       </p>
     </div>
   );

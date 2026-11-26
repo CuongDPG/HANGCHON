@@ -10,8 +10,8 @@
 - Số liệu: POST /v2/video/query/?fields=id,view_count,like_count,comment_count,share_count (scope `video.list`).
 - Giới hạn: 6 yêu cầu khởi tạo mỗi phút cho mỗi token người dùng.
 
-Cấu hình (settings): TIKTOK_ACCESS_TOKEN (token người dùng; làm mới bằng TIKTOK_CLIENT_KEY/SECRET ngoài phạm vi
-driver này). Chọn bằng `SOCIAL_CHANNEL_DRIVERS=tiktok=tiktok_draft`. Không có video/ảnh thì không đẩy được: kịch bản chữ để chị tự quay.
+Cấu hình: Cài đặt → Mạng xã hội → TikTok (nút «Kết nối TikTok», token tự làm mới — `channel_oauth.tiktok_access_token`),
+hoặc TIKTOK_ACCESS_TOKEN. Chọn bằng công tắc «Chạy thật» của thẻ hoặc `SOCIAL_CHANNEL_DRIVERS=tiktok=tiktok_draft`. Không có video/ảnh thì không đẩy được: kịch bản chữ để chị tự quay.
 """
 
 from __future__ import annotations
@@ -21,7 +21,6 @@ from typing import Any
 
 import httpx
 
-from app.core.config import settings
 from app.core.enums import Channel
 from app.integrations.base import IntegrationError, IntegrationNotConfigured
 from app.integrations.social import InboundEvent, PostMetrics, PublishResult, SentMessage, SocialDriver, SocialPost
@@ -34,14 +33,14 @@ class TikTokDraftPublisher:
     def __init__(self, transport: httpx.AsyncBaseTransport | None = None) -> None:
         self._transport = transport
 
-    def _token(self) -> str:
-        tok = settings.tiktok_access_token
-        if not tok:
-            raise IntegrationNotConfigured("Thiếu TIKTOK_ACCESS_TOKEN để đẩy bản nháp TikTok.")
-        return tok
+    async def _token(self) -> str:
+        """Cài đặt (sau «Kết nối TikTok», tự làm mới vì token chỉ sống 2 giờ) > TIKTOK_ACCESS_TOKEN."""
+        from app.integrations.channel_oauth import tiktok_access_token
+
+        return await tiktok_access_token()
 
     async def _post(self, path: str, body: dict[str, Any], params: dict[str, str] | None = None) -> dict[str, Any]:
-        headers = {"Authorization": f"Bearer {self._token()}", "Content-Type": "application/json; charset=UTF-8"}
+        headers = {"Authorization": f"Bearer {await self._token()}", "Content-Type": "application/json; charset=UTF-8"}
         async with httpx.AsyncClient(timeout=60, transport=self._transport) as c:
             try:
                 r = await c.post(f"{API}/{path.lstrip('/')}", json=body, params=params, headers=headers)
@@ -63,7 +62,7 @@ class TikTokDraftPublisher:
                 "TikTok cần video hoặc ảnh để đẩy bản nháp. Chị dựng video từ clip (mục Video) rồi thử lại.",
                 code="media_required",
             )
-        tok = self._token()
+        tok = await self._token()
         limiter.check(f"tiktok:{tok[-8:]}", limit=6, per_seconds=60, label="TikTok")
         if post.media_kind == "video":
             data = await self._post(

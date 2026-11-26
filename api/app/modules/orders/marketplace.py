@@ -44,8 +44,14 @@ MARKETPLACES = (Channel.TIKTOK_SHOP, Channel.SHOPEE)
 
 
 def driver_for(mk: Channel) -> Any:
-    """Sàn giả khi MARKETPLACES_DRIVER=mock; còn lại dùng driver thật của đúng sàn đó (tiktok_shop / shopee)."""
-    if settings.marketplaces_driver == "mock":
+    """Công tắc của sàn ở Cài đặt → Mạng xã hội; chưa đặt thì theo MARKETPLACES_DRIVER (mock = sàn giả, khác = driver
+    thật của đúng sàn đó: tiktok_shop / shopee)."""
+    from app.integrations import channel_config
+
+    chosen = channel_config.mode(mk.value)
+    if chosen == "real":
+        return get_driver("marketplaces", mk.value)
+    if chosen == "mock" or settings.marketplaces_driver == "mock":
         return get_driver("marketplaces", "mock")
     return get_driver("marketplaces", mk.value)
 

@@ -105,6 +105,8 @@ outcome = await control.propose(
 
 Mỗi tích hợp là một interface + nhiều driver, chọn bằng env; **driver mặc định là `mock`** để hệ thống chạy
 trọn vẹn khi chưa có tài khoản thật. Driver thật viết theo tài liệu chính thức, bật khi có khoá.
+Mạng xã hội và sàn: chị nhập khoá + bật chạy thật từng kênh ở *Cài đặt → Mạng xã hội* (`app/integrations/channel_config.py`,
+thứ tự **Cài đặt > env**; driver đọc `channel_config.value(kênh, ô)` thay vì `settings.*`), xem [channel-accounts.md](channel-accounts.md).
 
 | Tích hợp | Driver | Dùng cho |
 |---|---|---|

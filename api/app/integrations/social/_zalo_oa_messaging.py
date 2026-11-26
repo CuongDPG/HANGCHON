@@ -23,9 +23,9 @@ from typing import Any
 
 import httpx
 
-from app.core.config import settings
 from app.core.enums import Channel
 from app.core.timeutil import now_utc
+from app.integrations import channel_config as cc
 from app.integrations.base import IntegrationError, IntegrationNotConfigured
 from app.integrations.social import InboundEvent, SentMessage
 
@@ -57,9 +57,9 @@ class ZaloOAMessaging:
         self._names: dict[str, str] = {}
 
     def _token(self) -> str:
-        if not settings.zalo_oa_access_token:
+        if not cc.value("zalo_oa", "access_token"):
             raise IntegrationNotConfigured("Chưa cấu hình ZALO_OA_ACCESS_TOKEN.")
-        return settings.zalo_oa_access_token
+        return cc.value("zalo_oa", "access_token")
 
     async def _request(self, method: str, path: str, **kw: Any) -> dict[str, Any]:
         client = self._client or httpx.AsyncClient(timeout=20)
@@ -84,7 +84,7 @@ class ZaloOAMessaging:
     # ---- webhook ------------------------------------------------------------------------------------------------
 
     def check_signature(self, headers: dict[str, str], body: bytes, timestamp: str) -> None:
-        secret, app_id = settings.zalo_oa_secret, settings.zalo_app_id or ""
+        secret, app_id = cc.value("zalo_oa", "oa_secret"), cc.value("zalo_oa", "app_id") or ""
         if not secret or not app_id:
             raise IntegrationNotConfigured("Chưa cấu hình ZALO_OA_SECRET / ZALO_APP_ID để kiểm chữ ký webhook Zalo.")
         sig = {k.lower(): v for k, v in headers.items()}.get("x-zevent-signature", "").removeprefix("mac=")
@@ -115,7 +115,9 @@ class ZaloOAMessaging:
             InboundEvent(
                 channel=Channel.ZALO_OA,
                 kind="direct_message",
-                account_external_id=str((data.get("recipient") or {}).get("id", "") or settings.zalo_oa_id or ""),
+                account_external_id=str(
+                    (data.get("recipient") or {}).get("id", "") or cc.value("zalo_oa", "oa_id") or ""
+                ),
                 thread_external_id=sender,
                 message_external_id=str(msg.get("msg_id") or f"{sender}:{ts}"),
                 author_external_id=sender,
@@ -130,7 +132,7 @@ class ZaloOAMessaging:
         if user_id in self._names:
             return self._names[user_id]
         name = "Khách Zalo"
-        if settings.zalo_oa_access_token:
+        if cc.value("zalo_oa", "access_token"):
             try:
                 data = await self._request(
                     "GET", "/v3.0/oa/user/detail", params={"data": json.dumps({"user_id": user_id})}

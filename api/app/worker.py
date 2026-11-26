@@ -12,10 +12,17 @@ from app.core.timeutil import VN_TZ
 
 discover_modules()
 logging.basicConfig(level=settings.log_level)
+logging.getLogger("httpx").setLevel(logging.WARNING)  # URL gọi Meta/Shopee có access_token: không ghi log
 
 
 async def startup(ctx: dict[str, Any]) -> None:
     ctx.update(job_context())
+
+
+async def job_start(ctx: dict[str, Any]) -> None:
+    from app.integrations import channel_config
+
+    await channel_config.ensure_fresh()  # tài khoản kênh chị lưu ở Cài đặt (API là tiến trình khác)
 
 
 class WorkerSettings:
@@ -24,6 +31,7 @@ class WorkerSettings:
     redis_settings = redis_settings()
     queue_name = settings.jobs_queue_name
     on_startup = startup
+    on_job_start = job_start
     timezone = VN_TZ  # giờ trong @cron(...) là giờ Việt Nam
     max_jobs = 10
     job_timeout = 600

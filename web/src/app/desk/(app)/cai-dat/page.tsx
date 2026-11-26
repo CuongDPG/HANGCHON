@@ -1,7 +1,6 @@
-import { SettingsIndex } from "@/components/control/settings-screens";
+import { redirect } from "next/navigation";
 
-export const metadata = { title: "Cài đặt" };
-
+/** Cài đặt mở thẳng tab đầu (Cửa hàng, xem `SETTINGS_TABS`); các tab nằm ở thanh dưới tiêu đề mỗi trang. */
 export default function DeskSettingsPage() {
-  return <SettingsIndex />;
+  redirect("/desk/cai-dat/cua-hang");
 }

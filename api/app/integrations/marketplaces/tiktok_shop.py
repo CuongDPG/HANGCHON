@@ -20,7 +20,6 @@ from typing import Any
 
 import httpx
 
-from app.core.config import settings
 from app.core.enums import Channel
 from app.integrations.base import IntegrationError, IntegrationNotConfigured
 from app.integrations.marketplaces import (
@@ -43,17 +42,21 @@ def sign(app_secret: str, path: str, params: dict[str, Any], body: str = "") -> 
 class Driver(MarketplacesDriver):
     name = "tiktok_shop"
 
-    def _creds(self) -> tuple[str, str, str, str]:
-        key, secret = settings.tiktok_shop_app_key, settings.tiktok_shop_app_secret
-        token, cipher = settings.tiktok_shop_access_token or "", settings.tiktok_shop_cipher or ""
-        if not (key and secret and token and cipher):
+    async def _creds(self) -> tuple[str, str, str, str]:
+        """Cài đặt → Mạng xã hội (thẻ TikTok Shop, token tự làm mới) > biến môi trường."""
+        from app.integrations import channel_config as cc
+        from app.integrations.channel_oauth import tts_access_token
+
+        key, secret = cc.value("tiktok_shop", "app_key"), cc.value("tiktok_shop", "app_secret")
+        cipher = cc.value("tiktok_shop", "shop_cipher")
+        if not (key and secret and cipher):
             raise IntegrationNotConfigured("Chưa đủ khoá TikTok Shop (app key/secret, access token, shop cipher).")
-        return key, secret, token, cipher
+        return key, secret, await tts_access_token(), cipher
 
     async def _call(
         self, method: str, path: str, *, params: dict[str, Any] | None = None, body: dict[str, Any] | None = None
     ) -> dict[str, Any]:
-        key, secret, token, cipher = self._creds()
+        key, secret, token, cipher = await self._creds()
         q: dict[str, Any] = {"app_key": key, "timestamp": int(time.time()), "shop_cipher": cipher, **(params or {})}
         raw = json.dumps(body, separators=(",", ":"), ensure_ascii=False) if body is not None else ""
         q["sign"] = sign(secret, path, q, raw)

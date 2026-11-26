@@ -31,6 +31,7 @@ import httpx
 from app.core.config import settings
 from app.core.enums import Channel
 from app.core.timeutil import now_utc
+from app.integrations import channel_config as cc
 from app.integrations._mockutil import short_id
 from app.integrations._zalo_token import ZaloTokenStore
 from app.integrations.notify import NotifyDriver, NotifyResult, OutboundNotification, failed
@@ -73,7 +74,7 @@ class Driver(NotifyDriver):
     def missing_config(self) -> str | None:
         if not settings.zalo_zns_templates:
             return "Chưa cấu hình mẫu ZNS (ZALO_ZNS_TEMPLATES): chưa biết gửi loại tin nào bằng mẫu nào."
-        if not (settings.zalo_oa_access_token or self.tokens.can_refresh()):
+        if not (cc.value("zalo_oa", "access_token") or self.tokens.can_refresh()):
             return "Chưa có access token Zalo OA (ZALO_OA_ACCESS_TOKEN hoặc ZALO_OA_REFRESH_TOKEN + ZALO_APP_ID + ZALO_APP_SECRET)."
         return None
 

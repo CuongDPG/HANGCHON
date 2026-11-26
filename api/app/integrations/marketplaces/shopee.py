@@ -17,7 +17,6 @@ from typing import Any
 
 import httpx
 
-from app.core.config import settings
 from app.core.enums import Channel
 from app.integrations.base import IntegrationError, IntegrationNotConfigured
 from app.integrations.marketplaces import (
@@ -38,17 +37,24 @@ def sign(partner_key: str, partner_id: str, path: str, ts: int, access_token: st
 class Driver(MarketplacesDriver):
     name = "shopee"
 
-    def _creds(self) -> tuple[str, str, str, str]:
-        pid, key = settings.shopee_partner_id, settings.shopee_partner_key
-        shop, token = settings.shopee_shop_id or "", settings.shopee_access_token or ""
-        if not (pid and key and shop and token):
+    async def _creds(self) -> tuple[str, str, str, str]:
+        """Cài đặt → Mạng xã hội (thẻ Shopee, token tự làm mới) > biến môi trường."""
+        from app.integrations import channel_config as cc
+        from app.integrations.channel_oauth import shopee_access_token
+
+        pid, key, shop = (
+            cc.value("shopee", "partner_id"),
+            cc.value("shopee", "partner_key"),
+            cc.value("shopee", "shop_id"),
+        )
+        if not (pid and key and shop):
             raise IntegrationNotConfigured("Chưa đủ khoá Shopee (partner id/key, shop id, access token).")
-        return str(pid), key, shop, token
+        return str(pid), key, shop, await shopee_access_token()
 
     async def _call(
         self, method: str, path: str, *, params: dict[str, Any] | None = None, body: dict[str, Any] | None = None
     ) -> dict[str, Any]:
-        pid, key, shop, token = self._creds()
+        pid, key, shop, token = await self._creds()
         ts = int(time.time())
         q = {
             "partner_id": pid,

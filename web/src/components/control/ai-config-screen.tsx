@@ -35,6 +35,7 @@ import {
   type AITestResult,
 } from "@/lib/api/control";
 import { formatNumber, formatVnd } from "@/lib/format";
+import { SettingsNav } from "./settings-nav";
 import { OwnerOnly } from "./settings-screens";
 
 const EFFORT_LABELS: Record<AIEffort, string> = { low: "Thấp", medium: "Vừa", high: "Cao", max: "Tối đa" };
@@ -51,11 +52,8 @@ export function AIConfigScreen() {
   if (user && !owner) return <OwnerOnly title="AI và khoá API" />;
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        backHref="/desk/cai-dat"
-        title="AI và khoá API"
-        description="Chọn nhà cung cấp AI, khoá API và model. Khoá được mã hoá khi lưu, chỉ hiện dạng che."
-      />
+      <PageHeader title="AI và khoá API" description="Chọn nhà cung cấp AI, khoá API và model. Khoá được mã hoá khi lưu, chỉ hiện dạng che." />
+      <SettingsNav />
       {isPending ? (
         <SkeletonList rows={4} />
       ) : error ? (

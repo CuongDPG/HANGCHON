@@ -15,8 +15,9 @@ Thứ tự lấy token: tệp đã lưu → env (`ZALO_OA_ACCESS_TOKEN`, `ZALO_O
 token mới vào env (khác «hạt giống» đã ghi trong tệp) thì env thắng. Chưa đặt `ZALO_TOKEN_FILE` thì token làm mới chỉ
 nằm trong bộ nhớ tiến trình (đủ cho máy dev, KHÔNG đủ cho prod).
 
-Lưu ý: driver `social/zalo_oa` vẫn đọc thẳng `ZALO_OA_ACCESS_TOKEN`; nếu dùng chung một ứng dụng Zalo thì sau lần làm
-mới đầu tiên token trong env của nó hết hiệu lực — cần nối driver đó vào kho token này (việc sau).
+Cài đặt → Mạng xã hội (thẻ Zalo OA) ghi đè biến môi trường (`channel_config.value("zalo_oa", …)`). Khi Zalo OA được cấu
+hình ở Cài đặt, token làm mới được lưu luôn vào CSDL (mã hoá) nên driver `social/zalo_oa` (đọc
+`channel_config.value("zalo_oa", "access_token")`), API và worker cùng thấy token mới mà không cần `ZALO_TOKEN_FILE`.
 """
 
 from __future__ import annotations
@@ -33,6 +34,7 @@ from typing import Any
 import httpx
 
 from app.core.config import settings
+from app.integrations import channel_config as cc
 from app.integrations.base import IntegrationNotConfigured
 
 OAUTH_URL = "https://oauth.zaloapp.com/v4/oa/access_token"
@@ -49,11 +51,12 @@ class ZaloTokenStore:
     # ---- lưu / đọc ----------------------------------------------------------------------------------------------
 
     def _env_state(self) -> dict[str, Any]:
+        refresh = cc.value("zalo_oa", "refresh_token") or ""
         return {
-            "access_token": settings.zalo_oa_access_token or "",
-            "refresh_token": settings.zalo_oa_refresh_token or "",
-            "expires_at": None,
-            "seed": settings.zalo_oa_refresh_token or "",
+            "access_token": cc.value("zalo_oa", "access_token") or "",
+            "refresh_token": refresh,
+            "expires_at": cc.meta("zalo_oa").get("expires_at"),
+            "seed": refresh,
         }
 
     def _load(self) -> dict[str, Any]:
@@ -94,7 +97,9 @@ class ZaloTokenStore:
     # ---- dùng ---------------------------------------------------------------------------------------------------
 
     def can_refresh(self) -> bool:
-        return bool(settings.zalo_app_id and settings.zalo_app_secret and self._load().get("refresh_token"))
+        return bool(
+            cc.value("zalo_oa", "app_id") and cc.value("zalo_oa", "app_secret") and self._load().get("refresh_token")
+        )
 
     async def access_token(self) -> str:
         state = self._load()
@@ -108,12 +113,15 @@ class ZaloTokenStore:
             "ZALO_APP_SECRET để hệ thống tự làm mới."
         )
 
-    async def refresh(self, stale: str) -> str:
-        """Làm mới token. `stale` = token vừa bị Zalo từ chối; nếu tiến trình khác đã làm mới thì dùng luôn token đó."""
+    async def refresh(self, stale: str, force: bool = False) -> str:
+        """Làm mới token. `stale` = token vừa bị Zalo từ chối; nếu tiến trình khác đã làm mới thì dùng luôn token đó.
+        `force` (nút «Kiểm tra kết nối»): luôn gọi Zalo để chắc khoá đúng."""
         async with self._lock:
             with self._file_lock():
+                if cc.has_db_config("zalo_oa"):
+                    await cc.refresh()  # tiến trình khác có thể vừa lưu token mới vào CSDL
                 state = self._load()
-                if state.get("access_token") and state["access_token"] != stale:
+                if not force and state.get("access_token") and state["access_token"] != stale:
                     return str(state["access_token"])
                 if not self.can_refresh():
                     raise IntegrationNotConfigured(
@@ -123,10 +131,10 @@ class ZaloTokenStore:
                 async with httpx.AsyncClient(timeout=20, transport=self._transport) as client:
                     r = await client.post(
                         OAUTH_URL,
-                        headers={"secret_key": settings.zalo_app_secret or ""},
+                        headers={"secret_key": cc.value("zalo_oa", "app_secret") or ""},
                         data={
                             "refresh_token": state["refresh_token"],
-                            "app_id": settings.zalo_app_id or "",
+                            "app_id": cc.value("zalo_oa", "app_id") or "",
                             "grant_type": "refresh_token",
                         },
                     )
@@ -149,7 +157,15 @@ class ZaloTokenStore:
                     "access_token": body["access_token"],
                     "refresh_token": body.get("refresh_token") or state["refresh_token"],
                     "expires_at": time.time() + ttl,
-                    "seed": state.get("seed") or settings.zalo_oa_refresh_token or "",
+                    "seed": state.get("seed") or cc.value("zalo_oa", "refresh_token") or "",
                 }
+                if cc.has_db_config("zalo_oa"):
+                    # lưu vào Cài đặt: refresh token mới thành «hạt giống» mới, mọi tiến trình đọc được
+                    await cc.store_tokens(
+                        "zalo_oa",
+                        {"access_token": new["access_token"], "refresh_token": new["refresh_token"]},
+                        {"expires_at": new["expires_at"]},
+                    )
+                    new["seed"] = new["refresh_token"]
                 self._save(new)
                 return str(new["access_token"])

@@ -21,6 +21,7 @@ import httpx
 from app.core.config import settings
 from app.core.enums import Channel
 from app.core.timeutil import now_utc
+from app.integrations import channel_config as cc
 from app.integrations.base import IntegrationError, IntegrationNotConfigured
 from app.integrations.social import PostMetrics, PublishResult, SocialPost
 from app.integrations.social._ratelimit import RateLimited, limiter
@@ -32,9 +33,9 @@ class ZaloOAPublisher:
     _transport: httpx.AsyncBaseTransport | None = None
 
     def _publish_token(self) -> str:
-        if not settings.zalo_oa_access_token:
+        if not cc.value("zalo_oa", "access_token"):
             raise IntegrationNotConfigured("Thiếu ZALO_OA_ACCESS_TOKEN để đăng bài Zalo OA.")
-        return settings.zalo_oa_access_token
+        return cc.value("zalo_oa", "access_token")
 
     async def _req(
         self, method: str, path: str, *, json: dict[str, Any] | None = None, params: dict[str, Any] | None = None
