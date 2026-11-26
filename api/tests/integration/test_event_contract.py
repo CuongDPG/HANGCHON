@@ -26,6 +26,7 @@ from tests.selection.helpers import make_candidate
 CONTRACT: dict[str, set[str]] = {
     "brief.created": set(),
     "candidate.assessed": {"sourcing", "selection"},
+    "candidate.details_fetched": {"sourcing"},
     "candidate.stage_changed": {"supply"},
     "candidate.selected": {"catalog", "selection"},
     "candidate.rejected": {"selection"},

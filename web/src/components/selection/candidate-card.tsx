@@ -39,7 +39,7 @@ export function CandidateCard({
       )}
     >
       <div className="flex gap-3">
-        {compact ? null : <ImageBox src={card.image_url} alt="" ratio="1/1" className="size-14 shrink-0" placeholder="" />}
+        {compact ? null : <ImageBox src={card.image_url} alt="" ratio="1/1" className="size-14 shrink-0" placeholder="" referrerPolicy="no-referrer" />}
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-2">
             <h3 className={cn("line-clamp-2 min-w-0 flex-1 leading-snug font-semibold", compact ? "text-[14px]" : "text-[15px]")}>

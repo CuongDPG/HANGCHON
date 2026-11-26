@@ -43,7 +43,7 @@ class SaleMode(StrEnum):
 
 class ImageKind(StrEnum):
     OWNER_PHOTO = "owner_photo"  # ảnh thật chị chụp (chính)
-    SUPPLIER = "supplier"  # ảnh nguồn (chỉ tham khảo)
+    SUPPLIER = "supplier"  # ảnh nhà cung cấp chị chọn dùng lại (chép từ hồ sơ ứng viên, link gốc ở `source_url`)
     BUYER = "buyer"  # ảnh khách
     DETAIL = "detail"
 
@@ -204,6 +204,9 @@ class ProductImage(UUIDPk, Timestamps, Base):
     kind: Mapped[ImageKind] = mapped_column(enum_col(ImageKind), default=ImageKind.OWNER_PHOTO)
     status: Mapped[ImageStatus] = mapped_column(enum_col(ImageStatus), default=ImageStatus.RAW)
     original_key: Mapped[str] = mapped_column(String(300))
+    source_url: Mapped[str | None] = mapped_column(
+        Text, comment="kind=supplier: link ảnh gốc của nhà cung cấp (chỉ desk, không ra website)"
+    )
     processed_key: Mapped[str | None] = mapped_column(String(300))
     processing_ops: Mapped[list[Any]] = json_list(comment='[{"op":"crop"|"brightness"|"bg_clean", ...}]')
     width: Mapped[int | None] = mapped_column(Integer)

@@ -180,6 +180,9 @@ class Candidate(UUIDPk, Timestamps, Base):
     variants: Mapped[list[Any]] = json_list()
     images: Mapped[list[Any]] = json_list(comment="URL ảnh từ nguồn")
     main_image_url: Mapped[str | None] = mapped_column(Text)
+    image_cache: Mapped[list[Any]] = json_list(
+        comment='Bản sao ảnh nguồn trong kho riêng (chỉ desk): [{"url","key","type","bytes","at"} | {"url","error","at"}]'
+    )
     # giá ở nguồn
     price_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
     price_currency: Mapped[str | None] = mapped_column(String(3))
@@ -201,6 +204,25 @@ class Candidate(UUIDPk, Timestamps, Base):
     raw: Mapped[dict[str, Any]] = json_obj(comment="Dữ liệu gốc từ nguồn (để tra lại)")
 
     brief: Mapped[SourcingBrief | None] = relationship(back_populates="candidates", lazy="raise")
+
+    # ảnh hiển thị ở desk (bản đã lưu về kho, chưa lưu thì link gốc) — schema đọc qua from_attributes
+    @property
+    def gallery(self) -> list[dict[str, Any]]:
+        from app.modules.sourcing import gallery
+
+        return gallery.display(self)
+
+    @property
+    def thumb_url(self) -> str | None:
+        from app.modules.sourcing import gallery
+
+        return gallery.thumb(self)
+
+    @property
+    def image_count(self) -> int:
+        from app.modules.sourcing import gallery
+
+        return len(gallery.source_urls(self))
 
 
 class TrendSignal(UUIDPk, Timestamps, Base):

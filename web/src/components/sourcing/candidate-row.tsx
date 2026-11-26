@@ -43,7 +43,7 @@ export function CandidateRow({
             {selected ? <Check className="size-3.5" /> : null}
           </span>
         ) : null}
-        <ImageBox src={c.main_image_url} alt={c.title_vi} className="w-16 shrink-0" placeholder="" />
+        <ImageBox src={c.thumb_url} alt={c.title_vi} className="w-16 shrink-0" placeholder="Chưa có ảnh" referrerPolicy="no-referrer" />
         <div className="min-w-0 flex-1">
           <p className="text-[15px] leading-snug font-semibold [text-wrap:pretty]">{c.title_vi}</p>
           <p className="mt-0.5 text-[13px] text-ink-2">

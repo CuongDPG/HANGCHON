@@ -32,6 +32,7 @@ import { NoteItem } from "./note-item";
 import { ReasonsCard } from "./reasons-card";
 import { RejectSheet } from "./reject-sheet";
 import { RelatedLinks } from "@/components/desk/related-links";
+import { SupplierGallery } from "@/components/sourcing/supplier-gallery";
 
 /** Một món trên bàn chọn: thông tin nguồn, nhật ký thử (c2), lý do chọn (c3) / loại (c4), chuyển cột (c1). */
 export function CandidateScreen({ id }: { id: string }) {
@@ -119,6 +120,7 @@ export function CandidateScreen({ id }: { id: string }) {
             ratio="4/3"
             placeholder="Chưa có ảnh"
             className="w-32 shrink-0 md:w-full"
+            referrerPolicy="no-referrer"
             overlay={card.stage === "selected" ? <Seal chosen={card.seal?.chosen} total={card.seal?.total} size={56} /> : null}
           />
           <div className="flex min-w-0 flex-col gap-2">
@@ -131,6 +133,7 @@ export function CandidateScreen({ id }: { id: string }) {
           </div>
         </div>
         <div className="flex flex-col gap-4">
+          <SupplierGallery candidateId={id} />
           <Card>
             <DataList items={facts.filter((x): x is DataListItem => x !== null)} />
           </Card>

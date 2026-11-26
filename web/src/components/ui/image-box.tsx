@@ -1,5 +1,5 @@
 import { ImageIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import type { HTMLAttributeReferrerPolicy, ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
 export type ImageRatio = "1/1" | "4/5" | "3/4" | "4/3" | "16/9";
@@ -25,6 +25,8 @@ type ImageBoxProps = {
   overlay?: ReactNode;
   className?: string;
   imgClassName?: string;
+  /** Ảnh từ máy chủ ngoài (link ảnh nhà cung cấp chưa lưu về kho): "no-referrer" để CDN không chặn theo trang gọi. */
+  referrerPolicy?: HTMLAttributeReferrerPolicy;
 };
 
 /**
@@ -32,7 +34,7 @@ type ImageBoxProps = {
  * Dùng <img> thường vì ảnh đến từ kho lưu trữ (local/S3) qua API; muốn tối ưu kích thước thì
  * API trả sẵn bản thu nhỏ. Không dùng ảnh do AI tạo cho sản phẩm (xem chức năng e6).
  */
-export function ImageBox({ src, alt, ratio = "1/1", placeholder, priority = false, overlay, className, imgClassName }: ImageBoxProps) {
+export function ImageBox({ src, alt, ratio = "1/1", placeholder, priority = false, overlay, className, imgClassName, referrerPolicy }: ImageBoxProps) {
   return (
     <div className={cn("relative overflow-hidden rounded-md bg-soft-2", ratioClass[ratio], className)}>
       {src ? (
@@ -43,6 +45,7 @@ export function ImageBox({ src, alt, ratio = "1/1", placeholder, priority = fals
           loading={priority ? "eager" : "lazy"}
           fetchPriority={priority ? "high" : undefined}
           decoding="async"
+          referrerPolicy={referrerPolicy}
           className={cn("absolute inset-0 size-full object-cover", imgClassName)}
         />
       ) : (

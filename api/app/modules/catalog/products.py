@@ -20,7 +20,7 @@ from app.core.timeutil import now_utc
 from app.modules.catalog import images as img_lib
 from app.modules.catalog.ai_tasks import FactIn, WritePageIn, WritePageOut
 from app.modules.catalog.dossier import Snapshot, build_snapshot, overclaims, spec_pairs, unsupported_numbers
-from app.modules.catalog.models import ImageStatus, Product, ProductImage, ProductStatus
+from app.modules.catalog.models import ImageKind, ImageStatus, Product, ProductImage, ProductStatus
 from app.modules.catalog.textutil import seller_address_issues, unique_slug
 from app.modules.control.models import ApprovalItem, ApprovalStatus, User
 from app.modules.sourcing.models import Candidate
@@ -347,7 +347,15 @@ def primary_image(p: Product) -> ProductImage | None:
     return next((i for i in ready if i.is_primary), ready[0] if ready else None)
 
 
-async def upload_image(db: AsyncSession, product: Product, data: bytes, *, alt: str | None = None) -> ProductImage:
+async def upload_image(
+    db: AsyncSession,
+    product: Product,
+    data: bytes,
+    *,
+    alt: str | None = None,
+    kind: ImageKind = ImageKind.OWNER_PHOTO,
+    source_url: str | None = None,
+) -> ProductImage:
     img_lib.open_image(data)  # kiểm tệp trước khi lưu
     storage = get_storage()
     key = new_key("private/products/originals", "jpg")
@@ -364,7 +372,7 @@ async def upload_image(db: AsyncSession, product: Product, data: bytes, *, alt: 
     ).scalar_one() > 0
     img = ProductImage(
         product_id=product.id, original_key=key, position=position, is_primary=not has_primary,
-        alt=alt or product.name, status=ImageStatus.PROCESSING,
+        alt=alt or product.name, status=ImageStatus.PROCESSING, kind=kind, source_url=source_url,
     )  # fmt: skip
     db.add(img)
     await db.flush()
@@ -383,6 +391,59 @@ async def upload_image(db: AsyncSession, product: Product, data: bytes, *, alt: 
         await render_image(db, img, enhance=False)  # vẫn cần các cỡ để hiển thị, chỉ không chỉnh ảnh
     await db.refresh(product, ["images"])
     return img
+
+
+# ---- ảnh nhà cung cấp chị chọn dùng lại (Hồ sơ bán) ------------------------------------------------------------
+#
+# Không có gì tự chép: chị tích từng ảnh trong hồ sơ ứng viên. Ảnh đi đúng đường của ảnh chị tải lên (gốc ở
+# private/products/originals → `catalog.process_image` → các cỡ công khai không mang EXIF, tên tệp ngẫu nhiên, alt là
+# tên món), nên website không lộ link/tên nhà cung cấp. Link gốc chỉ ghi ở `product_images.source_url` (desk).
+
+MAX_SUPPLIER_PICK = 12
+
+
+async def supplier_image_options(db: AsyncSession, product: Product) -> list[dict[str, Any]]:
+    """Ảnh nhà cung cấp trong hồ sơ ứng viên của món (đọc bảng sourcing), kèm cờ đã dùng."""
+    from app.modules.sourcing import gallery
+
+    c = await db.get(Candidate, product.candidate_id) if product.candidate_id else None
+    if c is None:
+        return []
+    await db.refresh(product, ["images"])
+    used = {i.source_url for i in product.images if i.source_url}
+    return [{**g, "used": g["source_url"] in used} for g in gallery.display(c)]
+
+
+async def import_supplier_images(db: AsyncSession, product: Product, urls: list[str]) -> list[ProductImage]:
+    """Chị tích ảnh nhà cung cấp → thành ảnh sản phẩm bình thường (`kind=supplier`, ghi link gốc)."""
+    from app.modules.sourcing import gallery
+
+    c = await db.get(Candidate, product.candidate_id) if product.candidate_id else None
+    if c is None:
+        raise BadRequest("Món này không gắn với ứng viên nào nên không có ảnh nhà cung cấp.", code="no_candidate")
+    picked = list(dict.fromkeys(u for u in urls if u))[:MAX_SUPPLIER_PICK]
+    if not picked:
+        raise BadRequest("Chị chưa chọn ảnh nào.")
+    allowed = set(gallery.source_urls(c))
+    await db.refresh(product, ["images"])
+    used = {i.source_url for i in product.images if i.source_url}
+    out: list[ProductImage] = []
+    for url in picked:
+        if url not in allowed:
+            raise BadRequest("Ảnh này không có trong hồ sơ ứng viên của món.", code="not_in_dossier")
+        if url in used:
+            continue
+        got = await gallery.read_cached(c, url)
+        if got is None:
+            raise BadRequest(
+                "Có ảnh chưa lưu về máy. Chị bấm «Lấy ảnh và chi tiết» ở hồ sơ ứng viên rồi chọn lại.",
+                code="image_not_cached",
+            )
+        out.append(await upload_image(db, product, got[0], kind=ImageKind.SUPPLIER, source_url=url))
+    await control.audit(db, "catalog.supplier_images_used", entity_type="products", entity_id=product.id,
+                        summary=f"Dùng {len(out)} ảnh nhà cung cấp cho {product.name}",
+                        data={"count": len(out)})  # fmt: skip
+    return out
 
 
 CLEAN_BG_SETTING = "catalog.image_clean_background"

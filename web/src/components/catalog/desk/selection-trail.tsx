@@ -10,6 +10,7 @@ import { EmptyState, ScoreBar, SkeletonList } from "@/components/ui/feedback";
 import { Money } from "@/components/ui/money";
 import { useSelectionTrail, type SelectionTrail } from "@/lib/api/catalog";
 import { formatNumber } from "@/lib/format";
+import { SupplierGallery } from "@/components/sourcing/supplier-gallery";
 import { SelectionDossier } from "./selection-dossier";
 
 const SAFETY_TONE: Record<NonNullable<SelectionTrail["assessment"]>["safety_status"], BadgeTone> = {
@@ -35,6 +36,8 @@ export function SelectionTrailView({ productId }: { productId: string }) {
         </SectionLabel>
         <SelectionDossier productId={productId} />
       </section>
+
+      {t?.candidate_id ? <SupplierGallery candidateId={t.candidate_id} /> : null}
 
       <section className="flex flex-col gap-3" aria-label="Dấu vết từng bước">
         <SectionLabel>Dấu vết từng bước</SectionLabel>

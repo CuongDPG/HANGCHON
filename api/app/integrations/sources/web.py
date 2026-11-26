@@ -62,7 +62,9 @@ ai.task(
         "Vai trò: người tìm hàng trên các sàn (1688, Taobao, Rakuten, Amazon Nhật...). Dùng web_search với từ khoá đã "
         "cho (kèm `site:<tên miền>` của sàn) để tìm TIN RAO SẢN PHẨM cụ thể, mở trang bằng web_fetch khi cần xem giá.\n"
         "Trả về tối đa `limit` tin rao, mỗi tin: sàn, URL trang sản phẩm, tên gốc, giá gốc kèm tiền tệ, người bán, số sao, "
-        "số đánh giá, số đã bán nếu thấy. Bỏ tin rao vượt `price_max` (nếu có).\n" + _DATA_NOTE
+        "số đánh giá, số đã bán nếu thấy, và `image_url` = URL ảnh chính của món nếu thấy trong kết quả hoặc trang đã mở "
+        "(link tệp ảnh thật, thường ở CDN của sàn; không thấy thì để trống, không đoán). Bỏ tin rao vượt `price_max` (nếu "
+        "có).\n" + _DATA_NOTE
     ),
 )
 ai.task(

@@ -179,7 +179,7 @@ Nhập từ một chỗ: `import { Button, Card, Money } from "@/components/ui";
 | `Skeleton`, `SkeletonList` | `<Skeleton className="h-5 w-40" />` · `<SkeletonList rows={3} />` |
 | `EmptyState` | `<EmptyState icon={<Search />} title="Chưa có ứng viên" description="…" action={<Button>Ra đề</Button>} tone="error" />` |
 | `PageHeader` | `<PageHeader eyebrow="Thứ tư, 25/11" title="Hôm nay" description="…" backHref="/desk" actions={…} />` |
-| `ImageBox` | `<ImageBox src={url} alt="…" ratio="1/1\|4/5\|3/4\|4/3\|16/9" placeholder="Ảnh chị chụp" overlay={<Seal … />} priority />` |
+| `ImageBox` | `<ImageBox src={url} alt="…" ratio="1/1\|4/5\|3/4\|4/3\|16/9" placeholder="Ảnh chị chụp" overlay={<Seal … />} priority />` · ảnh từ máy chủ ngoài (link ảnh nhà cung cấp chưa lưu) thêm `referrerPolicy="no-referrer"` |
 | `Money` | `<Money value={385000} />` → 385.000đ · `compact` → 3,4 tr · `strike` |
 | `DateTime`, `useNow()` | `<DateTime value={iso} format="date\|dayMonth\|time\|dateTime\|weekday\|relative" />` |
 | `StatTile` | `<div className="grid grid-cols-3 gap-2"><StatTile value="9" label="đơn mới" href="/desk/don-hang" /></div>` |
@@ -255,3 +255,9 @@ Bài chính: `e2e/lifecycle.spec.ts` (vòng đời một món hàng) và `e2e/ro
 Bài khói chạy được khi API chưa chạy: lỗi tải `/api/*` được bỏ qua, nhưng trang phải hiện trạng thái trống/lỗi tử tế,
 không lỗi console, không tràn ngang ở 390px. Thêm màn hình quan trọng thì thêm một dòng vào `e2e/smoke.spec.ts`.
 Lưu ý Activity: trang đã rời vẫn nằm ẩn trong DOM, nên khi đếm phần tử trong Playwright hãy giới hạn trong vùng đang hiện (vd. `getByRole("main")`, phần tử `:visible`).
+
+## 8. Ảnh nhà cung cấp (desk)
+
+Phía chọn hàng dùng `components/sourcing/supplier-gallery.tsx`: `<SupplierGallery candidateId={id} />` (lưới ảnh, bấm xem lớn,
+«Lấy ảnh và chi tiết», tự làm mới màn khác khi lấy xong) và `<CandidateThumb …/>` (ảnh nhỏ bấm mở thư viện, dùng ở bảng
+so sánh). Danh sách dùng `thumb_url` của ứng viên. Không bao giờ dùng các component này ở website.

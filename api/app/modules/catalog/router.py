@@ -32,6 +32,7 @@ from app.modules.catalog.models import (
     FindRequest,
     FindRequestStatus,
     FindRequestVote,
+    ImageKind,
     Product,
     ProductStatus,
     Review,
@@ -45,6 +46,7 @@ from app.modules.catalog.schemas import (
     CategoryOut,
     DeskDrop,
     DeskFindRequest,
+    DeskImageSet,
     DeskProduct,
     DeskProductRow,
     DeskReview,
@@ -62,7 +64,6 @@ from app.modules.catalog.schemas import (
     FindStatusIn,
     FromCandidateIn,
     ImageOrderIn,
-    ImageSet,
     ProductDetail,
     ProductOut,
     ProductPatch,
@@ -78,6 +79,8 @@ from app.modules.catalog.schemas import (
     SelectionTrailOut,
     ShelfOut,
     SitemapEntry,
+    SupplierImageOption,
+    SupplierImagesIn,
     VoiceIssue,
     VoteIn,
     VoteOut,
@@ -296,7 +299,10 @@ async def _desk_product(db: AsyncSession, p: Product) -> DeskProduct:
     c = await db.get(Candidate, p.candidate_id) if p.candidate_id else None
     return DeskProduct(
         **ProductOut.model_validate(p).model_dump(),
-        images=[ImageSet.model_validate(image_set(i)) for i in sorted(p.images, key=lambda i: i.position)],
+        images=[
+            DeskImageSet(**image_set(i), source="supplier" if i.kind == ImageKind.SUPPLIER else "own")
+            for i in sorted(p.images, key=lambda i: i.position)
+        ],
         candidate_title=c.title_vi if c else None,
         voice_issues=[VoiceIssue.model_validate(i) for i in product_svc.voice_issues(p)],
     )
@@ -428,6 +434,20 @@ async def upload_image(
     if not data:
         raise BadRequest("Tệp ảnh trống.")
     await product_svc.upload_image(db, p, data, alt=alt)
+    return await _desk_product(db, p)
+
+
+@desk.get("/products/{product_id}/supplier-images", response_model=list[SupplierImageOption])
+async def supplier_images(product_id: uuid.UUID, _: CurrentUser, db: DbSession) -> Any:
+    """Ảnh nhà cung cấp trong hồ sơ ứng viên của món (chỉ desk) — để chị chọn dùng lại."""
+    return await product_svc.supplier_image_options(db, await product_svc.get_product(db, product_id))
+
+
+@desk.post("/products/{product_id}/supplier-images", response_model=DeskProduct, status_code=status.HTTP_201_CREATED)
+async def use_supplier_images(product_id: uuid.UUID, body: SupplierImagesIn, _: CurrentUser, db: DbSession) -> Any:
+    """Chị tích ảnh nhà cung cấp → chép thành ảnh sản phẩm, xử lý như ảnh chị tải lên."""
+    p = await product_svc.get_product(db, product_id)
+    await product_svc.import_supplier_images(db, p, body.urls)
     return await _desk_product(db, p)
 
 

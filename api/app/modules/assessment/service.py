@@ -325,8 +325,13 @@ async def _step_details(db: AsyncSession, a: Assessment, c: Candidate) -> list[S
     reviews = [SourceReview.model_validate(r) for r in _review_dicts(c)]
     if not c.source_url:
         return reviews
-    if not c.specs or not reviews:
+    # thiếu ảnh nhà cung cấp (< 2 ảnh, chưa từng đọc trang chi tiết) cũng đọc trang: phía chọn hàng cần ảnh để hình dung
+    few_images = len({u for u in [c.main_image_url, *(c.images or [])] if u}) < 2 and not (c.raw or {}).get("detail")
+    if not c.specs or not reviews or few_images:
         product = await sources().fetch_product(c.source_url)
+        images = [u for u in (product.images or ([product.image_url] if product.image_url else [])) if u]
+        if images:  # ảnh thuộc bảng của sourcing → ghi qua sự kiện
+            await events.emit("candidate.details_fetched", {"candidate_id": str(c.id), "images": images[:12]}, db=db)
         tr = await ai.run(
             "sourcing.translate_product",
             TranslateIn(

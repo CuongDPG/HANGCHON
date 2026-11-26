@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -390,6 +390,26 @@ class ImageSet(BaseModel):
     webp: dict[str, str] = Field(default_factory=dict)
 
 
+class DeskImageSet(ImageSet):
+    """Ảnh ở desk: thêm nguồn ảnh (chị chụp / nhà cung cấp). Website dùng `ImageSet`, không có trường này."""
+
+    source: Literal["own", "supplier"] = "own"
+
+
+class SupplierImageOption(BaseModel):
+    """Ảnh nhà cung cấp trong hồ sơ ứng viên, để chị chọn dùng lại ở Hồ sơ bán."""
+
+    src: str
+    source_url: str
+    cached: bool
+    error: str | None = None
+    used: bool = False
+
+
+class SupplierImagesIn(BaseModel):
+    urls: list[str] = Field(min_length=1, max_length=12)
+
+
 class SealOut(BaseModel):
     chosen: int
     total: int | None
@@ -651,7 +671,7 @@ class VoiceIssue(BaseModel):
 
 
 class DeskProduct(ProductOut):
-    images: list[ImageSet] = Field(default_factory=list)
+    images: list[DeskImageSet] = Field(default_factory=list)
     candidate_title: str | None = None
     voice_issues: list[VoiceIssue] = Field(default_factory=list)
 

@@ -35,9 +35,12 @@ from app.modules.sourcing.schemas import (
     BriefPatch,
     CandidateCard,
     CandidateDetail,
+    CandidateGallery,
     DemandMentionOut,
     DemandSignalOut,
     DemandView,
+    DetailFetch,
+    GalleryImage,
     ImportLinkIn,
     Offer,
     RankGuidance,
@@ -291,6 +294,34 @@ async def get_candidate(candidate_id: uuid.UUID, _: CurrentUser, db: DbSession) 
             "guidance": rank_guidance(c),
         }
     )
+
+
+def gallery_view(c: Candidate) -> CandidateGallery:
+    st = service.detail_state(c)
+    return CandidateGallery(
+        candidate_id=c.id,
+        title_vi=c.title_vi,
+        source_url=c.source_url,
+        images=[GalleryImage.model_validate(g) for g in c.gallery],
+        detail_fetch=DetailFetch.model_validate(st) if st and st.get("status") else None,
+    )
+
+
+@router.get("/candidates/{candidate_id}/gallery", response_model=CandidateGallery)
+async def candidate_gallery(candidate_id: uuid.UUID, _: CurrentUser, db: DbSession) -> CandidateGallery:
+    """Ảnh nhà cung cấp của một ứng viên (chỉ desk) + trạng thái «Lấy ảnh và chi tiết»."""
+    return gallery_view(await service.get_candidate(db, candidate_id))
+
+
+@router.post("/candidates/{candidate_id}/fetch-details", response_model=CandidateGallery)
+async def fetch_details(candidate_id: uuid.UUID, _: CurrentUser, db: DbSession) -> CandidateGallery:
+    """«Lấy ảnh và chi tiết»: đọc trang nguồn (job nền) rồi lưu ảnh về kho riêng. Đang chạy thì không xếp thêm."""
+    c = await service.get_candidate(db, candidate_id)
+    if service.request_details(c):
+        await db.commit()
+        await enqueue("sourcing.fetch_details", candidate_id=str(c.id))
+        await db.refresh(c)
+    return gallery_view(c)
 
 
 # ---- a5: radar xu hướng ------------------------------------------------------------------------------------------

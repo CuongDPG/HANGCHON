@@ -172,6 +172,7 @@ Module không gọi service của module khác. Bên phát gọi `await events.e
 |---|---|---|---|
 | `brief.created` | `brief_id` | sourcing | — |
 | `candidate.assessed` | `candidate_id`, `assessment_id` | assessment | sourcing (cập nhật điểm xếp hạng), selection (đạt điểm đạt của khung chấm → việc chờ «mua mẫu?», `selection.suggest_sample`) |
+| `candidate.details_fetched` | `candidate_id`, `images` (≤ 12 URL ảnh nguồn) | assessment (bước lấy chi tiết đọc trang nguồn) | sourcing (thêm ảnh nhà cung cấp vào ứng viên, lưu bản sao về kho riêng) |
 | `candidate.stage_changed` | `candidate_id`, `from`, `to` | selection | supply (sang Mua mẫu → đơn đặt mẫu chờ chị duyệt) |
 | `candidate.selected` | `candidate_id`, `decision_id` | selection | catalog (tạo sản phẩm nháp, e1), selection (học gu, c6) |
 | `candidate.rejected` | `candidate_id`, `decision_id` | selection | selection (học gu) |

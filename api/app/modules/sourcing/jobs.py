@@ -19,6 +19,7 @@ async def scan_brief(ctx: dict[str, Any], run_id: str) -> str:
     async with ctx["db"]() as db:
         run = await service.execute_scan(db, uuid.UUID(run_id))
         await db.commit()
+        await service.after_save(db, run)
         return run.status.value
 
 
@@ -27,6 +28,7 @@ async def import_link(ctx: dict[str, Any], run_id: str) -> str:
     async with ctx["db"]() as db:
         run = await service.execute_import(db, uuid.UUID(run_id))
         await db.commit()
+        await service.after_save(db, run)
         return run.status.value
 
 
@@ -35,7 +37,17 @@ async def image_search(ctx: dict[str, Any], run_id: str) -> str:
     async with ctx["db"]() as db:
         run = await service.execute_image_search(db, uuid.UUID(run_id))
         await db.commit()
+        await service.after_save(db, run)
         return run.status.value
+
+
+@job("sourcing.fetch_details")
+async def fetch_details(ctx: dict[str, Any], candidate_id: str) -> str | None:
+    """«Lấy ảnh và chi tiết» một ứng viên (chị bấm, hoặc tự lấy cho món điểm cao sau lượt quét)."""
+    async with ctx["db"]() as db:
+        c = await service.execute_fetch_details(db, uuid.UUID(candidate_id))
+        await db.commit()
+        return (service.detail_state(c) or {}).get("status")
 
 
 @job("sourcing.trend_radar")

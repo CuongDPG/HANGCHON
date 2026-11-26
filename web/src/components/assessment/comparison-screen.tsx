@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Badge, Button, Card, EmptyState, ImageBox, PageHeader, Skeleton, SkeletonList } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, PageHeader, Skeleton, SkeletonList } from "@/components/ui";
+import { CandidateThumb } from "@/components/sourcing/supplier-gallery";
 import { useComparison } from "@/lib/api/assessment";
 import { cn } from "@/lib/cn";
 
@@ -52,8 +53,8 @@ export function ComparisonScreen({ id }: { id: string }) {
                 const rec = data.recommended_candidate_id === it.candidate_id;
                 return (
                   <th key={it.id} scope="col" className="min-w-36 p-2 text-left align-top font-normal">
+                    <CandidateThumb candidateId={it.candidate_id} src={c?.thumb_url ?? null} count={c?.image_count ?? 0} title={c?.title_vi ?? "Ứng viên"} className="mb-1.5 w-20" />
                     <Link href={`/desk/san-hang/ung-vien/${it.candidate_id}`} className="flex flex-col gap-1.5">
-                      <ImageBox src={c?.main_image_url} alt={c?.title_vi ?? ""} className="w-14" placeholder="" />
                       <span className="text-[13px] leading-snug font-semibold [text-wrap:pretty]">{c?.title_vi}</span>
                       {rec ? <Badge tone="accent">Nên mua mẫu</Badge> : null}
                     </Link>

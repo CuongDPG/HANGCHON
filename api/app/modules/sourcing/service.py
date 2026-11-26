@@ -1568,3 +1568,210 @@ async def last_runs(db: AsyncSession, brief_ids: list[uuid.UUID]) -> dict[uuid.U
 def offers_of(c: Candidate) -> list[dict[str, Any]]:
     offers = (c.raw or {}).get("offers")
     return offers if isinstance(offers, list) else []
+
+
+# ---- ảnh và chi tiết nhà cung cấp (chỉ desk) ---------------------------------------------------------------------
+#
+# Mỗi ứng viên ở phía chọn hàng phải có ảnh của nhà cung cấp để chị hình dung món hàng. Ảnh lấy từ kết quả tìm (nếu
+# nguồn trả ảnh) và từ trang chi tiết (`fetch_product`: ảnh, thông số gốc, đánh giá); bản sao lưu vào kho riêng
+# (`gallery.cache_images`). Lấy chi tiết bằng driver `web` tốn một lượt AI có web fetch (~8.000–11.000đ), nên tự lấy
+# chỉ cho `AUTO_DETAIL_SETTING` món điểm cao nhất mỗi lượt quét; món khác chị bấm «Lấy ảnh và chi tiết».
+
+AUTO_DETAIL_SETTING = "sourcing.auto_detail_top_n"
+DEFAULT_AUTO_DETAIL_TOP_N = 5
+DETAIL_STALE = timedelta(minutes=15)
+
+
+def auto_followups_enabled() -> bool:
+    """Việc nối sau lượt quét (lưu ảnh, tự lấy chi tiết). Tắt trong test (test gọi trực tiếp) và khi nguồn là giả lập
+    (dữ liệu mẫu, e2e: tự lấy chi tiết giả chỉ làm đầy nhật ký AI)."""
+    return not settings.is_test and sources().name != "mock"
+
+
+def detail_state(c: Candidate) -> dict[str, Any] | None:
+    st = (c.raw or {}).get("detail_fetch")
+    return st if isinstance(st, dict) else None
+
+
+def _set_detail_state(c: Candidate, **fields: Any) -> None:
+    c.raw = {**(c.raw or {}), "detail_fetch": {**(detail_state(c) or {}), **fields}}
+    flag_modified(c, "raw")
+
+
+def detail_busy(c: Candidate) -> bool:
+    st = detail_state(c) or {}
+    if st.get("status") not in ("queued", "running"):
+        return False
+    try:
+        from datetime import datetime
+
+        return now_utc() - datetime.fromisoformat(st["at"]) < DETAIL_STALE
+    except (KeyError, ValueError, TypeError):
+        return False
+
+
+def request_details(c: Candidate) -> bool:
+    """Chị bấm «Lấy ảnh và chi tiết». Trả False nếu lượt trước còn đang chạy (không xếp thêm)."""
+    if not c.source_url:
+        raise BadRequest("Ứng viên này không có link nguồn để lấy ảnh và chi tiết.", code="no_source_url")
+    if detail_busy(c):
+        return False
+    _set_detail_state(c, status="queued", at=now_utc().isoformat(), error=None)
+    return True
+
+
+def details_payload(product: SourceProduct) -> dict[str, Any]:
+    return {
+        "images": [u for u in (product.images or ([product.image_url] if product.image_url else [])) if u],
+        "description_original": product.description,
+        "moq": product.moq,
+        "weight_grams": product.weight_grams,
+        "rating": product.rating,
+        "review_count": product.review_count,
+        "specs_original": product.specs,
+        "reviews": [r.model_dump(mode="json") for r in product.reviews[:30]],
+    }
+
+
+def merge_images(c: Candidate, urls: list[str]) -> int:
+    """Thêm ảnh nguồn mới vào ứng viên (giữ ảnh cũ, khử trùng). Trả số ảnh mới thêm."""
+    new = [u for u in urls if isinstance(u, str) and u.startswith(("http://", "https://"))]
+    before = [u for u in (c.images or []) if isinstance(u, str)]
+    merged = list(dict.fromkeys([*before, *new]))
+    added = len(merged) - len(before)
+    if added:
+        c.images = merged
+    if not c.main_image_url and merged:
+        c.main_image_url = merged[0]
+    return added
+
+
+async def apply_details(db: AsyncSession, candidate_id: str, d: dict[str, Any]) -> dict[str, Any]:
+    """Handler `sourcing.fetch_details`: ghi ảnh + chi tiết còn trống. Không đè thứ chị/AI đã có."""
+    c = await get_candidate(db, uuid.UUID(candidate_id))
+    added = merge_images(c, d.get("images") or [])
+    for k in ("description_original", "moq", "weight_grams", "review_count"):
+        if getattr(c, k) is None and d.get(k) is not None:
+            setattr(c, k, d[k])
+    if c.rating is None and d.get("rating") is not None:
+        c.rating = Decimal(str(d["rating"]))
+    raw = dict(c.raw or {})
+    if not raw.get("reviews") and d.get("reviews"):
+        raw["reviews"] = d["reviews"]
+    raw["detail"] = {"specs_original": d.get("specs_original") or {}, "fetched_at": now_utc().isoformat()}
+    c.raw = raw
+    flag_modified(c, "raw")
+    await db.flush()
+    return {"candidate_id": candidate_id, "images_added": added, "image_count": len(c.images or [])}
+
+
+async def execute_fetch_details(db: AsyncSession, candidate_id: uuid.UUID) -> Candidate:
+    """Job «Lấy ảnh và chi tiết»: đọc trang nguồn → ghi qua control → lưu ảnh về kho riêng."""
+    from app.modules.sourcing import gallery
+
+    c = await get_candidate(db, candidate_id)
+    if not c.source_url:
+        return c
+    _set_detail_state(c, status="running", at=now_utc().isoformat())
+    await db.commit()
+    error: str | None = None
+    note: str | None = None
+    try:
+        product = await sources().fetch_product(c.source_url)
+    except (IntegrationError, IntegrationNotConfigured, ai.AIError) as e:
+        error = f"Không đọc được trang nguồn: {getattr(e, 'message', str(e))}"
+    else:
+        d = details_payload(product)
+        out = await control.propose(
+            "sourcing.fetch_details",
+            f"Lấy ảnh và chi tiết: {c.title_vi}",
+            {"candidate_id": str(c.id), "details": d},
+            {"title": c.title_vi, "url": c.source_url, "image_count": len(d["images"]),
+             "review_count": len(d["reviews"])},
+            db=db,
+            summary=f"{len(d['images'])} ảnh, {len(d['reviews'])} đánh giá từ trang nguồn.",
+            sources=[{"url": c.source_url, "title": product.title}],
+            ref_type="candidates",
+            ref_id=c.id,
+            dedupe_key=f"details:{c.id}",
+        )  # fmt: skip
+        if out.status == "pending":
+            note = "Chi tiết đang chờ chị duyệt ở Chờ duyệt."
+        elif out.status == "blocked":
+            error = "Việc lấy ảnh và chi tiết đang tắt trong Mức tự chủ."
+        elif out.status == "failed":
+            error = out.error or "Ghi chi tiết bị lỗi."
+    counts = await gallery.cache_images(c, retry_failed=True)
+    n = len(gallery.source_urls(c))
+    _set_detail_state(
+        c,
+        status="failed" if error else "done",
+        at=now_utc().isoformat(),
+        error=error,
+        note=note,
+        image_count=n,
+        cached=sum(1 for g in gallery.display(c) if g["cached"]),
+        failed_images=counts["failed"],
+    )
+    await db.commit()
+    return c
+
+
+async def cache_candidate_images(db: AsyncSession, ids: list[uuid.UUID]) -> int:
+    """Lưu ảnh nguồn của nhiều ứng viên về kho riêng (sau lượt quét / dán link / thẩm định). Trả số ảnh lưu được."""
+    from app.modules.sourcing import gallery
+
+    if not gallery.caching_enabled():
+        return 0
+    n = 0
+    for cid in ids:
+        c = await db.get(Candidate, cid)
+        if c is not None:
+            n += (await gallery.cache_images(c))["cached"]
+            await db.commit()
+    return n
+
+
+async def auto_detail_ids(db: AsyncSession, candidate_ids: list[str]) -> list[uuid.UUID]:
+    """Món điểm cao nhất của lượt quét còn thiếu ảnh (< 2 ảnh) và chưa từng lấy chi tiết — tối đa N (cài đặt)."""
+    n = await control.get_setting(db, AUTO_DETAIL_SETTING, DEFAULT_AUTO_DETAIL_TOP_N)
+    n = max(0, min(int(n or 0), 20))
+    if not n or not candidate_ids:
+        return []
+    from app.modules.sourcing import gallery
+
+    rows = (
+        (
+            await db.execute(
+                select(Candidate)
+                .where(
+                    Candidate.id.in_([uuid.UUID(i) for i in candidate_ids]),
+                    Candidate.stage == CandidateStage.CANDIDATE,
+                    Candidate.source_url.is_not(None),
+                )
+                .order_by(Candidate.ai_score.desc().nulls_last())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    out = [c.id for c in rows if detail_state(c) is None and len(gallery.source_urls(c)) < 2]
+    return out[:n]
+
+
+async def after_save(db: AsyncSession, run: SourcingRun) -> None:
+    """Sau khi lượt quét / dán link đã commit: lưu ảnh nguồn về kho, tự lấy chi tiết cho vài món điểm cao."""
+    from app.core.jobs import enqueue
+
+    if not auto_followups_enabled():
+        return
+    ids = [str(i) for i in run_progress(run).get("candidate_ids") or []]
+    if not ids:
+        return
+    if run.kind in (RunKind.BRIEF_SCAN, RunKind.SCHEDULED_SCAN, RunKind.IMAGE_SEARCH):
+        for cid in await auto_detail_ids(db, ids):
+            c = await db.get(Candidate, cid)
+            if c is not None and request_details(c):
+                await db.commit()
+                await enqueue("sourcing.fetch_details", candidate_id=str(cid))
+    await cache_candidate_images(db, [uuid.UUID(i) for i in ids])

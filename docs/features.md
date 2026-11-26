@@ -70,7 +70,8 @@ Nơi khách đọc kỹ, đặt hàng và theo dõi đơn.
 | e3 | Mở bán theo đợt | AI làm, chị duyệt | 1 | Đợt gom đơn có hạn chót, số suất, ngày hàng về dự kiến. |
 | e4 | Đặt hàng một trang | AI tự làm | 1 | Không cần tạo tài khoản. Chuyển khoản bằng mã QR tự xác nhận, hoặc trả tiền khi nhận. |
 | e5 | Theo dõi đơn | AI tự làm | 1 | Khách xem hành trình đơn bằng số điện thoại và mã đơn. |
-| e6 | Xử lý ảnh sản phẩm | AI tự làm | 1 | Ảnh thật chị chụp là chính. AI cắt, cân sáng, làm sạch nền; không tạo ảnh giả. |
+| e6 | Xử lý ảnh sản phẩm | AI tự làm | 1 | Ảnh thật chị chụp là chính. AI cắt, cân sáng, làm sạch nền; không tạo ảnh giả. Chị có thể tự chọn dùng lại ảnh nhà cung cấp (không gì tự chép). |
+| a2, b1, c1, e2 | Ảnh nhà cung cấp ở phía chọn (26/11) | AI tự làm | 1 | Mọi ứng viên có ảnh của nhà cung cấp (lưu bản sao về kho riêng, chỉ desk) để chị hình dung món; link gốc vẫn mở được. Thiếu ảnh thì «Lấy ảnh và chi tiết». |
 | e7 | Trợ lý hỏi đáp trên web | AI tự làm | 2 | Trả lời từ hồ sơ thẩm định, có dẫn nguồn. Không biết thì nói không biết và chuyển chị. |
 | e8 | Đánh giá có ảnh của khách | AI làm, chị duyệt | 2 | Tự xin đánh giá sau khi khách nhận hàng. AI lọc, chị duyệt hiển thị. |
 | e9 | Trang Nhờ tìm | AI làm, chị duyệt | 2 | Khách gửi nhu cầu, AI lọc rồi đề xuất, chị duyệt mới hiện. Người khác bấm cùng cần; đủ số người thì AI đề xuất mở đề tìm, chị duyệt. |

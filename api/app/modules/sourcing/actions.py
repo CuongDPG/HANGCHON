@@ -68,6 +68,22 @@ control.register_action(
     description="Trang Nhờ tìm đủ người bấm «cùng cần»: duyệt để AI mở đề tìm món đó.",
 )
 
+control.register_action(
+    "sourcing.fetch_details",
+    "Lấy ảnh và chi tiết từ trang nguồn",
+    GROUP,
+    default="auto",
+    description="Đọc trang sản phẩm của nhà cung cấp: ảnh, thông số gốc, đánh giá. Ảnh lưu về kho riêng, chỉ hiện ở desk.",
+)
+
+control.register_setting(
+    service.AUTO_DETAIL_SETTING,
+    "Tự lấy ảnh và chi tiết cho mấy món điểm cao nhất mỗi lượt quét",
+    service.DEFAULT_AUTO_DETAIL_TOP_N,
+    group=GROUP,
+    description="0 = không tự lấy. Với cách «AI tìm trên web», mỗi món tốn một lượt AI đọc trang (~8.000–11.000đ).",
+)
+
 control.register_setting(
     FX_SETTING_KEY,
     "Tỷ giá ước tính giá vốn",
@@ -125,6 +141,17 @@ async def _import(ctx: control.ActionContext) -> control.HandlerResult:
 @control.undoer("sourcing.import_link")
 async def _undo_import(ctx: control.UndoContext) -> None:
     await service.undo_candidates(ctx.db, ctx.undo.get("candidate_ids", []))
+
+
+@control.handler("sourcing.fetch_details")
+async def _fetch_details(ctx: control.ActionContext) -> control.HandlerResult:
+    res = await service.apply_details(ctx.db, ctx.payload["candidate_id"], ctx.payload["details"])
+    return control.HandlerResult(
+        result=res,
+        summary=f"Thêm {res['images_added']} ảnh, có {res['image_count']} ảnh nguồn.",
+        ref_type="candidates",
+        ref_id=uuid.UUID(res["candidate_id"]),
+    )
 
 
 @control.handler("sourcing.save_trends")

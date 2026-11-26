@@ -172,6 +172,27 @@ def at(days_ago: float, hour: int | None = None) -> Iterator[None]:
         yield
 
 
+_DEMO_COLORS = [(46, 63, 143), (150, 90, 60), (70, 120, 110), (180, 150, 70), (120, 80, 130), (90, 100, 110)]
+
+
+async def _supplier_photos(c: Any, i: int) -> None:
+    """Ảnh nhà cung cấp (ví dụ) của ứng viên mẫu: ảnh vẽ sẵn, lưu thẳng vào kho riêng như khi đã «Lấy ảnh và chi tiết»
+    (không tải gì từ mạng). Link nguồn là tên miền ví dụ."""
+    from app.core.storage import get_storage
+    from app.modules.catalog.images import sample_photo
+
+    urls, cache = [], []
+    for n, note in enumerate(("Ảnh nhà cung cấp (ví dụ)", "Ảnh chi tiết của shop (ví dụ)")):
+        url = f"https://example.com/{c.source_platform.value}/img/{i + 1001}-{n + 1}.jpg"
+        key = f"private/sourcing/candidates/{c.id}/demo-{n + 1}.jpg"
+        color = _DEMO_COLORS[(i + n * 3) % len(_DEMO_COLORS)]
+        data = sample_photo(c.title_vi, color, size=640, note=note)
+        await get_storage().put(key, data, "image/jpeg")
+        urls.append(url)
+        cache.append({"url": url, "key": key, "type": "image/jpeg", "bytes": len(data), "at": now_utc().isoformat()})
+    c.images, c.main_image_url, c.image_cache = urls, urls[0], cache
+
+
 class Story:
     def __init__(self, c: httpx.AsyncClient, public: httpx.AsyncClient) -> None:
         self.c, self.pub = c, public
@@ -240,6 +261,7 @@ class Story:
                 )  # fmt: skip
                 s.add(c)
                 await s.flush()
+                await _supplier_photos(c, i)
                 self.ids[key] = str(c.id)
                 self.bump("candidates")
             # chị đã xác nhận cách AI hiểu đề; ứng viên ở trên là kết quả lượt quét (dựng tay để tên món cố định)

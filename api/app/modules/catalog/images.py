@@ -181,6 +181,7 @@ def process_photo(data: bytes, *, enhance: bool = True, clean_bg: bool = True) -
                 ops.append(bg_op)
     img, crop_op = square_crop(img, follow_subject=enhance)
     ops.append(crop_op)
+    img.info = {}  # bỏ mọi siêu dữ liệu của ảnh gốc (EXIF, XMP, chú thích JPEG — ảnh nhà cung cấp hay ghi tên shop)
     side = img.width
     out = ProcessedImage(width=side, height=side, ops=ops)
     for size in SIZES:

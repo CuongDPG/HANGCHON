@@ -259,6 +259,35 @@ class Offer(BaseModel):
     review_count: int | None = None
 
 
+class GalleryImage(BaseModel):
+    """Ảnh nhà cung cấp hiện ở desk: `src` là bản đã lưu về kho riêng (`cached`), chưa lưu thì link gốc."""
+
+    src: str
+    source_url: str
+    cached: bool = False
+    error: str | None = None
+
+
+class DetailFetch(BaseModel):
+    """Trạng thái «Lấy ảnh và chi tiết» gần nhất."""
+
+    status: Literal["queued", "running", "done", "failed"]
+    at: str | None = None
+    error: str | None = None
+    note: str | None = None
+    image_count: int | None = None
+    cached: int | None = None
+    failed_images: int | None = None
+
+
+class CandidateGallery(BaseModel):
+    candidate_id: uuid.UUID
+    title_vi: str
+    source_url: str | None
+    images: list[GalleryImage]
+    detail_fetch: DetailFetch | None = None
+
+
 class GuidanceNote(BaseModel):
     kind: Literal["principle", "taste"]
     delta: int
@@ -287,6 +316,8 @@ class CandidateCard(BaseModel):
     title_vi: str
     title_original: str | None
     main_image_url: str | None
+    thumb_url: str | None = None
+    image_count: int = 0
     price_amount: Decimal | None
     price_currency: str | None
     price_vnd_estimate: int | None
@@ -304,6 +335,8 @@ class CandidateCard(BaseModel):
 
 
 class CandidateDetail(CandidateOut):
+    thumb_url: str | None = None
+    gallery: list[GalleryImage] = Field(default_factory=list)
     landed_estimate_vnd: int | None = None
     guidance: RankGuidance | None = None
     offers: list[Offer] = Field(default_factory=list)

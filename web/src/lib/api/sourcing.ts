@@ -91,6 +91,9 @@ export type CandidateCard = {
   title_vi: string;
   title_original: string | null;
   main_image_url: string | null;
+  /** Ảnh thu nhỏ ở desk: bản đã lưu về kho riêng, chưa lưu thì link gốc (hiện với referrerPolicy="no-referrer"). */
+  thumb_url: string | null;
+  image_count: number;
   price_amount: string | null;
   price_currency: string | null;
   price_vnd_estimate: number | null;
@@ -126,10 +129,35 @@ export type Offer = {
   review_count: number | null;
 };
 
+/** Một ảnh nhà cung cấp (chỉ desk). `cached` = đã lưu bản sao về kho riêng; chưa thì `src` là link gốc. */
+export type GalleryImage = { src: string; source_url: string; cached: boolean; error: string | null };
+
+export type DetailFetch = {
+  status: "queued" | "running" | "done" | "failed";
+  at: string | null;
+  error: string | null;
+  note: string | null;
+  image_count: number | null;
+  cached: number | null;
+  failed_images: number | null;
+};
+
+export type CandidateGallery = {
+  candidate_id: string;
+  title_vi: string;
+  source_url: string | null;
+  images: GalleryImage[];
+  detail_fetch: DetailFetch | null;
+};
+
+export const isDetailFetchActive = (g?: CandidateGallery | null) =>
+  !!g?.detail_fetch && (g.detail_fetch.status === "queued" || g.detail_fetch.status === "running");
+
 export type CandidateDetail = CandidateCard & {
   description_vi: string | null;
   specs: Record<string, string>;
   images: string[];
+  gallery: GalleryImage[];
   moq: number | null;
   weight_grams: number | null;
   offers: Offer[];
@@ -208,6 +236,7 @@ export const sourcingKeys = {
   briefCandidates: (id: string, version = "") => ["sourcing", "brief", id, "candidates", version] as const,
   run: (id: string) => ["sourcing", "run", id] as const,
   candidate: (id: string) => ["sourcing", "candidate", id] as const,
+  gallery: (id: string) => ["sourcing", "candidate", id, "gallery"] as const,
   trends: ["sourcing", "trends"] as const,
   demand: ["sourcing", "demand"] as const,
 };
@@ -240,6 +269,24 @@ export function useBriefCandidates(id: string, enabled = true, version = "") {
 
 export function useCandidate(id: string) {
   return useQuery({ queryKey: sourcingKeys.candidate(id), queryFn: () => api.get<CandidateDetail>(`${BASE}/candidates/${id}`) });
+}
+
+/** Ảnh nhà cung cấp của một ứng viên; đang «Lấy ảnh và chi tiết» thì hỏi lại mỗi 2 giây. */
+export function useCandidateGallery(id: string) {
+  return useQuery({
+    queryKey: sourcingKeys.gallery(id),
+    queryFn: () => api.get<CandidateGallery>(`${BASE}/candidates/${id}/gallery`),
+    refetchInterval: (q) => (isDetailFetchActive(q.state.data) ? 2000 : false),
+  });
+}
+
+/** «Lấy ảnh và chi tiết»: đọc trang nguồn (việc nền) rồi lưu ảnh về kho riêng. Xong thì làm mới mọi màn săn hàng. */
+export function useFetchDetails(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<CandidateGallery>(`${BASE}/candidates/${id}/fetch-details`),
+    onSuccess: (data) => qc.setQueryData(sourcingKeys.gallery(id), data),
+  });
 }
 
 /** Hỏi lại một lượt tìm mỗi 1,5 giây cho tới khi xong. */

@@ -30,6 +30,7 @@ import { ReviewsCard } from "./reviews-card";
 import { ScoreCard } from "./score-card";
 import { WarningsCard } from "./warnings-card";
 import { RelatedLinks } from "@/components/desk/related-links";
+import { SupplierGallery } from "@/components/sourcing/supplier-gallery";
 
 const STEP_LABEL: Record<string, string> = {
   details: "lấy chi tiết",
@@ -104,7 +105,7 @@ export function ProfileScreen({ id }: { id: string }) {
       <RelatedLinks links={[{ href: `/desk/ban-chon/${c.id}`, label: "Trên bàn chọn" }, { href: `/desk/nguon-cung/gia-von/${c.id}`, label: "Giá vốn" }]} />
 
       <div className="flex items-start gap-3">
-        <ImageBox src={c.main_image_url} alt={c.title_vi} className="w-[84px] shrink-0" placeholder="" priority />
+        <ImageBox src={c.thumb_url} alt={c.title_vi} className="w-[84px] shrink-0" placeholder="" priority referrerPolicy="no-referrer" />
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2">
             <span className="font-display text-[34px] leading-none font-bold tabular-nums">{total ?? c.ai_score ?? "—"}</span>
@@ -134,6 +135,8 @@ export function ProfileScreen({ id }: { id: string }) {
           ) : null}
         </div>
       </div>
+
+      <SupplierGallery candidateId={c.id} />
 
       {c.guidance ? (
         <Card className="flex flex-col gap-2">

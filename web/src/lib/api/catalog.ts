@@ -18,6 +18,12 @@ export type ImageSet = {
   webp: Record<string, string>;
 };
 
+/** Ảnh ở desk: thêm nguồn (chị chụp / nhà cung cấp chị chọn dùng lại). Website không có trường này. */
+export type DeskImageSet = ImageSet & { source: "own" | "supplier" };
+
+/** Ảnh nhà cung cấp trong hồ sơ ứng viên của món — để chị chọn dùng lại ở Hồ sơ bán. */
+export type SupplierImageOption = { src: string; source_url: string; cached: boolean; error: string | null; used: boolean };
+
 export type SealInfo = { chosen: number; total: number | null };
 export type DropRef = {
   id: string;
@@ -280,7 +286,7 @@ export type DeskProduct = {
   approval_item_id: string | null;
   rating_avg: number | null;
   review_count: number;
-  images: ImageSet[];
+  images: DeskImageSet[];
   updated_at: string;
 };
 
@@ -477,7 +483,17 @@ export const deskProductApi = {
   order: (id: string, ids: string[]) => api.put<DeskProduct>(`${D}/products/${id}/images/order`, { ids }),
   primary: (id: string, imageId: string) => api.post<DeskProduct>(`${D}/products/${id}/images/${imageId}/primary`),
   removeImage: (id: string, imageId: string) => api.delete(`${D}/products/${id}/images/${imageId}`),
+  addSupplierImages: (id: string, urls: string[]) => api.post<DeskProduct>(`${D}/products/${id}/supplier-images`, { urls }),
 };
+
+export function useSupplierImageOptions(id: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["catalog", "product", id, "supplier-images"] as const,
+    queryFn: () => api.get<SupplierImageOption[]>(`${D}/products/${id}/supplier-images`),
+    enabled,
+    staleTime: 0, // cờ «đã dùng» đổi ngay sau khi chị thêm ảnh
+  });
+}
 
 export function useDeskDrops() {
   return useQuery({

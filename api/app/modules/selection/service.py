@@ -223,7 +223,7 @@ async def build_cards(db: AsyncSession, cands: list[Candidate]) -> list[dict[str
             {
                 "id": c.id,
                 "title": c.title_vi,
-                "image_url": c.main_image_url or (c.images[0] if c.images else None),
+                "image_url": c.thumb_url,  # bản ảnh nguồn đã lưu về kho riêng, chưa có thì link gốc
                 "source_platform": c.source_platform.value,
                 "price_vnd_estimate": c.price_vnd_estimate,
                 "ai_score": c.ai_score,

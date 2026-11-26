@@ -46,3 +46,22 @@ async def _on_assessed(db: AsyncSession, payload: dict[str, Any]) -> None:
         cand.raw = {**cand.raw, "guidance": {**gd, "base_score": score}}
         score = max(0, min(100, score + int(gd["delta"])))
     cand.ai_score = score
+
+
+@events.on("candidate.details_fetched")
+async def _on_details_fetched(db: AsyncSession, payload: dict[str, Any]) -> None:
+    """Thẩm định đã đọc trang chi tiết → ghi ảnh nhà cung cấp vào ứng viên rồi lưu bản sao về kho riêng."""
+    from sqlalchemy.orm.attributes import flag_modified
+
+    from app.core.timeutil import now_utc
+    from app.modules.sourcing import gallery
+
+    cand = await db.get(Candidate, uuid.UUID(payload["candidate_id"]))
+    if cand is None:
+        return
+    service.merge_images(cand, payload.get("images") or [])
+    if not (cand.raw or {}).get("detail"):
+        cand.raw = {**(cand.raw or {}), "detail": {"fetched_at": now_utc().isoformat(), "by": "assessment"}}
+        flag_modified(cand, "raw")
+    if gallery.caching_enabled():
+        await gallery.cache_images(cand)
