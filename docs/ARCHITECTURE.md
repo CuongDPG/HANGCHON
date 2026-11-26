@@ -65,7 +65,7 @@ result = await ai.run(
 )
 ```
 
-- Provider: `anthropic` (SDK chính thức `anthropic`, structured outputs qua `client.messages.parse`, adaptive
+- Provider: `anthropic` (SDK chính thức `anthropic`, structured outputs qua `output_config.format` — khuôn mọi thuộc tính required, xem `app/ai/schema.py`, adaptive
   thinking, không `temperature`, không prefill, không ép `tool_choice`), `openrouter` (REST tương thích OpenAI qua
   `httpx`, `response_format` json_schema, plugin `web`) hoặc `fake` (hàm giả đăng ký theo tên tác vụ, dùng cho test và
   chạy thử không có khoá). Thêm provider = một tệp `app/ai/providers/<ten>.py` với lớp `@register`.

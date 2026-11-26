@@ -18,6 +18,7 @@ from urllib.parse import urlparse
 from pydantic import BaseModel, Field
 
 from app import ai
+from app.ai.schema import OptStr
 from app.core.enums import Language, SourcePlatform
 from app.integrations.sources import (
     MarketListing,
@@ -111,13 +112,23 @@ ai.task(
 )
 ai.task(
     "sources.web_market_prices",
-    tier="fast",
+    # smart: chạy thật 26/11 Haiku tìm thấy trang có giá nhưng chỉ trả 0–1 tin (4/4 lần rỗng với prompt cũ);
+    # Opus trả 10 tin có giá (~70 giây, ~8.000đ một lần).
+    tier="smart",
     web=True,
-    description="Driver web: giá cùng món trên Shopee, TikTok Shop Việt Nam",
+    description="Driver web: giá cùng loại ở Việt Nam (Shopee, Lazada, Tiki, TikTok Shop, website cửa hàng)",
     system=(
-        "Vai trò: tìm giá bán ở Việt Nam của món đã cho trên Shopee (shopee.vn) và TikTok Shop. Mỗi tin rao: sàn, tên, "
-        "URL, shop, giá đang bán (VND, số nguyên), giá gốc nếu có, số đã bán, số sao. Chỉ lấy tin rao cùng loại món.\n"
-        + _DATA_NOTE
+        "Vai trò: tìm giá bán LẺ ở Việt Nam của món đã cho (`query`) để biết thị trường đang bán bao nhiêu.\n"
+        "Cách làm: web_search 2–4 lượt bằng tiếng Việt — một lượt với tên món, một lượt với loại hàng ngắn gọn (bỏ chữ "
+        "thừa), thêm «giá» hoặc tên sàn (Shopee, Lazada, Tiki, TikTok Shop). Nhận mọi nơi bán ở Việt Nam: sàn TMĐT, "
+        "website cửa hàng, trang so sánh giá (websosanh, biggo...). Giá ghi trong đoạn trích kết quả tìm kiếm là dùng "
+        "được; trang không ghi giá trong đoạn trích thì mở 2–5 trang đáng tin bằng web_fetch để đọc giá (Shopee "
+        "thường chặn, ưu tiên trang khác).\n"
+        "Mỗi tin rao: `platform` = shopee_vn | lazada_vn | tiki | tiktok_shop_vn theo tên miền, nơi khác ghi web; tên, "
+        "URL trang sản phẩm (hoặc trang so sánh có giá), shop, giá đang bán (VND, số nguyên), giá gốc nếu có, số đã "
+        "bán, số sao. Lấy món CÙNG LOẠI (cùng công dụng, quy cách gần giống — vd cùng là hộp nhiều chun buộc tóc cho "
+        "bé), không cần trùng mẫu; bỏ món khác loại. Tối đa `limit` tin; tìm được ít thì trả ít, không thấy giá nào "
+        "mới trả danh sách rỗng.\n" + _DATA_NOTE
     ),
 )
 
@@ -132,10 +143,10 @@ class _Listing(BaseModel):
     language: Language = Language.ZH
     price_amount: float = Field(ge=0)
     currency: str = Field(description="ISO 4217: CNY, JPY, USD, VND")
-    external_id: str | None = None
-    image_url: str | None = None
-    seller_name: str | None = None
-    seller_url: str | None = None
+    external_id: OptStr = None
+    image_url: OptStr = None
+    seller_name: OptStr = None
+    seller_url: OptStr = None
     rating: float | None = Field(default=None, ge=0, le=5)
     review_count: int | None = None
     sales_count: int | None = None
@@ -161,17 +172,17 @@ class _Review(BaseModel):
     rating: int = Field(ge=1, le=5)
     body: str
     language: Language = Language.ZH
-    external_id: str | None = None
-    author: str | None = None
-    created_on: str | None = Field(default=None, description="YYYY-MM-DD")
+    external_id: OptStr = None
+    author: OptStr = None
+    created_on: OptStr = Field(default=None, description="YYYY-MM-DD, chuỗi rỗng nếu không thấy")
     photos: list[str] = Field(default_factory=list)
-    variant: str | None = None
+    variant: OptStr = None
 
 
 class _ProductOut(_Listing):
     readable: bool = True
-    note: str | None = None
-    description: str | None = None
+    note: OptStr = None
+    description: OptStr = None
     images: list[str] = Field(default_factory=list)
     specs: list[_Spec] = Field(default_factory=list)
     variants: list[str] = Field(default_factory=list)
@@ -199,11 +210,11 @@ class _Trend(BaseModel):
     title: str
     url: str
     language: Language = Language.ZH
-    image_url: str | None = None
+    image_url: OptStr = None
     mentions: float | None = None
     growth_pct: float | None = None
     rank: float | None = None
-    snippet: str | None = None
+    snippet: OptStr = None
 
 
 class _TrendsIn(BaseModel):
@@ -225,7 +236,7 @@ class _Market(BaseModel):
     platform: SourcePlatform
     title: str
     url: str
-    shop_name: str | None = None
+    shop_name: OptStr = None
     price_vnd: int = Field(ge=0)
     original_price_vnd: int | None = None
     sold_count: int | None = None

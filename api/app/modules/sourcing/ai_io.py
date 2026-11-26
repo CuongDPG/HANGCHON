@@ -6,6 +6,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.ai.schema import OptStr
+
 Origin = Literal["cn", "jp", "kr", "other"]
 
 
@@ -22,7 +24,7 @@ class BriefParse(BaseModel):
     title: str = Field(description="Tên đề ngắn, 2–6 từ, vd «Giá phơi gấp gọn»")
     interpretation: str = Field(description="Một hai câu «Em hiểu là chị cần…» để chị kiểm")
     product_type: str = Field(description="Loại hàng, danh từ chung tiếng Việt")
-    category: str | None = Field(default=None, description="Một trong các nhóm hàng đã cho, hoặc null")
+    category: OptStr = Field(default=None, description="Một trong các nhóm hàng đã cho, hoặc chuỗi rỗng")
     materials: list[str] = Field(default_factory=list)
     must: list[str] = Field(default_factory=list, description="Điều bắt buộc")
     must_not: list[str] = Field(default_factory=list, description="Điều không chấp nhận")
@@ -54,6 +56,7 @@ class RankBrief(BaseModel):
     must_not: list[str] = Field(default_factory=list)
     prefer: list[str] = Field(default_factory=list)
     landed_cost_max_vnd: int | None = None
+    price_max_vnd: int | None = Field(default=None, description="Giá bán dự kiến tối đa ở VN")
     min_rating: float | None = None
     min_reviews: int | None = None
 

@@ -281,3 +281,20 @@ async def test_unpublish(db, owner_client):
     r = await owner_client.post(f"/api/desk/catalog/products/{p.id}/unpublish")
     assert r.json()["status"] == "paused"
     assert svc  # dùng module để giữ import cho kiểu
+
+
+async def test_write_page_job_retries_until_product_is_committed() -> None:
+    """«Đã chọn» còn chạy AI trước khi commit: việc viết trang chưa thấy sản phẩm thì hẹn thử lại, không lặng lẽ bỏ."""
+    import uuid
+
+    from arq import Retry
+
+    from app.modules.catalog.jobs import NOT_FOUND_RETRIES
+
+    missing = str(uuid.uuid4())
+    with pytest.raises(Retry):
+        await write_product_page({**job_context(), "job_try": 1}, missing)
+    # hết lượt thử → ghi log và dừng (cron write_missing_pages là lưới an toàn)
+    assert await write_product_page({**job_context(), "job_try": NOT_FOUND_RETRIES}, missing) is None
+    # chạy ngoài worker (không có job_try) → không raise
+    assert await write_product_page(job_context(), missing) is None

@@ -26,6 +26,7 @@ from app.core import events
 from app.core.config import settings
 from app.core.enums import Channel, Language, SourcePlatform
 from app.core.errors import BadRequest, Conflict, NotFound
+from app.core.money import format_vnd
 from app.core.timeutil import local_today, now_utc
 from app.integrations import IntegrationError, IntegrationNotConfigured, get_driver
 from app.integrations.sources import SourceItem, SourceProduct, SourceQuery, SourcesDriver
@@ -379,6 +380,7 @@ def _rank_brief(brief: SourcingBrief) -> RankBrief:
         must_not=f.get("must_not") or [],
         prefer=f.get("prefer") or [],
         landed_cost_max_vnd=brief.target_landed_cost_max_vnd,
+        price_max_vnd=brief.price_max_vnd,
         min_rating=f.get("min_rating"),
         min_reviews=f.get("min_reviews"),
     )
@@ -512,27 +514,43 @@ def build_results(
     prefix = brief.id.hex[:8]
     for key, members in groups.items():
         members.sort(key=lambda m: (-m[1].score, m[2] or 10**12))
-        best, r, _ = members[0]
+        best, r, landed = members[0]
         reason = r.reason
         if len(members) > 1:
             reason = f"{reason} Cùng mẫu có ở {len(members)} shop."
-        out.append(
-            _candidate_fields(
-                best,
-                brief=brief,
-                origin=origin,
-                title_vi=r.title_vi,
-                rates=rates,
-                score=r.score,
-                reason=reason,
-                group=f"{prefix}:{slugify(key, max_length=50)}",
-                offers=[_offer(m[0], rates) for m in members],
-            )
+        score = r.score
+        over = price_over_range(landed, brief.price_max_vnd)
+        if over:  # giá về tay đã vượt giá bán tối đa của đề → khó có lãi: hạ điểm và nói rõ
+            score = max(0, score - OVER_PRICE_PENALTY)
+            reason = f"{reason} {over}"
+        fields = _candidate_fields(
+            best,
+            brief=brief,
+            origin=origin,
+            title_vi=r.title_vi,
+            rates=rates,
+            score=score,
+            reason=reason,
+            group=f"{prefix}:{slugify(key, max_length=50)}",
+            offers=[_offer(m[0], rates) for m in members],
         )
+        if over:
+            fields["raw"]["price_flag"] = {"landed_vnd": landed, "price_max_vnd": brief.price_max_vnd}
+        out.append(fields)
     if guide:
         out = [guidance.apply(guide, c) for c in out]
     out.sort(key=lambda c: (bool((c["raw"].get("guidance") or {}).get("violates")), -(c["ai_score"] or 0)))
     return out
+
+
+OVER_PRICE_PENALTY = 40
+
+
+def price_over_range(landed: int | None, price_max_vnd: int | None) -> str | None:
+    """Giá về tay ≥ giá bán tối đa chị đặt cho đề (bán không có lãi) → câu cảnh báo; không thì None."""
+    if not landed or not price_max_vnd or landed < price_max_vnd:
+        return None
+    return f"Lưu ý: giá về tay ước {format_vnd(landed)} đã vượt giá bán tối đa {format_vnd(price_max_vnd)} của đề."
 
 
 def image_hashing_enabled() -> bool:

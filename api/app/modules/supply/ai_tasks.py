@@ -8,6 +8,7 @@ import re
 from pydantic import BaseModel, Field
 
 from app import ai
+from app.ai.schema import OptStr
 from app.core.money import format_vnd
 
 # ---- d3: đề xuất giá bán -------------------------------------------------------------------------------------------
@@ -311,17 +312,17 @@ class DocumentReadIn(BaseModel):
 
 class DocumentExtract(BaseModel):
     readable: bool = Field(description="False nếu ảnh mờ, không phải chứng từ, hoặc không đọc được")
-    product_name: str | None = Field(default=None, description="Tên hàng như in trên chứng từ")
-    product_name_vi: str | None = Field(default=None, description="Tên hàng dịch sang tiếng Việt")
-    manufacturer: str | None = Field(default=None, description="Nhà sản xuất / công ty")
-    origin_country: str | None = Field(default=None, description="Xuất xứ, mã ISO 2 chữ (CN, JP...) nếu rõ")
-    lot_number: str | None = Field(default=None, description="Số lô / batch")
-    production_date: str | None = Field(default=None, description="Ngày sản xuất, YYYY-MM-DD nếu đọc được")
-    expiry_date: str | None = Field(default=None, description="Hạn dùng, YYYY-MM-DD nếu đọc được")
-    doc_number: str | None = Field(default=None, description="Số hoá đơn / tờ khai / chứng nhận")
-    doc_date: str | None = Field(default=None, description="Ngày chứng từ, YYYY-MM-DD")
+    product_name: OptStr = Field(default=None, description="Tên hàng như in trên chứng từ")
+    product_name_vi: OptStr = Field(default=None, description="Tên hàng dịch sang tiếng Việt")
+    manufacturer: OptStr = Field(default=None, description="Nhà sản xuất / công ty")
+    origin_country: OptStr = Field(default=None, description="Xuất xứ, mã ISO 2 chữ (CN, JP...) nếu rõ")
+    lot_number: OptStr = Field(default=None, description="Số lô / batch")
+    production_date: OptStr = Field(default=None, description="Ngày sản xuất, YYYY-MM-DD nếu đọc được")
+    expiry_date: OptStr = Field(default=None, description="Hạn dùng, YYYY-MM-DD nếu đọc được")
+    doc_number: OptStr = Field(default=None, description="Số hoá đơn / tờ khai / chứng nhận")
+    doc_date: OptStr = Field(default=None, description="Ngày chứng từ, YYYY-MM-DD")
     amount: float | None = Field(default=None, ge=0, description="Tổng tiền trên chứng từ")
-    currency: str | None = Field(default=None, description="CNY | JPY | VND | USD")
+    currency: OptStr = Field(default=None, description="CNY | JPY | VND | USD")
     certifications: list[str] = Field(default_factory=list, description="Chứng nhận / tiêu chuẩn in trên chứng từ")
     summary: str = Field(description="Một câu tiếng Việt: chứng từ này là gì, cho món nào")
 

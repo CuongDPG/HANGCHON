@@ -130,10 +130,12 @@ def _resp(stop_reason: str, parsed: Any = None, content: list | None = None, **u
         server_tool_use=SimpleNamespace(web_search_requests=usage.get("web", 0), web_fetch_requests=0),
         iterations=usage.get("iterations"),
     )
+    blocks = list(content or [])
+    if parsed is not None:  # câu trả lời cuối: khối chữ JSON (structured outputs)
+        blocks.append(SimpleNamespace(type="text", text=parsed.model_dump_json()))
     return SimpleNamespace(
         stop_reason=stop_reason,
-        parsed_output=parsed,
-        content=content or [],
+        content=blocks,
         usage=u,
         model=usage.get("model", "claude-opus-5-5"),
         stop_details=SimpleNamespace(category=usage.get("category")),
@@ -146,7 +148,7 @@ class _Messages:
         self.responses = responses
         self.calls: list[dict[str, Any]] = []
 
-    async def parse(self, **kw: Any) -> SimpleNamespace:
+    async def create(self, **kw: Any) -> SimpleNamespace:
         self.calls.append(kw)
         return self.responses.pop(0)
 
@@ -170,7 +172,10 @@ async def test_anthropic_request_shape_and_fallbacks() -> None:
     out = await p.complete(_req(), Connection())
     call = msgs.calls[0]
     assert out.output.text == "ok" and out.request_id == "req_test"
-    assert call["output_format"] is Inp and call["output_config"] == {"effort": "medium"}
+    assert call["output_config"]["effort"] == "medium" and "output_format" not in call
+    schema = call["output_config"]["format"]["schema"]
+    assert call["output_config"]["format"]["type"] == "json_schema" and schema["required"] == ["text"]
+    assert schema["additionalProperties"] is False
     assert call["fallbacks"] == "default" and call["betas"] == ["server-side-fallback-2026-07-01"]
     assert "temperature" not in call and "thinking" not in call and "tool_choice" not in call
     assert call["system"][0]["cache_control"] == {"type": "ephemeral"}
@@ -219,7 +224,7 @@ async def test_anthropic_errors_map_to_vietnamese() -> None:
         def __init__(self, exc: Exception) -> None:
             self.exc = exc
 
-        async def parse(self, **_: Any) -> None:
+        async def create(self, **_: Any) -> None:
             raise self.exc
 
     cases = [
@@ -240,3 +245,55 @@ async def test_anthropic_errors_map_to_vietnamese() -> None:
 async def test_anthropic_without_key_is_unavailable() -> None:
     with pytest.raises(ai.AIUnavailable):
         AnthropicProvider().client_for(Connection())
+
+
+async def test_anthropic_schema_too_complex_fails_fast_without_retry() -> None:
+    import anthropic
+    import httpx2
+
+    req = httpx2.Request("POST", "https://api.anthropic.com/v1/messages")
+    calls: list[int] = []
+
+    class _Boom:
+        async def create(self, **_: Any) -> None:
+            calls.append(1)
+            raise anthropic.BadRequestError(
+                "Schema is too complex.", response=httpx2.Response(400, request=req), body=None
+            )
+
+    p = AnthropicProvider()
+    p._client = SimpleNamespace(messages=_Boom(), beta=SimpleNamespace(messages=_Boom()))  # type: ignore[assignment]
+    with pytest.raises(ai.AIError) as e:
+        await p.complete(_req(), Connection())
+    assert e.value.code == "ai_schema_too_complex" and len(calls) == 1
+
+
+async def test_anthropic_last_text_block_is_parsed_and_bad_json_is_invalid() -> None:
+    pre = SimpleNamespace(type="text", text="Mình tra cứu đã…")
+    p, _ = _provider([_resp("end_turn", Inp(text="ok"), [pre])])
+    assert (await p.complete(_req(), Connection())).output.text == "ok"
+    p, _ = _provider([_resp("end_turn", None, [SimpleNamespace(type="text", text='{"khac": 1}')])])
+    with pytest.raises(ai.AIOutputInvalid):
+        await p.complete(_req(), Connection())
+
+
+def test_anthropic_schema_marks_every_property_required() -> None:
+    from app.ai.schema import anthropic_schema, model_complexity
+
+    schema = anthropic_schema(Out)
+    assert schema["required"] == list(schema["properties"])
+    item = schema["$defs"]["Item"]
+    assert item["required"] == ["name", "score"] and "minimum" not in item["properties"]["score"]
+    c = model_complexity(Out)
+    assert c.optional == 0 and c.unions == 2  # note: str | None, price: Decimal (number | string)
+
+
+async def test_run_rejects_too_complex_schema_before_calling_provider() -> None:
+    from pydantic import create_model
+
+    Big = create_model("Big", **{f"f{i}": (int | None, None) for i in range(12)})  # 12 kiểu hợp > ngân sách
+    with pytest.raises(ai.AIError) as e:
+        await ai.run("test.big", Inp(text="x"), Big)
+    assert e.value.code == "ai_schema_too_complex"
+    runs = await _runs()
+    assert runs[-1].error_code == "ai_schema_too_complex"

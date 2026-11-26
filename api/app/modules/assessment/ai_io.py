@@ -101,6 +101,9 @@ class SafetyOut(BaseModel):
     declaration: str | None = Field(default=None, description="Loại công bố / giấy phép cần có")
     docs_needed: list[str] = Field(default_factory=list)
     findings: list[Finding] = Field(default_factory=list)
+    customer_warnings: list[str] = Field(
+        default_factory=list, description="0–3 câu cảnh báo khách cần biết khi dùng; không ghi chuyện giấy tờ"
+    )
 
 
 # ---- b1 + b4: hồ sơ và chấm điểm ---------------------------------------------------------------------------------
@@ -143,6 +146,7 @@ class EvaluateOut(BaseModel):
 
 class CompareCandidate(BaseModel):
     id: str
+    name: str = Field(description="Tên gọi món này trong kết luận (khách quan, đã phân biệt các món trùng tên)")
     title: str
     values: dict[str, str]
 

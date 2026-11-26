@@ -19,9 +19,19 @@ from app.modules.content.ai_io import LiveIn, LiveOut, LiveQuestion
 from app.modules.content.models import LivestreamScript, ScriptStatus
 from app.modules.content.service import ACTION_LIVE
 from app.modules.control.models import ApprovalItem, User
-from app.modules.inbox.models import Direction, Message, Thread
+from app.modules.inbox.models import Direction, Intent, Message, Thread
 
 MAX_QUESTIONS = 30
+# Tin không phải câu hỏi về món (khiếu nại, hỏi đơn, chốt mua, chuyện phiếm) không đưa vào phần hỏi–đáp trên live.
+SKIP_INTENTS = (Intent.COMPLAINT, Intent.ORDER_STATUS, Intent.PURCHASE, Intent.SMALL_TALK)
+# Câu chạm tới sức khoẻ → chị xem lại trước khi nói trên live (AI chỉ được khuyên «hỏi bác sĩ»).
+MEDICAL_WORDS = ("bác sĩ", "khám", "dị ứng", "da đầu", "rụng tóc", "ngứa", "mẩn", "sốt", "thuốc", "bệnh", "sức khoẻ",
+                 "sức khỏe", "nuốt", "hóc")  # fmt: skip
+
+
+def needs_review(q: str, a: str) -> bool:
+    text = f"{q} {a}".lower()
+    return any(w in text for w in MEDICAL_WORDS)
 
 
 async def customer_questions(db: AsyncSession, product_ids: list[uuid.UUID]) -> list[LiveQuestion]:
@@ -32,7 +42,11 @@ async def customer_questions(db: AsyncSession, product_ids: list[uuid.UUID]) -> 
         await db.execute(
             select(Message.body, Thread.product_id)
             .join(Thread, Thread.id == Message.thread_id)
-            .where(Thread.product_id.in_(product_ids), Message.direction == Direction.INBOUND)
+            .where(
+                Thread.product_id.in_(product_ids),
+                Message.direction == Direction.INBOUND,
+                Message.intent.is_(None) | Message.intent.not_in(SKIP_INTENTS),
+            )
             .order_by(Message.sent_at.desc())
             .limit(MAX_QUESTIONS)
         )
@@ -102,7 +116,7 @@ async def generate(
     minutes: int,
     instruction: str | None,
 ) -> None:
-    pfs = [facts.product_facts(p) for p in products]
+    pfs = [await facts.product_facts_full(db, p) for p in products]
     res = await ai.run(
         "content.livestream",
         LiveIn(
@@ -122,7 +136,7 @@ async def generate(
         {"product_id": str(p.id), "order": i + 1, "name": p.name, "talking_points": [], "demo": "", "price_note": ""}
         for i, p in enumerate(products)
     ]
-    row.faq = [f.model_dump() for f in out.faq]
+    row.faq = [{**f.model_dump(), "needs_review": f.needs_review or needs_review(f.q, f.a)} for f in out.faq]
     row.ai_generated = True
     row.ai_run_id = res.run_id
     row.status = ScriptStatus.PENDING_REVIEW

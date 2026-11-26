@@ -16,6 +16,7 @@ from app.ai.fakegen import fake_output
 from app.ai.providers.fake import FakeRefusal
 from app.ai.registry import TASKS, fake, on_budget_exceeded, task
 from app.ai.runner import monthly_budget_vnd, monthly_spend_vnd, run
+from app.ai.schema import OptStr
 from app.ai.types import AIImage, AIResult, TaskSpec, Tier
 
 __all__ = [
@@ -28,6 +29,7 @@ __all__ = [
     "AIResult",
     "AIUnavailable",
     "FakeRefusal",
+    "OptStr",
     "TaskSpec",
     "Tier",
     "fake",

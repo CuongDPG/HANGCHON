@@ -236,13 +236,26 @@ def _drop_drafts(d: DropFacts, channels: list[str]) -> list[ChannelDraftOut]:
 BUILDERS = {"instagram": _instagram, "threads": _threads, "tiktok": _tiktok, "zalo_oa": _zalo}
 
 
+def _add_warnings(d: ChannelDraftOut, p: ProductFacts) -> None:
+    """Cảnh báo an toàn bắt buộc có trong mọi bài; TikTok nói trong lời thoại cảnh cuối."""
+    if not p.safety_warnings:
+        return
+    line = f"Lưu ý: {_lower_first(_first_sentence(p.safety_warnings[0]))}."
+    if d.scenes:
+        d.scenes[-1].voiceover = f"{d.scenes[-1].voiceover} {line}"
+    else:
+        d.body = f"{d.body.rstrip()}\n\n{line}" if d.channel == "facebook" else f"{d.body.rstrip()} {line}"
+
+
 def fake_compose(inp: ComposeIn) -> ComposeOut:
     if inp.kind == "drop" and inp.drop:
         return ComposeOut(drafts=_drop_drafts(inp.drop, list(inp.channels)))
     assert inp.product is not None
     drafts = []
     for ch in inp.channels:
-        d = _facebook(inp.product, inp.trial_notes, inp.instruction) if ch == "facebook" else BUILDERS[ch](inp.product)
+        notes = inp.trial_notes or inp.product.trial_notes
+        d = _facebook(inp.product, notes, inp.instruction) if ch == "facebook" else BUILDERS[ch](inp.product)
+        _add_warnings(d, inp.product)
         if inp.instruction:
             d.body = f"{d.body}\n\n{_instruction_line(inp.instruction)}" if ch == "facebook" else d.body
         drafts.append(d)

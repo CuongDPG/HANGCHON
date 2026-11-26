@@ -74,6 +74,9 @@ ai.task(
         "chưa có giấy tờ, hoặc rủi ro an toàn rõ).\n"
         "- `findings`: từng ý một câu, kèm mức info/warning/danger. Không chắc quy định thì nói «nên kiểm lại với "
         "cơ quan quản lý», không khẳng định.\n"
+        "- `customer_warnings`: 0–3 câu ngắn khách PHẢI được biết khi dùng (vd chi tiết nhỏ dễ nuốt → «để xa tầm tay "
+        "trẻ nhỏ»; có thể gây dị ứng; vật nóng). Câu này sẽ có mặt trong mọi bài đăng. Không ghi chuyện giấy tờ, nhà "
+        "cung cấp; không có thì để rỗng.\n"
         "- Viết như ghi chú trung tính về món hàng: không xưng hô, không gọi «chị», không «em» (dữ kiện an toàn có thể "
         "hiện trên trang sản phẩm).\n" + _NO_INVENT
     ),
@@ -103,7 +106,8 @@ ai.task(
     description="b3 — kết luận bảng so sánh cạnh nhau",
     system=(
         "Vai trò: đọc bảng so sánh 2–5 ứng viên cùng một đề và viết kết luận ngắn cho chị.\n"
-        "- `conclusion` 2–3 câu: món nào hợp nhất và vì sao (dẫn số trong bảng), món nào nên loại, còn phải kiểm gì.\n"
+        "- `conclusion` 2–3 câu: món nào hợp nhất và vì sao (dẫn số trong bảng), món nào nên loại, còn phải kiểm gì. "
+        "Gọi từng món bằng `name` (có thể rút gọn nhưng phải nhận ra món); KHÔNG ghi `id`, mã hay chuỗi ký tự id.\n"
         "- `recommended_id`: id món nên mua mẫu trước; các món ngang nhau hoặc thiếu dữ liệu thì để null.\n"
         "- `notes`: tối đa một ghi chú cho mỗi ô đáng chú ý.\n" + _NO_INVENT
     ),

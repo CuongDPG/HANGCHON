@@ -59,6 +59,37 @@ def product_facts(p: Product) -> ProductFacts:
     )
 
 
+# Cảnh báo an toàn khách cần biết (từ bản soát an toàn b6 của ứng viên). Bản soát cũ chưa có `customer_warnings`
+# thì lọc các ý có từ khoá rủi ro khi dùng; ý về giấy tờ/nhà cung cấp không đưa vào bài.
+_WARNING_WORDS = ("hóc", "nuốt", "xa tầm tay", "dị ứng", "bỏng", "cạnh sắc", "trẻ dưới", "trông bé", "trông trẻ")
+
+
+def customer_warnings(safety: dict[str, Any] | None) -> list[str]:
+    s = safety or {}
+    explicit = [str(w).strip() for w in s.get("customer_warnings") or [] if str(w).strip()]
+    if explicit:
+        return explicit[:3]
+    out = []
+    for f in s.get("findings") or []:
+        text = str(f.get("text") if isinstance(f, dict) else f or "").strip()
+        level = f.get("level") if isinstance(f, dict) else None
+        if text and level in ("warning", "danger") and any(w in text.lower() for w in _WARNING_WORDS):
+            out.append(text)
+    return out[:3]
+
+
+async def product_facts_full(db: AsyncSession, p: Product) -> ProductFacts:
+    """Hồ sơ cho AI viết/soát bài: kèm ghi chú thử hàng và cảnh báo an toàn bắt buộc (đọc bảng assessment)."""
+    from app.modules.assessment.models import Assessment  # chỉ đọc
+
+    pf = product_facts(p)
+    pf.trial_notes = await trial_notes(db, p)
+    if p.candidate_id:
+        safety = await db.scalar(select(Assessment.safety).where(Assessment.candidate_id == p.candidate_id))
+        pf.safety_warnings = customer_warnings(safety)
+    return pf
+
+
 async def drop_facts(db: AsyncSession, d: Drop) -> DropFacts:
     pids = [it.product_id for it in d.items]
     names = {}

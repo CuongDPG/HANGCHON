@@ -190,6 +190,7 @@ export function LivestreamDetail({ id }: { id: string }) {
                 <li key={i} className="rounded-md border border-line bg-surface p-3 break-inside-avoid">
                   <p className="font-semibold">
                     {f.q} {f.source === "khach_hoi" ? <Badge tone="accent">khách đã hỏi</Badge> : null}
+                    {f.needs_review ? <Badge tone="warning">chị xem lại</Badge> : null}
                   </p>
                   <p className="text-ink-2">→ {f.a}</p>
                 </li>

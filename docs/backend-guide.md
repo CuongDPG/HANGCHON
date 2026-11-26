@@ -101,7 +101,7 @@ def _fake(inp: ParseBriefIn) -> ParseBriefOut:  # sync hoặc async; trả Pydan
 res = await ai.run(
     "sourcing.parse_brief",          # task "<module>.<viec>"
     ParseBriefIn(text=...),          # Pydantic | dict | str — được bọc trong <du_lieu>…</du_lieu> (dữ liệu, không phải chỉ dẫn)
-    ParseBriefOut,                   # Pydantic → structured output (messages.parse)
+    ParseBriefOut,                   # Pydantic → structured output (output_config.format, mọi thuộc tính required)
     tier="smart",                    # "smart" = AI_MODEL_SMART (claude-opus-5-5) · "fast" = AI_MODEL_FAST (claude-haiku-5-5)
     images=[b"...", "https://...", ai.AIImage(data=..., media_type="image/png")],
     web=True,                        # bật web_search_20260209 + web_fetch_20260209 (timezone Asia/Ho_Chi_Minh, không gửi country)
@@ -116,7 +116,11 @@ res.cost_vnd, res.model, res.sources  # sources = [{"url","title"}] từ web sea
 - Lỗi (đều là AppError, route tự trả câu tiếng Việt): `AIBudgetExceeded` (409, chạm trần — đã tự tạo việc chờ chị
   `control.raise_ai_budget`), `AIRefused` (422, `.category`), `AIUnavailable` (503: khoá, mạng, quá tải), `AIOutputInvalid` (502).
   Job nền nên bắt `ai.AIError` để không retry vô hạn.
-- Provider anthropic: `messages.parse(output_format=...)`, không temperature/prefill/tool_choice, không gửi `thinking`
+- Khuôn ra phải gọn (`app/ai/schema.py`, test `tests/test_ai_schemas.py` soát mọi khuôn dùng với `ai.run`): Anthropic từ
+  chối 400 «Schema is too complex» (sau 90–180 giây) khi nhiều trường tuỳ chọn/kiểu hợp. Provider gửi khuôn với MỌI thuộc
+  tính required; kiểu hợp (`X | None`, `Decimal`) tối đa 10 mỗi khuôn — chuỗi có thể vắng dùng `ai.OptStr` (AI ghi "",
+  code nhận None). Khuôn vượt ngân sách bị chặn ngay khi gọi (`ai_schema_too_complex`), không chờ API.
+- Provider anthropic: `messages.create(output_config={"format": ...})` rồi Pydantic kiểm lại, không temperature/prefill/tool_choice, không gửi `thinking`
   (Opus 5.5/Haiku 5.5 luôn adaptive; độ sâu = `output_config.effort`), cache_control trên system, tự gửi lại lượt `pause_turn`,
   model trong `AI_FALLBACK_MODELS` bật `fallbacks="default"` (beta `server-side-fallback-2026-07-01`; Haiku không hỗ trợ nên không gửi).
 - Chi phí = bảng giá `DEFAULT_AI_PRICING` (ghi đè bằng `AI_PRICING`) × `AI_USD_VND_RATE` + web search; mỗi lần gọi ghi `ai_runs`.

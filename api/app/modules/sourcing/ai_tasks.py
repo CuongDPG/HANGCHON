@@ -62,7 +62,9 @@ ai.task(
         "- `title_vi`: tên tiếng Việt ngắn, đúng món, nêu điểm phân biệt (kiểu dáng, chất liệu), bỏ từ quảng cáo.\n"
         "- `keep`: true chỉ khi đúng loại hàng của đề và không vi phạm điều bắt buộc / không chấp nhận; "
         "`landed_estimate_vnd` vượt `landed_cost_max_vnd` thì keep=false.\n"
-        "- `score` 0–100: độ khớp đề (đúng món, chất liệu, giá về tay so với trần, số sao và số đánh giá).\n"
+        "- `score` 0–100: độ khớp đề (đúng món, chất liệu, giá về tay so với trần, số sao và số đánh giá). Giá về tay "
+        "từ `price_max_vnd` (giá bán tối đa chị định bán) trở lên thì bán không có lãi: điểm thấp (dưới 40) và "
+        "`reason` nói rõ giá vượt khoảng của đề.\n"
         "- `reason`: MỘT câu tiếng Việt bắt đầu «Đáng xem vì…» (nếu keep) hoặc «Bỏ qua vì…», chỉ dựa trên dữ liệu đã cho.\n"
         "- `same_model_key`: các tin rao rõ ràng là CÙNG một mẫu (cùng kiểu dáng, cùng ảnh, khác shop) dùng chung một "
         "khoá ngắn; không chắc thì để khác nhau.\n" + _NO_INVENT

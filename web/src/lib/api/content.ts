@@ -14,7 +14,7 @@ export type PostStatus = "planned" | "approved" | "publishing" | "published" | "
 export type DisplayStatus = "published" | "draft_pushed" | "approved" | "pending" | "needs_fix" | "failed" | "publishing";
 
 export type CheckFinding = {
-  key: "numbers" | "claims" | "length" | "voice" | "process" | "ai_label";
+  key: "numbers" | "claims" | "length" | "voice" | "process" | "reason" | "safety" | "ai_label";
   label: string;
   ok: boolean;
   detail: string;
@@ -250,7 +250,7 @@ export type Livestream = {
   status: "drafting" | "pending_review" | "approved" | "used";
   outline: { segment: string; minutes: number; notes: string }[];
   items: { product_id: string; order: number; name: string; talking_points: string[]; demo: string; price_note: string }[];
-  faq: { q: string; a: string; product_id: string | null; source: "khach_hoi" | "du_doan" }[];
+  faq: { q: string; a: string; product_id: string | null; source: "khach_hoi" | "du_doan"; needs_review?: boolean }[];
   notes: string | null;
   ai_generated: boolean;
   approval_pending: boolean;

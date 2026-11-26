@@ -25,6 +25,10 @@ class ProductFacts(BaseModel):
     image_count: int = 0
     image_alts: list[str] = Field(default_factory=list)
     url: str | None = None
+    trial_notes: list[str] = Field(default_factory=list, description="Ghi chú thử hàng của chị (nguồn sự thật)")
+    safety_warnings: list[str] = Field(
+        default_factory=list, description="Cảnh báo an toàn bắt buộc phải có trong MỌI bài, mọi kênh"
+    )
 
 
 class DropItemFacts(BaseModel):
@@ -115,6 +119,9 @@ class CheckIn(BaseModel):
 class CheckIssue(BaseModel):
     quote: str = Field(description="Đoạn chữ có vấn đề, trích nguyên văn")
     detail: str
+    severity: Literal["fail", "note"] = Field(
+        default="fail", description="fail = lỗi thật phải sửa; note = chỉ góp ý cách nói, nội dung khớp hồ sơ"
+    )
     suggestion: str | None = None
 
 
@@ -279,6 +286,7 @@ class LiveFaq(BaseModel):
     a: str
     product_id: str | None = None
     source: Literal["khach_hoi", "du_doan"] = "du_doan"
+    needs_review: bool = Field(default=False, description="Câu chạm tới sức khoẻ/y tế: chị cần xem lại trước khi nói")
 
 
 class LiveOut(BaseModel):

@@ -253,7 +253,8 @@ async def test_approve_in_queue_with_edit_rechecks(product_factory, owner_client
         f"/api/desk/control/approvals/{z['approval_item_id_pending']}/approve",
         json={
             "payload": {
-                "body": "Cả nhà ơi, mình vừa lên kệ bình giữ nhiệt, giá 385.000đ, ai cần nhắn mình giữ suất nhé."
+                "body": "Cả nhà ơi, mình vừa lên kệ bình giữ nhiệt. Vì sao mình chọn món này: mình dùng hằng ngày thấy "
+                "tiện. Giá 385.000đ, ai cần nhắn mình giữ suất nhé."
             }
         },
     )

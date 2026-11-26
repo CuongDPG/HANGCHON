@@ -8,6 +8,7 @@ Xong thì phát `candidate.assessed`."""
 from __future__ import annotations
 
 import logging
+import re
 import statistics
 import uuid
 from collections import Counter
@@ -23,7 +24,7 @@ from app import ai, control
 from app.core import events
 from app.core.enums import Language, SourcePlatform
 from app.core.errors import BadRequest, Conflict, NotFound
-from app.core.money import margin_pct, round_vnd
+from app.core.money import format_vnd, margin_pct, round_vnd
 from app.core.timeutil import now_utc
 from app.integrations import IntegrationError, IntegrationNotConfigured, get_driver
 from app.integrations.sources import SourceReview
@@ -448,8 +449,8 @@ def save_digest_row(db: AsyncSession, p: dict[str, Any], ai_run_id: uuid.UUID | 
 async def _step_market(db: AsyncSession, a: Assessment, c: Candidate) -> None:
     query = c.title_vi
     listings = await sources().market_prices(query, limit=10)
-    if not listings:
-        return
+    if not listings:  # báo rõ trên hồ sơ thay vì im lặng để trống
+        raise IntegrationError("Không tìm thấy tin rao cùng loại có giá ở Việt Nam.")
     refs = {f"l{i}": li for i, li in enumerate(listings)}
     res = await ai.run(
         "assessment.match_market",
@@ -655,13 +656,16 @@ async def _same_image_sellers(db: AsyncSession, c: Candidate) -> tuple[set[str],
     return sellers | look, bool(look - sellers)
 
 
-def risk_levels(notes: list[dict[str, str]]) -> tuple[RiskLevel, RiskLevel]:
+def risk_levels(notes: list[dict[str, str]], *, has_reviews: bool = True) -> tuple[RiskLevel, RiskLevel]:
+    """Mức rủi ro theo cảnh báo. Không có cảnh báo nào nhưng cũng không có đánh giá để soát → «chưa rõ», không «thấp»."""
     rank = {"info": RiskLevel.LOW, "warning": RiskLevel.MEDIUM, "danger": RiskLevel.HIGH}
     order = [RiskLevel.LOW, RiskLevel.MEDIUM, RiskLevel.HIGH]
 
     def level(kind: str) -> RiskLevel:
         lv = [rank.get(n["level"], RiskLevel.LOW) for n in notes if n["kind"] == kind]
-        return max(lv, key=order.index) if lv else RiskLevel.LOW
+        if lv:
+            return max(lv, key=order.index)
+        return RiskLevel.LOW if has_reviews else RiskLevel.UNKNOWN
 
     return level("counterfeit"), level("fake_review")
 
@@ -670,7 +674,8 @@ async def _step_risk(db: AsyncSession, a: Assessment, c: Candidate, reviews: lis
     notes = await risk_signals(
         db, c, await latest_digest(db, c.id), [r.model_dump(mode="json") for r in reviews] or None
     )
-    cf, fr = risk_levels(notes)
+    has_reviews = bool(reviews) or bool(_review_dicts(c)) or bool(c.review_count)
+    cf, fr = risk_levels(notes, has_reviews=has_reviews)
     await control.propose(
         "assessment.risk_flags",
         f"Cảnh báo nhái/đánh giá ảo: {c.title_vi}",
@@ -973,6 +978,27 @@ async def comparison_values(db: AsyncSession, cands: list[Candidate]) -> tuple[l
     return criteria, values, landed_of
 
 
+def compare_names(cands: list[Candidate], landed: dict[uuid.UUID, int | None]) -> dict[uuid.UUID, str]:
+    """Tên để AI gọi từng món trong kết luận; tên trùng nhau thì thêm sàn và giá về tay cho dễ phân biệt."""
+    counts = Counter(c.title_vi for c in cands)
+    out = {}
+    for c in cands:
+        name = c.title_vi
+        if counts[name] > 1:
+            price = f", về tay {format_vnd(landed.get(c.id), suffix='đ')}" if landed.get(c.id) else ""
+            name = f"{name} ({c.source_platform.value}{price})"
+        out[c.id] = name
+    return out
+
+
+def ids_to_names(text: str, names: dict[uuid.UUID, str]) -> str:
+    """Lưới an toàn: AI vẫn lỡ ghi id (vd «bộ d6fe00ae») thì thay bằng tên món."""
+    for cid, name in names.items():
+        full = str(cid)
+        text = re.sub(rf"{full}|\b{full[:8]}\b", f"«{name}»", text, flags=re.IGNORECASE)
+    return text
+
+
 async def create_comparison(db: AsyncSession, candidate_ids: list[uuid.UUID], title: str | None) -> Comparison:
     ids = list(dict.fromkeys(candidate_ids))
     if not 2 <= len(ids) <= 5:
@@ -985,13 +1011,17 @@ async def create_comparison(db: AsyncSession, candidate_ids: list[uuid.UUID], ti
         raise BadRequest("Chỉ so sánh các ứng viên cùng một đề tìm.")
     brief = await db.get(SourcingBrief, cands[0].brief_id)
     criteria, values, landed = await comparison_values(db, cands)
+    names = compare_names(cands, landed)
     res = await ai.run(
         "assessment.compare",
         CompareIn(
             criteria=criteria,
             candidates=[
                 CompareCandidate(
-                    id=str(c.id), title=c.title_vi, values={k: str(v["value"]) for k, v in values[c.id].items()}
+                    id=str(c.id),
+                    name=names[c.id],
+                    title=c.title_vi,
+                    values={k: str(v["value"]) for k, v in values[c.id].items()},
                 )
                 for c in cands
             ],
@@ -999,6 +1029,9 @@ async def create_comparison(db: AsyncSession, candidate_ids: list[uuid.UUID], ti
         CompareOut,
     )
     out = res.output
+    out.conclusion = ids_to_names(out.conclusion, names)
+    for n in out.notes:
+        n.note = ids_to_names(n.note, names)
     notes = {(n.candidate_id, n.key): n.note for n in out.notes}
     payload = {
         "title": title or f"So sánh {len(cands)} món: {brief.title if brief else ''}".strip(),

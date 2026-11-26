@@ -209,3 +209,44 @@ async def test_legacy_profile_upgraded(db):
     await db.commit()
     rows = (await db.execute(select(ScoringProfile))).scalars().all()
     assert len(rows) == 1
+
+
+async def test_market_listings_from_any_vn_shop_are_saved(owner_client, monkeypatch):
+    """Driver web trả tin rao từ website cửa hàng (platform web, không có shop) → vẫn lưu và tóm tắt được (b5)."""
+    from app.integrations.sources import MarketListing
+
+    _, items = await scanned_brief(owner_client)
+
+    async def web_like(query, *, limit=10):
+        return [
+            MarketListing(
+                platform=SourcePlatform.WEB, title=f"{query} hộp 100", url=f"https://shop{i}.vn/p", price_vnd=p
+            )
+            for i, p in enumerate((28_000, 20_000, 19_000))
+        ] + [MarketListing(platform=SourcePlatform.TIKI, title=query, url="https://tiki.vn/p1", price_vnd=29_000)]
+
+    monkeypatch.setattr(get_driver("sources"), "market_prices", web_like)
+    a = await _assess(owner_client, items[0]["id"], ["market"])
+    assert a["status"] == "ready" and not a["error"]
+    page = (await owner_client.get(f"{API}/candidates/{items[0]['id']}")).json()
+    assert page["market"]["count"] >= 3 and page["market"]["low_vnd"] == 19_000  # khớp món do match_market (giả)
+
+
+async def test_market_empty_is_reported_not_silent(owner_client, monkeypatch):
+    _, items = await scanned_brief(owner_client)
+
+    async def nothing(query, *, limit=10):
+        return []
+
+    monkeypatch.setattr(get_driver("sources"), "market_prices", nothing)
+    a = await _assess(owner_client, items[0]["id"], ["market"])
+    assert "Không tìm thấy tin rao cùng loại" in (a["error"] or "")
+
+
+def test_risk_unknown_without_reviews():
+    from app.modules.assessment.models import RiskLevel
+
+    assert service.risk_levels([], has_reviews=False) == (RiskLevel.UNKNOWN, RiskLevel.UNKNOWN)
+    assert service.risk_levels([], has_reviews=True) == (RiskLevel.LOW, RiskLevel.LOW)
+    notes = [{"kind": "counterfeit", "level": "warning", "text": "Ảnh trùng"}]
+    assert service.risk_levels(notes, has_reviews=False) == (RiskLevel.MEDIUM, RiskLevel.UNKNOWN)

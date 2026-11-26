@@ -92,7 +92,7 @@ async def draft_context(
     return (
         product,
         drop,
-        facts.product_facts(product) if product else None,
+        await facts.product_facts_full(db, product) if product else None,
         await facts.drop_facts(db, drop) if drop else None,
     )
 
@@ -234,9 +234,8 @@ async def compose(
     kind = "drop" if drop is not None else "product"
     allowed = [c for c, _ in channels_for(kind)]
     chans = [c for c in (channels or allowed) if c in allowed] or allowed
-    pf = facts.product_facts(product) if product is not None else None
+    pf = await facts.product_facts_full(db, product) if product is not None else None  # kèm ghi chú thử, cảnh báo
     df = await facts.drop_facts(db, drop) if drop is not None else None
-    notes = await facts.trial_notes(db, product) if product is not None else []
     vp = await facts.active_voice(db)
     res = await ai.run(
         "content.compose",
@@ -244,7 +243,6 @@ async def compose(
             kind=kind,
             product=pf,
             drop=df,
-            trial_notes=notes,
             voice=facts.voice_card(vp),
             channels=[c.value for c in chans],
             channel_guides={c.value: CHANNEL_GUIDE[c.value] for c in chans},

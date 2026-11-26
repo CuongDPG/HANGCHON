@@ -7,6 +7,8 @@ Mỗi bản nháp có một danh sách mục soát (chip ✓/!):
   voice     «Xưng hô với khách»           người bán xưng «mình», gọi khách «bạn»; không gọi người bán là «chị»
                                          (lời khách trích trong ngoặc «…» không tính)
   process   «Không kể quá trình chọn»     khách chỉ đọc nội dung cuối: không «hồ sơ chọn», mẫu bị loại, số món đã xem/thử
+  reason    «Có «Vì sao mình chọn món này»» luật của chị: mọi bài về một sản phẩm, mọi kênh (TikTok: trong lời thoại)
+  safety    «Giữ cảnh báo an toàn»        hồ sơ có cảnh báo an toàn (vd chi tiết nhỏ dễ nuốt) thì bài phải nhắc
   ai_label  «Nhãn nội dung AI»            có phần do AI tạo → gắn nhãn khi đăng (luôn ✓, chỉ báo)
 
 Mục không đạt (`ok=False`) chặn nút «Duyệt» cho tới khi sửa, hoặc chị xác nhận bỏ qua có lý do (`overridden`).
@@ -30,6 +32,8 @@ CHECK_LABELS = {
     "length": "Độ dài hợp kênh",
     "voice": "Xưng hô với khách",
     "process": "Không kể quá trình chọn",
+    "reason": "Có «Vì sao mình chọn món này»",
+    "safety": "Giữ cảnh báo an toàn",
     "ai_label": "Nhãn nội dung AI",
 }
 
@@ -79,6 +83,28 @@ _PROCESS = [
         r"(?:xem|thử|so sánh|so|cân nhắc|loại)\s+(?:qua\s+)?\d+\s+(?:chiếc|mẫu|loại|món|cái|kiểu|bộ|sản phẩm)",
         re.IGNORECASE,
     ),
+]
+
+
+# «Vì sao mình chọn món này» — chấp nhận «vì sao/tại sao/lý do mình chọn …».
+_REASON = re.compile(r"(?:vì sao|tại sao|lý do|lí do)\s+mình\s+(?:lại\s+)?chọn", re.IGNORECASE)
+
+# Lời hứa / ưu đãi / dịch vụ cho khách: chỉ được nói khi hồ sơ có (bài đầu tiên tự thêm «đóng túi zip cho bạn»).
+_PROMISE_WORDS = [
+    "tặng kèm", "quà tặng", "miễn phí", "freeship", "free ship", "bảo hành", "đổi trả", "hoàn tiền", "bao đổi",
+    "cam kết", "giao ngay", "giao hoả tốc", "giao hỏa tốc",
+]  # fmt: skip
+_SERVICE_FOR_YOU = re.compile(
+    r"\b(?:đóng|gói|bọc|tặng|kèm|thêm|gửi kèm|chuẩn bị|làm sẵn)\b[^.!?\n]{0,40}?\bcho\s+(?:bạn|cả nhà|khách)\b",
+    re.IGNORECASE,
+)
+
+# Nhóm từ của từng loại cảnh báo an toàn: cảnh báo có từ của nhóm nào thì bài phải có ít nhất một từ của nhóm đó.
+_SAFETY_GROUPS: list[tuple[str, tuple[str, ...]]] = [
+    ("hóc/nuốt", ("hóc", "nuốt", "xa tầm tay", "ngoài tầm tay")),
+    ("dị ứng", ("dị ứng",)),
+    ("bỏng/nóng", ("bỏng", "nóng")),
+    ("cạnh sắc", ("sắc", "cứa", "cắt tay")),
 ]
 
 
@@ -146,6 +172,75 @@ def check_process(text: str) -> list[str]:
     return [f"«{q}» kể quá trình chọn — khách chỉ cần biết vì sao mình chọn món này." for q in dict.fromkeys(quotes)]
 
 
+def _norm(text: str) -> str:
+    return unicodedata.normalize("NFC", text).lower()
+
+
+def dossier_text(product: ProductFacts | None, drop: DropFacts | None) -> str:
+    """Mọi chữ trong hồ sơ — nguồn để biết một lời hứa có thật hay bài tự thêm."""
+    parts: list[str] = []
+    if product:
+        parts += [product.name, product.subtitle or "", product.short_description or "", product.reason_selected or ""]
+        parts += [product.not_satisfied or "", *product.trial_notes, *product.safety_warnings]
+        parts += [" ".join(str(v) for v in s.values()) for s in product.specs]
+    if drop:
+        parts += [drop.title, drop.description or ""]
+    return _norm("\n".join(parts))
+
+
+def check_promises(text: str, product: ProductFacts | None, drop: DropFacts | None) -> list[str]:
+    """Lời hứa/ưu đãi/dịch vụ cho khách mà hồ sơ không ghi → mỗi chỗ một vấn đề."""
+    low, src = _norm(text), dossier_text(product, drop)
+    problems = [f"«{w}» — hồ sơ không có lời hứa/ưu đãi này." for w in _PROMISE_WORDS if w in low and w not in src]
+    for m in _SERVICE_FOR_YOU.finditer(unicodedata.normalize("NFC", text)):
+        who = re.sub(r"\s+", " ", m.group(0).lower().rsplit("cho", 1)[-1].strip())
+        if f"cho {who}" not in src:
+            problems.append(f"«{m.group(0)}» — hồ sơ không hứa việc này với khách (chỉ kể việc mình đã làm khi thử).")
+    return problems
+
+
+def check_reason(channel: Channel, body: str, scenes: list[dict[str, Any]], product: ProductFacts | None,
+                 drop: DropFacts | None) -> list[str]:  # fmt: skip
+    """Luật của chị: bài về một sản phẩm phải có «Vì sao mình chọn món này» (TikTok: trong lời thoại)."""
+    if product is None or drop is not None:
+        return []
+    if channel == Channel.TIKTOK:
+        spoken = " ".join(str(s.get("voiceover") or "") for s in scenes)
+        if not _REASON.search(_norm(spoken)):
+            return ["Lời thoại chưa có câu «Vì sao mình chọn món này…» kèm lý do chọn."]
+        return []
+    if not _REASON.search(_norm(body)):
+        return ["Bài chưa có phần «Vì sao mình chọn món này» kèm lý do chọn."]
+    return []
+
+
+def check_safety(text: str, product: ProductFacts | None) -> list[str]:
+    """Hồ sơ có cảnh báo an toàn thì bài phải nhắc (soát theo nhóm từ; cảnh báo không thuộc nhóm nào thì để AI soát)."""
+    if product is None or not product.safety_warnings:
+        return []
+    low = _norm(text)
+    problems = []
+    for warning in product.safety_warnings:
+        w = _norm(warning)
+        for label, words in _SAFETY_GROUPS:
+            if any(x in w for x in words) and not any(x in low for x in words):
+                problems.append(f"Bài thiếu cảnh báo {label}: «{warning}».")
+    return list(dict.fromkeys(problems))
+
+
+# Lời giải thích tự nói «không phải lỗi» thì mục đó không phải lỗi (lần chạy thật: verdict fail nhưng giải thích
+# «khớp hồ sơ, không phải lỗi»).
+_SELF_CLEARED = ("không phải lỗi", "không phải là lỗi", "không sai", "không vi phạm", "khớp hồ sơ", "đúng hồ sơ")
+
+
+def _self_cleared(issue: Any) -> bool:
+    return any(p in _norm(issue.detail) for p in _SELF_CLEARED)
+
+
+def is_real_issue(issue: Any) -> bool:
+    return getattr(issue, "severity", "fail") == "fail" and not _self_cleared(issue)
+
+
 def check_claims(text: str) -> list[str]:
     low = text.lower()
     hits = [p for p in BANNED_PHRASES if p in low]
@@ -208,19 +303,29 @@ def build_findings(
     scenes = [s for s in script if "voiceover" in s]
     slides = [s for s in script if "caption" in s and "voiceover" not in s]
     text = full_text(body, title, scenes, slides)
-    numbers = check_numbers(text, product, drop) + [f"{i.quote}: {i.detail}" for i in (ai.number_issues if ai else [])]
-    claims = check_claims(text) + [f"{i.quote}: {i.detail}" for i in (ai.claim_issues if ai else [])]
+    ai_numbers = [i for i in (ai.number_issues if ai else []) if is_real_issue(i)]
+    ai_claims = [i for i in (ai.claim_issues if ai else []) if is_real_issue(i)]
+    # góp ý = mục AI ghi severity=note mà lời giải thích không tự gỡ («khớp hồ sơ», «không phải lỗi») — không chặn duyệt
+    every = [*(ai.number_issues if ai else []), *(ai.claim_issues if ai else [])]
+    ai_notes = [i for i in every if not is_real_issue(i) and not _self_cleared(i)]
+    numbers = check_numbers(text, product, drop) + [f"{i.quote}: {i.detail}" for i in ai_numbers]
+    claims = check_claims(text) + check_promises(text, product, drop) + [f"{i.quote}: {i.detail}" for i in ai_claims]
     length = check_length(channel, body, hashtags, scenes)
     voice, voice_fix = check_voice(text)
     process = check_process(text)
+    reason = check_reason(channel, body, scenes, product, drop)
+    safety = check_safety(text, product)
     suggestions = {
-        "numbers": next((i.suggestion for i in (ai.number_issues if ai else []) if i.suggestion), None)
+        "numbers": next((i.suggestion for i in ai_numbers if i.suggestion), None)
         or "Sửa số cho khớp hồ sơ, hoặc bỏ con số.",
-        "claims": next((i.suggestion for i in (ai.claim_issues if ai else []) if i.suggestion), None)
-        or "Kể trải nghiệm thật thay cho lời khẳng định.",
+        "claims": next((i.suggestion for i in ai_claims if i.suggestion), None)
+        or "Kể trải nghiệm thật thay cho lời khẳng định; bỏ lời hứa hồ sơ không có.",
         "length": "Bấm «Ngắn hơn» hoặc sửa tay cho vừa kênh.",
         "voice": voice_fix,
         "process": "Bỏ phần kể quá trình chọn; giữ lý do chọn và điều chưa ưng.",
+        "reason": "Thêm «Vì sao mình chọn món này: …» kèm lý do chọn"
+        + (" vào lời thoại một cảnh." if channel == Channel.TIKTOK else "."),
+        "safety": "Thêm câu cảnh báo ngắn, vd «Chi tiết nhỏ, bạn để xa tầm tay bé nhỏ».",
     }
     items = []
     for key, problems in (
@@ -229,6 +334,8 @@ def build_findings(
         ("length", length),
         ("voice", voice),
         ("process", process),
+        ("reason", reason),
+        ("safety", safety),
     ):
         items.append(
             {
@@ -248,6 +355,10 @@ def build_findings(
             "suggestion": None,
         }
     )
+    if ai_notes:  # góp ý của AI (không phải lỗi): hiện kèm, không chặn duyệt
+        claims_item = next(it for it in items if it["key"] == "claims")
+        if claims_item["ok"]:
+            claims_item["detail"] += " Góp ý: " + " ".join(f"«{i.quote}»: {i.detail}" for i in ai_notes[:3])
     prev = {f.get("key"): f for f in previous or []}
     for it in items:
         old = prev.get(it["key"])
@@ -264,6 +375,8 @@ def _ok_detail(key: str) -> str:
         "length": "Độ dài vừa với kênh.",
         "voice": "Xưng «mình», gọi khách «bạn».",
         "process": "Không nhắc quá trình chọn, chỉ kể vì sao mình chọn.",
+        "reason": "Có phần «Vì sao mình chọn món này».",
+        "safety": "Giữ đủ cảnh báo an toàn của hồ sơ.",
     }[key]
 
 

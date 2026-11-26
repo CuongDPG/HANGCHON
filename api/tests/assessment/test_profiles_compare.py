@@ -86,3 +86,24 @@ async def test_comparison(owner_client):
     r = await owner_client.post(f"{API}/comparisons", json={"candidate_ids": [ids[0], other[0]["id"]]})
     assert r.status_code == 400
     assert (await owner_client.get(f"{API}/comparisons/{uuid.uuid4()}")).status_code == 404
+
+
+async def test_comparison_conclusion_uses_names_not_ids(owner_client, fake_ai):
+    """Chạy thật 26/11: kết luận ghi «bộ d6fe00ae» — AI phải nhận tên, id lỡ ghi thì được thay bằng tên."""
+    from app.modules.assessment.ai_io import CompareIn, CompareOut
+
+    _, items = await scanned_brief(owner_client)
+    ids = [c["id"] for c in items[:2]]
+    seen: list[CompareIn] = []
+
+    def recorded(inp: CompareIn) -> CompareOut:
+        seen.append(inp)
+        return CompareOut(conclusion=f"Nên loại bộ {ids[0][:8]} vì biên âm; bộ {ids[1]} còn thiếu giá ở Việt Nam.")
+
+    fake_ai["assessment.compare"] = recorded
+    r = await owner_client.post(f"{API}/comparisons", json={"candidate_ids": ids})
+    assert r.status_code == 201, r.text
+    conclusion = r.json()["conclusion"]
+    assert ids[0][:8] not in conclusion and ids[1] not in conclusion
+    names = {c.id: c.name for c in seen[0].candidates}
+    assert f"«{names[ids[0]]}»" in conclusion and f"«{names[ids[1]]}»" in conclusion

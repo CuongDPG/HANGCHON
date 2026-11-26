@@ -1,6 +1,8 @@
 """Provider Anthropic (SDK chính thức `anthropic` 2.x).
 
-- Structured outputs qua `messages.parse(output_format=<Pydantic>)`; không temperature, không prefill, không ép tool_choice.
+- Structured outputs qua `output_config.format` với khuôn `app.ai.schema.anthropic_schema()` (mọi thuộc tính required để
+  khỏi vượt giới hạn độ phức tạp ngữ pháp), Pydantic kiểm lại theo model gốc; không temperature, không prefill, không ép
+  tool_choice. Khuôn vượt ngân sách bị chặn trước khi gọi (`check_limits`), lỗi 400 không gửi lại.
 - Thinking: Opus 5.5 / Haiku 5.5 luôn adaptive → không gửi `thinking`; độ sâu điều khiển bằng `output_config.effort`.
 - web=True: bật server tools `web_search_20260209` + `web_fetch_20260209`; xử lý `pause_turn` bằng cách gửi lại lượt dở.
   Lưu ý: `user_location.country="VN"` bị API từ chối, chỉ gửi timezone.
@@ -21,6 +23,7 @@ from pydantic import ValidationError
 
 from app.ai.errors import AIError, AIOutputInvalid, AIRefused, AIUnavailable
 from app.ai.providers import BaseProvider, Connection, register
+from app.ai.schema import AISchemaTooComplex, anthropic_schema
 from app.ai.types import AIRequest, ProviderResponse, Usage
 from app.core.config import settings
 from app.core.secrets import redact
@@ -142,10 +145,11 @@ class AnthropicProvider(BaseProvider):
             "model": req.model,
             "max_tokens": req.max_tokens,
             "system": [{"type": "text", "text": req.system, "cache_control": {"type": "ephemeral"}}],
-            "output_format": req.output,
         }
+        output_config: dict[str, Any] = {"format": {"type": "json_schema", "schema": anthropic_schema(req.output)}}
         if req.effort:
-            kwargs["output_config"] = {"effort": req.effort}
+            output_config["effort"] = req.effort
+        kwargs["output_config"] = output_config
         if req.web:
             kwargs["tools"] = WEB_TOOLS
         fallbacks = self._uses_fallbacks(req.model)
@@ -156,11 +160,11 @@ class AnthropicProvider(BaseProvider):
         try:
             for _ in range(MAX_PAUSE_TURNS + 1):
                 if fallbacks:
-                    resp = await client.beta.messages.parse(
+                    resp = await client.beta.messages.create(
                         messages=messages, betas=[FALLBACK_BETA], fallbacks="default", **kwargs
                     )
                 else:
-                    resp = await client.messages.parse(messages=messages, **kwargs)
+                    resp = await client.messages.create(messages=messages, **kwargs)
                 usage.add(_usage(resp))
                 all_content += list(resp.content)
                 if resp.stop_reason != "pause_turn":
@@ -184,13 +188,16 @@ class AnthropicProvider(BaseProvider):
                     "Tài khoản Anthropic hết hạn mức (credit), nạp thêm rồi thử lại.", code="ai_quota"
                 ) from e
             log.error("Anthropic từ chối yêu cầu (%s): %s", req.task, detail)
+            low = detail.lower()
+            if "too complex" in low or "grammar compilation" in low:
+                raise AISchemaTooComplex(
+                    f"Khuôn kết quả {req.output.__name__} quá phức tạp, AI từ chối biên dịch (lỗi hệ thống)."
+                ) from e
             raise AIError("Yêu cầu gửi AI không hợp lệ (lỗi hệ thống).", code="ai_bad_request") from e
         except anthropic.APIStatusError as e:
             raise AIUnavailable(code="ai_server_error") from e
         except anthropic.APIConnectionError as e:  # gồm cả APITimeoutError
             raise AIUnavailable("Không kết nối được dịch vụ AI.", code="ai_connection") from e
-        except ValidationError as e:
-            raise AIOutputInvalid() from e
 
         fallback_model = None
         iterations = getattr(resp.usage, "iterations", None) or []
@@ -203,9 +210,13 @@ class AnthropicProvider(BaseProvider):
             raise AIError("AI tra cứu web quá lâu chưa xong, chị thử lại.", code="ai_pause_limit")
         if resp.stop_reason == "max_tokens":
             raise AIOutputInvalid("AI trả lời bị cắt ngang vì quá dài.", code="ai_max_tokens")
-        parsed = resp.parsed_output
-        if parsed is None:
+        texts = [b.text for b in resp.content if getattr(b, "type", "") == "text" and getattr(b, "text", "")]
+        if not texts:
             raise AIOutputInvalid()
+        try:
+            parsed = req.output.model_validate_json(texts[-1])
+        except ValidationError as e:
+            raise AIOutputInvalid() from e
         return ProviderResponse(
             output=parsed,
             model=resp.model,
