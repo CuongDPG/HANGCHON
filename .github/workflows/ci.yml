@@ -1,4 +1,6 @@
 # Cổng chất lượng trên GitHub, cùng nội dung với scripts/check.sh (api + web) và thêm `next build`.
+# Đẩy lên `main` (không phải PR) và CI xanh → dựng image amd64 + arm64 lên GHCR → deploy lên máy chủ riêng qua SSH
+# (bỏ qua êm nếu chưa khai secret DEPLOY_HOST). Xem docs/deployment.md mục «Máy chủ riêng + GitHub Actions».
 name: CI
 
 on:
@@ -12,7 +14,11 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # PR: bản mới huỷ bản cũ. `main`: không huỷ giữa chừng (đang đẩy image / deploy), lần đẩy sau xếp hàng chờ.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  IMAGE_REPO: ghcr.io/cuongdpg/hangchon
 
 jobs:
   api:
@@ -94,3 +100,150 @@ jobs:
         run: bun run test
       - name: build
         run: bun run build
+
+  # ---- image: dựng từng kiến trúc trên runner gốc (không QEMU), đẩy theo digest, rồi ghép manifest list ------------
+  image:
+    name: image (${{ matrix.image }}, ${{ matrix.arch }})
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [api, web]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: true
+      matrix:
+        image: [api, web]
+        arch: [amd64, arm64]
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: build + push (theo digest)
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ./${{ matrix.image }}
+          platforms: linux/${{ matrix.arch }}
+          # web: không truyền SITE_URL (lấy lúc chạy); API_ORIGIN mặc định http://hangchon-api:8000 trong web/Dockerfile
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          outputs: type=image,name=${{ env.IMAGE_REPO }}-${{ matrix.image }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-${{ matrix.arch }}
+      - name: ghi digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: digests-${{ matrix.image }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  image-merge:
+    name: image manifest (${{ matrix.image }})
+    needs: [image]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        image: [api, web]
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: digests-${{ matrix.image }}-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/digests
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: manifest list sha-<7> + latest
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          NAME: ${{ env.IMAGE_REPO }}-${{ matrix.image }}
+        run: |
+          refs=()
+          for d in *; do refs+=("$NAME@sha256:$d"); done
+          test "${#refs[@]}" = 2
+          docker buildx imagetools create -t "$NAME:sha-${GITHUB_SHA::7}" -t "$NAME:latest" "${refs[@]}"
+          docker buildx imagetools inspect "$NAME:sha-${GITHUB_SHA::7}"
+
+  # ---- deploy: SSH vào máy chủ, ghim tag mới, pull + up -d, chờ healthy -------------------------------------------
+  deploy:
+    name: deploy (máy chủ riêng)
+    needs: [image-merge]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+    steps:
+      - name: có máy chủ chưa?
+        id: cfg
+        run: |
+          if [ -z "$DEPLOY_HOST" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=deploy bỏ qua::Chưa khai secret DEPLOY_HOST — image đã lên GHCR, không deploy."
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.cfg.outputs.enabled == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: khoá SSH + known_hosts
+        if: steps.cfg.outputs.enabled == 'true'
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          if [ -z "$DEPLOY_SSH_KEY" ]; then echo "::error::Thiếu secret DEPLOY_SSH_KEY"; exit 1; fi
+          if [ -z "$DEPLOY_KNOWN_HOSTS" ]; then
+            echo "::error::Thiếu secret DEPLOY_KNOWN_HOSTS (kết quả 'ssh-keyscan -p <cổng> <máy chủ>', đã đối chiếu vân tay) — không tắt kiểm khoá máy chủ"
+            exit 1
+          fi
+          install -d -m 700 "$RUNNER_TEMP/ssh"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$RUNNER_TEMP/ssh/key"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$RUNNER_TEMP/ssh/known_hosts"
+          chmod 600 "$RUNNER_TEMP/ssh/key" "$RUNNER_TEMP/ssh/known_hosts"
+      - name: chép compose + chạy server-deploy.sh
+        if: steps.cfg.outputs.enabled == 'true'
+        env:
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          : "${DEPLOY_USER:?Thiếu secret DEPLOY_USER}"
+          port="${DEPLOY_PORT:-22}"
+          path="${DEPLOY_PATH:-/opt/hangchon}"
+          opts=(-o BatchMode=yes -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$RUNNER_TEMP/ssh/known_hosts"
+                -o IdentitiesOnly=yes -i "$RUNNER_TEMP/ssh/key" -o ConnectTimeout=20 -o ServerAliveInterval=30)
+          scp -q "${opts[@]}" -P "$port" docker-compose.prod.yml docker-compose.server.yml scripts/server-deploy.sh \
+            "$DEPLOY_USER@$DEPLOY_HOST:$path/"
+          ssh "${opts[@]}" -p "$port" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "bash $(printf '%q' "$path/server-deploy.sh") sha-${GITHUB_SHA::7}"
+      - name: dọn khoá
+        if: always() && steps.cfg.outputs.enabled == 'true'
+        run: rm -rf "$RUNNER_TEMP/ssh"

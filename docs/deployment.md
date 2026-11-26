@@ -2,6 +2,8 @@
 
 Bản chạy thật là một ứng dụng **Docker Compose** trên Dokploy, dùng tệp [`docker-compose.prod.yml`](../docker-compose.prod.yml).
 Mỗi lần gộp vào `main`, Dokploy tự build lại và chạy lại; API tự chạy `alembic upgrade head` trước khi nhận request.
+Cách thứ hai — **máy chủ nhỏ tự quản, không build trên máy** (image dựng sẵn trên GHCR, GitHub Actions deploy qua SSH,
+Cloudflare Tunnel phía trước): [mục 10](#10-máy-chủ-riêng--github-actions).
 
 ```
 Internet ── Traefik (Dokploy, HTTPS) ─┬─ https://<tên miền>/      → hangchon-web    :3000  (Next.js standalone)
@@ -30,8 +32,9 @@ scripts/deploy-check.sh        # build 2 image, dựng compose prod (web :3900, 
 ```
 
 Script kiểm: mọi dịch vụ healthy, `/api/health`, đúng một head Alembic và CSDL đã ở head, API không chạy bằng root,
-trang chủ và `robots.txt` (mang `SITE_URL`), rewrite `/api/*` của web, đăng nhập owner + cookie phiên, sao lưu bằng
-`pg_dump`, worker trả lời `arq --check`. Không đụng bộ container dev (Postgres 5442, Redis 6382, API 8010, Web 3010).
+trang chủ và `robots.txt` (mang `SITE_URL` lúc chạy — web build không có `SITE_URL`), rewrite `/api/*` của web, đăng nhập
+owner + cookie phiên, sao lưu bằng `pg_dump`, worker trả lời `arq --check`, và `docker-compose.server.yml` ghép được
+(image GHCR, không build). Không đụng bộ container dev (Postgres 5442, Redis 6382, API 8010, Web 3010).
 Tuỳ chọn: `NO_CACHE=1` (build lại từ đầu), `KEEP=1` (giữ container để xem), `WEB_PORT=… API_PORT=…`.
 
 ## 2. Tạo ứng dụng trên Dokploy
@@ -46,7 +49,9 @@ Tuỳ chọn: `NO_CACHE=1` (build lại từ đầu), `KEEP=1` (giữ container 
    (Dokploy khuyên không đặt `container_name`, ở đây đặt có chủ ý), dùng `docker logs hangchon-api` trên máy chủ.
 
 > **Đổi biến môi trường xong phải bấm _Redeploy_, không phải _Restart_.** Restart chạy lại container cũ với env cũ.
-> Riêng `SITE_URL` được ghi vào bản build của web (sitemap, robots, JSON-LD) nên càng phải Redeploy để build lại.
+> `SITE_URL` **không** ghi vào bản build của web (từ 26/11: sitemap, robots, JSON-LD tính theo request từ env lúc chạy;
+> `web/Dockerfile` tự dừng build nếu giá trị lúc build lọt vào bản build), nên đổi tên miền chỉ cần Redeploy, không cần
+> build lại. Riêng `API_ORIGIN` (rewrites `/api/*`) vẫn ghi lúc build, compose tự dựng theo `CONTAINER_PREFIX`.
 
 ## 3. Biến môi trường
 
@@ -241,3 +246,159 @@ Thử khôi phục định kỳ trên máy khác (hoặc bằng `KEEP=1 scripts/
   Mọi dịch vụ `restart: unless-stopped`.
 - **CI:** [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) (bật từ 25/11/2026, chạy mỗi lần đẩy lên `main` và mỗi PR) chạy ruff + pytest (Postgres + Redis thật) và
   typecheck + lint + test + build của web khi push/PR vào `main`. Dokploy không chờ CI: kiểm xanh trước khi gộp.
+  Đẩy lên `main` mà CI xanh thì workflow dựng thêm image lên GHCR và deploy lên máy chủ riêng nếu đã khai (mục 10).
+
+## 10. Máy chủ riêng + GitHub Actions
+
+Phương án chạy thử (pilot): **một máy Linux nhỏ luôn bật** — ưu tiên Oracle Cloud Always Free (ARM64, Ampere A1,
+Singapore), dự phòng một VPS x86 2 GB — với Cloudflare đứng trước (DNS, HTTPS, CDN). Máy 2 GB không build nổi Next.js
+nên **máy chủ không build gì**: GitHub Actions dựng image, máy chủ chỉ `pull`.
+
+```
+push main ─ CI (api, web) xanh ─ image ×4 (api/web × amd64/arm64, runner gốc, không QEMU) ─ manifest list ─ deploy (SSH)
+                                   ghcr.io/cuongdpg/hangchon-api:sha-<7>, :latest          scripts/server-deploy.sh sha-<7>
+                                   ghcr.io/cuongdpg/hangchon-web:sha-<7>, :latest          pull → up -d → chờ healthy
+
+Khách ── Cloudflare (DNS, HTTPS, CDN) ══ Tunnel ══ hangchon-cloudflared ─┬─ /api/* → hangchon-api :8000
+                                    (kết nối đi ra, máy chủ không mở 80/443) └─ /       → hangchon-web :3000
+```
+
+**Vì sao Cloudflare Tunnel** (thay vì Caddy/Traefik trên máy): container `cloudflared` tự nối ra Cloudflare, nên máy chủ
+không mở cổng web nào (ufw chỉ mở SSH), không tự xin/gia hạn chứng chỉ, IP máy chủ không lộ qua DNS, mọi truy cập buộc đi qua
+Cloudflare. Đổi lại: phụ thuộc Cloudflare, và gói Free giới hạn **100 MB mỗi request** (áp cả khi proxy thường) — đủ cho
+ảnh/video ngắn. Không muốn dùng Tunnel thì phải tự thêm reverse proxy có HTTPS (không có sẵn trong repo) và mở 80/443.
+
+Tệp liên quan: [`docker-compose.server.yml`](../docker-compose.server.yml) (ghép lên `docker-compose.prod.yml`: bỏ `build`,
+dùng image GHCR theo `IMAGE_TAG`, thêm `cloudflared`), [`scripts/server-bootstrap.sh`](../scripts/server-bootstrap.sh),
+[`scripts/server-deploy.sh`](../scripts/server-deploy.sh), job `image`, `image-merge`, `deploy` trong
+[`ci.yml`](../.github/workflows/ci.yml). Đường Dokploy (mục 2–4) không đổi.
+
+### 10.1 Image và cấu hình web lúc chạy
+
+- Tag: `sha-<7 ký tự commit>` (bản ghim khi deploy) và `latest`. Chỉ dựng khi **đẩy lên `main`** và job `api` + `web` xanh;
+  PR không dựng. Cache lớp image ở GitHub Actions cache, mỗi kiến trúc một phạm vi.
+- **Một image cho mọi tên miền:** `SITE_URL` lấy từ env lúc chạy (robots, sitemap, JSON-LD, Open Graph tính theo request).
+  `API_ORIGIN` của rewrites `/api/*` thì Next ghi cứng lúc build (bản standalone không đọc lại `next.config` lúc chạy), nên
+  image GHCR luôn trỏ `http://hangchon-api:8000`; `docker-compose.server.yml` gắn bí danh mạng `hangchon-api` cho API để địa chỉ
+  đó luôn đúng. Không cần biến nào ở GitHub cho web.
+- Image **không chứa bí mật**: dựng từ bản checkout git (chỉ tệp đã commit — repo vốn công khai), `.dockerignore` loại `.env*`,
+  không build-arg bí mật. Vì vậy hai gói GHCR để **công khai** (máy chủ pull không cần đăng nhập). Gói mới tạo trên GHCR mặc
+  định *Private*: lần đầu vào GitHub → hồ sơ → *Packages* → `hangchon-api` / `hangchon-web` → *Package settings* →
+  *Change visibility* → *Public* (GitHub không có API đổi việc này). Để private thì trên máy chủ chạy một lần
+  `docker login ghcr.io` bằng token *read:packages* dưới user deploy.
+
+### 10.2 Khai trên GitHub (Settings → Environments → `production` → Environment secrets)
+
+Chưa khai `DEPLOY_HOST` thì job `deploy` **bỏ qua êm** (xanh, có dòng ghi chú) — image vẫn lên GHCR.
+
+| Secret | Bắt buộc | Giá trị |
+|---|---|---|
+| `DEPLOY_HOST` | có | IP hoặc tên máy chủ SSH |
+| `DEPLOY_USER` | có | user deploy (mặc định script tạo `deploy`) |
+| `DEPLOY_SSH_KEY` | có | khoá **riêng** ed25519 dành riêng cho deploy (không dùng lại khoá cá nhân) |
+| `DEPLOY_KNOWN_HOSTS` | có | dòng known_hosts của máy chủ — job **dừng** nếu thiếu, không tắt kiểm khoá máy chủ |
+| `DEPLOY_PORT` | không | cổng SSH, mặc định `22` |
+| `DEPLOY_PATH` | không | thư mục deploy, mặc định `/opt/hangchon` |
+
+```bash
+ssh-keygen -t ed25519 -N "" -C github-deploy -f hangchon-deploy        # .pub lên máy chủ, khoá riêng vào DEPLOY_SSH_KEY
+ssh-keyscan -t ed25519 -p 22 <IP máy chủ>                              # → DEPLOY_KNOWN_HOSTS (cổng khác 22: dòng có dạng [IP]:cổng)
+ssh-keygen -lf <(ssh-keyscan -t ed25519 <IP máy chủ> 2>/dev/null)      # đối chiếu vân tay với máy chủ:
+#   (trên máy chủ) ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
+```
+
+Bí mật của ứng dụng (mục 3) **không** để ở GitHub: chúng nằm trong `.env` trên máy chủ. Muốn duyệt tay trước mỗi lần deploy:
+bật *Required reviewers* cho environment `production`. Các lần deploy không chồng nhau (concurrency `deploy-production`).
+
+### 10.3 Oracle Cloud Always Free (lưu ý)
+
+- **Home region chọn lúc tạo tài khoản và không đổi được** — chọn *Singapore* (`ap-singapore-1`). Tài nguyên Always Free chỉ
+  có ở home region.
+- Máy: shape `VM.Standard.A1.Flex` (Ampere, ARM64; hạn mức miễn phí tổng 4 OCPU / 24 GB RAM), image **Canonical Ubuntu
+  24.04 bản aarch64**. A1 hay báo *Out of capacity*: thử lại sau, hoặc đổi Availability Domain.
+- **Nâng tài khoản lên Pay As You Go** (vẫn miễn phí trong hạn mức Always Free): tài khoản Free Tier bị Oracle thu hồi máy
+  «nhàn rỗi» (CPU, mạng, RAM thấp kéo dài ~7 ngày) — máy bán hàng ít khách dễ bị coi là nhàn rỗi. Sau khi nâng, đặt
+  **Budget alert** (Billing → Budgets, vd 1 USD/tháng) để biết ngay nếu lỡ dùng tài nguyên tính tiền.
+- Dùng Tunnel thì Security List / NSG **chỉ cần cổng 22** (mặc định đã có). Không dùng Tunnel: thêm ingress TCP 80, 443.
+- Image Ubuntu của Oracle có sẵn luật iptables (`netfilter-persistent`) chỉ mở cổng 22. `server-bootstrap.sh` cài `ufw`
+  (có thể làm apt gỡ `iptables-persistent`). **Chưa thử trên máy Oracle thật**: sau bootstrap mở phiên SSH thứ hai kiểm vào
+  được, xem `sudo iptables -S`, rồi mới đóng phiên cũ.
+- Dự phòng VPS x86 2 GB: cùng script (amd64), cùng các bước.
+
+### 10.4 Chuẩn bị máy chủ (một lần)
+
+```bash
+scp scripts/server-bootstrap.sh ubuntu@<IP>:
+ssh ubuntu@<IP> 'sudo DEPLOY_PUBKEY="$(cat)" SWAP_SIZE=4G bash server-bootstrap.sh' < hangchon-deploy.pub
+```
+
+Script (chạy lại được nhiều lần): Docker Engine + compose plugin từ kho của Docker, xoay log Docker (3 × 10 MB),
+user `deploy` thuộc nhóm `docker` (tương đương root — chỉ khoá deploy được vào), thư mục `/opt/hangchon`, swapfile
+(`SWAP_SIZE`, mặc định 2G; máy 1–2 GB RAM nên 2G–4G), ufw chặn mọi cổng vào trừ SSH (`OPEN_WEB_PORTS=1` mở thêm 80/443),
+unattended-upgrades. Không đổi cấu hình sshd.
+
+Rồi tạo `/opt/hangchon/.env` (chủ `deploy`, `chmod 600`) với các biến của mục 3, cộng:
+
+```bash
+CLOUDFLARE_TUNNEL_TOKEN=…                 # mục 10.5
+COMPOSE_FILE=docker-compose.prod.yml:docker-compose.server.yml   # để gõ tay `docker compose ps/logs` trong thư mục này
+# IMAGE_TAG do server-deploy.sh tự ghi, không đặt tay
+```
+
+### 10.5 Cloudflare: tên miền, Tunnel
+
+1. Tên miền dùng nameserver của Cloudflare. *SSL/TLS → Edge Certificates*: bật *Always Use HTTPS*.
+2. *Zero Trust → Networks → Tunnels → Create a tunnel* (loại Cloudflared) → chép **token** vào `CLOUDFLARE_TUNNEL_TOKEN`.
+   Bỏ qua bước cài cloudflared trên máy (đã có container `hangchon-cloudflared`).
+3. *Public hostnames* của tunnel, **dòng `/api` đứng trước** (Cloudflare xét từ trên xuống):
+
+   | Hostname | Path | Service |
+   |---|---|---|
+   | `hangchon.vn` | `^/api(/\|$)` | `HTTP` · `hangchon-api:8000` |
+   | `hangchon.vn` | (trống) | `HTTP` · `hangchon-web:3000` |
+
+   Thiếu dòng `/api` vẫn chạy (web chuyển tiếp sang API), nhưng tệp tải lên đi hai chặng. Có `www` thì thêm một dòng → web.
+   `SITE_URL` = `https://hangchon.vn` (đúng tên miền này).
+4. Không bật *Cache Everything*: desk, giỏ hàng, trang đơn là nội dung theo từng người. Tệp tĩnh `/_next/static/*` đã có
+   `Cache-Control` dài hạn nên Cloudflare tự cache.
+5. IP khách: Cloudflare gửi kèm `X-Forwarded-For`; uvicorn chỉ tin header này khi request tới từ mạng Docker nội bộ (chính là
+   `cloudflared`). **Chưa kiểm với tunnel thật** — sau lần deploy đầu, xem log API thấy IP khách thật chứ không phải `172.x`.
+
+### 10.6 Lưu tệp và sao lưu trên Cloudflare R2
+
+Tạo bucket R2 (vd `hangchon`, **không bật truy cập công khai**) và API token *Object Read & Write* chỉ cho bucket đó.
+
+```bash
+S3_ENDPOINT_URL=https://<account_id>.r2.cloudflarestorage.com
+S3_REGION=auto
+S3_BUCKET=hangchon
+S3_ACCESS_KEY=…
+S3_SECRET_KEY=…
+```
+
+- **Khuyên dùng cho pilot: `STORAGE_DRIVER=local` + các biến `S3_*` ở trên.** Ảnh nằm trên volume `apidata`, phục vụ qua
+  `https://<tên miền>/api/files/…` (`STORAGE_PUBLIC_BASE_URL` mặc định `${SITE_URL}/api/files`, Cloudflare cache được); mỗi bản
+  sao lưu tự chép lên R2 (mục 7) — đó là bản ngoài máy chủ.
+- `STORAGE_DRIVER=s3` (mọi tệp trên R2): driver hiện trả **link ký tạm 1 giờ** cho mỗi lần hiển thị và **bỏ qua**
+  `STORAGE_PUBLIC_BASE_URL` — chạy được nhưng CDN khó cache, link ảnh dán ra ngoài (bài đăng mạng xã hội) hết hạn sau 1 giờ, và
+  driver chưa kiểm chứng với dịch vụ thật. Bucket chứa cả `private/backups/…` nên **không** mở công khai bucket. Muốn ảnh có
+  URL công khai lâu dài trên R2 phải sửa driver (chưa làm).
+
+### 10.7 Lần deploy đầu
+
+1. Bootstrap máy (10.4), đặt `.env` (10.4), tạo tunnel (10.5).
+2. Khai 4 secret bắt buộc ở 10.2. Image đã có sẵn từ lần đẩy `main` gần nhất; chạy lại workflow CI của commit đó
+   (*Actions → CI → Re-run all jobs*) hoặc đẩy commit mới → job `deploy` chép `docker-compose.prod.yml`,
+   `docker-compose.server.yml`, `server-deploy.sh` vào `DEPLOY_PATH` rồi chạy `server-deploy.sh sha-<7>`: ghim `IMAGE_TAG`
+   trong `.env`, `pull`, `up -d --wait` (lần đầu API tự migrate và tạo tài khoản chị), kiểm `/api/health`. Dịch vụ nào không
+   healthy trong 7 phút → job đỏ, in log.
+3. Mở `https://<tên miền>/api/health`, đăng nhập, làm danh sách kiểm mục 8.
+
+**Quay về bản cũ:** trên máy chủ `cd /opt/hangchon && ./server-deploy.sh sha-<bản trước>` (lịch sử ở `.deploy-history`).
+Script không tự quay về: bản mới có thể đã migrate CSDL — xem migration trước khi lùi.
+
+**Khôi phục từ bản sao lưu** (máy mới hoặc mất dữ liệu): deploy như trên để có đủ container, tải tệp
+`private/backups/YYYY/MM/hangchon-….sql.gz` mới nhất từ bucket R2 (bảng điều khiển R2, hoặc `rclone`/`aws s3 cp
+--endpoint-url $S3_ENDPOINT_URL`), chép lên máy chủ rồi làm đúng các lệnh *Khôi phục CSDL* ở mục 7
+(`docker stop hangchon-worker hangchon-api` → DROP/CREATE → `gunzip | psql` → `docker start`). Tệp ảnh: khôi phục volume
+`apidata` từ bản `tar` (mục 7) nếu có. Giữ `SECRETS_ENCRYPTION_KEY` cũ, nếu không khoá API đã lưu không giải mã được.

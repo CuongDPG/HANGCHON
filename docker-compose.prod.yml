@@ -6,6 +6,7 @@
 # container của ứng dụng khác.
 #
 # Không mở cổng ra máy chủ: Traefik của Dokploy chuyển tên miền vào `web` (cổng 3000) và `/api` vào `api` (cổng 8000).
+# Máy chủ riêng không build: dùng thêm docker-compose.server.yml (image dựng sẵn trên GHCR + Cloudflare Tunnel).
 
 x-api-env: &api-env
   # ---- ứng dụng ----
@@ -233,15 +234,15 @@ services:
     build:
       context: ./web
       args:
+        # rewrites /api/* ghi cứng lúc build; SITE_URL chỉ cần lúc chạy (environment bên dưới)
         API_ORIGIN: http://${CONTAINER_PREFIX:-hangchon}-api:8000
-        SITE_URL: ${SITE_URL:?SITE_URL bắt buộc}
     image: ${CONTAINER_PREFIX:-hangchon}-web:latest
     container_name: ${CONTAINER_PREFIX:-hangchon}-web
     restart: unless-stopped
     init: true
     environment:
       API_ORIGIN: http://${CONTAINER_PREFIX:-hangchon}-api:8000
-      SITE_URL: ${SITE_URL}
+      SITE_URL: ${SITE_URL:?SITE_URL bắt buộc}
       NEXT_PUBLIC_SITE_URL: ${SITE_URL}
       PORT: "3000"
       HOSTNAME: 0.0.0.0

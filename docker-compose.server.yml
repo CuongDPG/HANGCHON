@@ -1,0 +1,41 @@
+# Hàng Chọn trên máy chủ riêng (không Dokploy): ghép lên docker-compose.prod.yml, KHÔNG build trên máy chủ.
+#
+#   docker compose -f docker-compose.prod.yml -f docker-compose.server.yml up -d
+#
+# - api / worker / web dùng image dựng sẵn trên GHCR (GitHub Actions dựng amd64 + arm64 sau khi CI xanh trên `main`).
+#   IMAGE_TAG do scripts/server-deploy.sh ghi vào .env (sha-<7 ký tự commit>); để trống = latest.
+# - cloudflared nối máy chủ với Cloudflare Tunnel: không mở cổng 80/443, không tự quản chứng chỉ. Đường đi (tên miền →
+#   http://hangchon-web:3000, /api/* → http://hangchon-api:8000) khai trên bảng điều khiển Cloudflare, xem docs/deployment.md.
+# - Mọi bí mật nằm trong .env cạnh tệp này trên máy chủ, không ở repo, không ở GitHub.
+# Cần Docker Compose ≥ 2.24.4 (cú pháp `!reset`).
+
+name: hangchon
+
+services:
+  api:
+    build: !reset null
+    image: ${IMAGE_REPO:-ghcr.io/cuongdpg/hangchon}-api:${IMAGE_TAG:-latest}
+    networks:
+      default:
+        # image web dựng sẵn có rewrites /api/* → http://hangchon-api:8000 (ghi cứng lúc build); bí danh này giữ đúng
+        # địa chỉ đó kể cả khi đổi CONTAINER_PREFIX
+        aliases: [hangchon-api]
+
+  worker:
+    build: !reset null
+    image: ${IMAGE_REPO:-ghcr.io/cuongdpg/hangchon}-api:${IMAGE_TAG:-latest}
+
+  web:
+    build: !reset null
+    image: ${IMAGE_REPO:-ghcr.io/cuongdpg/hangchon}-web:${IMAGE_TAG:-latest}
+
+  cloudflared:
+    image: cloudflare/cloudflared:2026.11.2
+    container_name: ${CONTAINER_PREFIX:-hangchon}-cloudflared
+    restart: unless-stopped
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?CLOUDFLARE_TUNNEL_TOKEN bắt buộc (Cloudflare Zero Trust → Networks → Tunnels)}
+    depends_on:
+      web:
+        condition: service_healthy

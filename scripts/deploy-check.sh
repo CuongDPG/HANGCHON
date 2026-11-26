@@ -103,6 +103,13 @@ services:
 EOF
 ok "env thử ở $TMP (khoá ngẫu nhiên, xoá khi xong)"
 
+# bộ compose của máy chủ riêng (image GHCR, không build) phải ghép được với tệp prod
+CLOUDFLARE_TUNNEL_TOKEN=deploycheck docker compose -f "$ROOT/docker-compose.prod.yml" \
+  -f "$ROOT/docker-compose.server.yml" --env-file "$ENV_FILE" config --format json >"$TMP/server.json"
+grep -q '"build"' "$TMP/server.json" && die "docker-compose.server.yml: còn dịch vụ có build"
+grep -q 'ghcr.io/cuongdpg/hangchon-web:latest' "$TMP/server.json" || die "docker-compose.server.yml: thiếu image web GHCR"
+ok "docker-compose.server.yml ghép được (image GHCR, không build)"
+
 # ---- build ---------------------------------------------------------------------------------------------------------
 say "Build image"
 t0=$(date +%s)
