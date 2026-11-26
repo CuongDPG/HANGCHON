@@ -271,6 +271,7 @@ export const controlKeys = {
   integrations: () => ["control", "integrations"] as const,
   aiConfig: () => ["control", "ai-config"] as const,
   channels: () => ["control", "channels"] as const,
+  sources: () => ["control", "sources"] as const,
   intents: () => ["control", "intents"] as const,
   users: () => ["control", "users"] as const,
 };
@@ -499,6 +500,75 @@ export function useCheckChannelAccount() {
 export function useConnectChannelAccount() {
   return useMutation({
     mutationFn: (channel: string) => api.post<{ url: string; redirect_uri: string }>(`${BASE}/channels/${channel}/connect`),
+  });
+}
+
+/* ---------- nguồn hàng: Cài đặt → Nguồn hàng (chỉ chị) ---------- */
+
+export type SourcePlatformCard = {
+  platform: string;
+  label: string;
+  /** mock | web | onebound | rakuten */
+  driver: string;
+  driver_source: "settings" | "env";
+  status: "mock" | "web" | "connected" | "not_connected";
+  account: string | null;
+  options: { driver: string; label: string }[];
+  notes: string[];
+  warning: string | null;
+};
+
+export type SourceAccount = {
+  account: string;
+  label: string;
+  driver: string;
+  platforms: string[];
+  used_by: string[];
+  ready: boolean;
+  verified: boolean;
+  fields: ChannelField[];
+  check: { ok: boolean; message: string; at: string | null } | null;
+  guide: { needs: string[]; steps: string[]; limits: string[]; cost: string[]; links: { label: string; url: string }[] };
+};
+
+export type SourcesOverview = { platforms: SourcePlatformCard[]; accounts: SourceAccount[]; general_driver: string };
+
+export function useSources(enabled: boolean) {
+  return useQuery({ queryKey: controlKeys.sources(), queryFn: () => api.get<SourcesOverview>(`${BASE}/sources`), enabled });
+}
+
+function useSourcesInvalidate() {
+  const qc = useQueryClient();
+  return () => {
+    void qc.invalidateQueries({ queryKey: controlKeys.sources() });
+    void qc.invalidateQueries({ queryKey: controlKeys.integrations() });
+  };
+}
+
+export function useSaveSourceRoute() {
+  const done = useSourcesInvalidate();
+  return useMutation({
+    mutationFn: ({ platform, driver }: { platform: string; driver: string | null }) =>
+      api.patch<SourcesOverview>(`${BASE}/sources/platforms/${platform}`, { driver }),
+    onSuccess: done,
+  });
+}
+
+export function useSaveSourceAccount() {
+  const done = useSourcesInvalidate();
+  return useMutation({
+    mutationFn: ({ account, ...input }: { account: string; values?: Record<string, string>; clear?: string[] }) =>
+      api.patch<SourceAccount>(`${BASE}/sources/accounts/${account}`, input),
+    onSuccess: done,
+  });
+}
+
+export function useCheckSourceAccount() {
+  const done = useSourcesInvalidate();
+  return useMutation({
+    mutationFn: ({ account, values }: { account: string; values?: Record<string, string> }) =>
+      api.post<{ ok: boolean; message: string }>(`${BASE}/sources/accounts/${account}/check`, { values: values ?? {} }),
+    onSuccess: done,
   });
 }
 

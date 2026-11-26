@@ -228,7 +228,7 @@ Nguồn duy nhất: `src/lib/desk-nav.ts` (`DESK_PRIMARY_NAV`, `DESK_MORE_NAV`, 
 | `/desk/nhat-ky-ai` | Nhật ký AI *(Thêm)* | i4, k3 |
 | `/desk/bao-cao` | Báo cáo *(Thêm)* | i5, f7 |
 | `/desk/so-sach` | Sổ sách *(Thêm)* | k1, k5 |
-| `/desk/cai-dat` | Cài đặt *(menu tài khoản)* — chuyển tới tab đầu; tab theo URL (`SettingsNav`): `cua-hang` · `mang-xa-hoi` · `tich-hop` · `ai` · `nguoi-phu-giup` · `tai-khoan` (gồm chọn sáng/tối) · `sao-luu` | k4, f4, h1, g9 |
+| `/desk/cai-dat` | Cài đặt *(menu tài khoản)* — chuyển tới tab đầu; tab theo URL (`SettingsNav`): `cua-hang` · `mang-xa-hoi` · `nguon-hang` · `tich-hop` · `ai` · `nguoi-phu-giup` · `tai-khoan` (gồm chọn sáng/tối) · `sao-luu` | k4, f4, h1, g9 |
 | `/desk/dang-nhap` | Đăng nhập (ngoài khung, không cần đăng nhập) | — |
 | `/desk/kit` | Trưng bày hệ thiết kế (ngoài khung, không cần đăng nhập) | — |
 | `/desk/manifest.webmanifest` | Manifest PWA (phạm vi `/desk`) | — |

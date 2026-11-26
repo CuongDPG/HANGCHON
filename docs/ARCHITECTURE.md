@@ -110,7 +110,7 @@ thứ tự **Cài đặt > env**; driver đọc `channel_config.value(kênh, ô)
 
 | Tích hợp | Driver | Dùng cho |
 |---|---|---|
-| `sources` | `mock`, `web` (AI + web search/fetch), `onebound` (1688/Taobao, cần khoá) | Săn hàng, lấy hồ sơ từ link |
+| `sources` | `mock`, `web` (AI + web search/fetch), `onebound` (1688/Taobao/Tmall, cần khoá), `rakuten` (Rakuten API), `routed` (mỗi sàn một đường, chọn ở *Cài đặt → Nguồn hàng*, xem [source-accounts.md](source-accounts.md)) | Săn hàng, lấy hồ sơ từ link |
 | `social` | `mock`, `meta` (Facebook Page, Instagram, Threads), `tiktok_draft`, `zalo_oa` | Đăng bài, bình luận, tin nhắn |
 | `payments` | `mock`, `sepay` (webhook chuyển khoản VietQR) | Khớp thanh toán |
 | `shipping` | `mock`, `ghn`, `ghtk` | Vận đơn, trạng thái giao |

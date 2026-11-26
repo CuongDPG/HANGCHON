@@ -545,3 +545,61 @@ class ChannelCheckIn(BaseModel):
 class ChannelConnectOut(BaseModel):
     url: str
     redirect_uri: str
+
+
+# ---- nguồn hàng (Cài đặt → Nguồn hàng) ---------------------------------------------------------------------------
+
+
+class SourceDriverOption(BaseModel):
+    driver: str
+    label: str
+
+
+class SourcePlatformOut(BaseModel):
+    platform: str
+    label: str
+    driver: str = Field(description="mock | web | onebound | rakuten")
+    driver_source: Literal["settings", "env"]
+    status: Literal["mock", "web", "connected", "not_connected"]
+    account: str | None = Field(default=None, description="Tài khoản dịch vụ khi lấy qua tài khoản")
+    options: list[SourceDriverOption]
+    notes: list[str]
+    warning: str | None = None
+
+
+class SourceGuideOut(ChannelGuideOut):
+    cost: list[str]
+
+
+class SourceCheckOut(BaseModel):
+    ok: bool
+    message: str
+    at: str | None = None
+
+
+class SourceAccountOut(BaseModel):
+    account: str
+    label: str
+    driver: str
+    platforms: list[str]
+    used_by: list[str] = Field(description="Các sàn đang lấy hàng qua tài khoản này")
+    ready: bool
+    verified: bool = Field(description="Đã thử với khoá thật")
+    fields: list[ChannelFieldOut]
+    check: SourceCheckOut | None = None
+    guide: SourceGuideOut
+
+
+class SourcesOverviewOut(BaseModel):
+    platforms: list[SourcePlatformOut]
+    accounts: list[SourceAccountOut]
+    general_driver: str = Field(description="Driver cho xu hướng, giá sàn VN, link trang lạ")
+
+
+class SourceRouteIn(BaseModel):
+    driver: str | None = Field(description="mock | web | driver tài khoản; null = theo SOURCES_DRIVER")
+
+
+class SourceAccountIn(BaseModel):
+    values: dict[str, str] = Field(default_factory=dict, description="Ô bí mật để trống = giữ giá trị cũ")
+    clear: list[str] = Field(default_factory=list, description="Xoá giá trị đã lưu (về biến môi trường)")

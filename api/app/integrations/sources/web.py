@@ -31,6 +31,7 @@ from app.integrations.sources import (
 
 DOMAINS: dict[SourcePlatform, str] = {
     SourcePlatform.ALIBABA_1688: "1688.com",
+    SourcePlatform.ALIBABA: "alibaba.com",
     SourcePlatform.TAOBAO: "taobao.com",
     SourcePlatform.TMALL: "tmall.com",
     SourcePlatform.PINDUODUO: "yangkeduo.com",

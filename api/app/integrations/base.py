@@ -32,6 +32,11 @@ class IntegrationNotConfigured(AppError):
 
 
 def driver_name(kind: str) -> str:
+    if kind == "sources":
+        from app.integrations import source_config
+
+        if source_config.has_routes():  # chị đã chọn cách lấy hàng từng sàn ở Cài đặt → Nguồn hàng
+            return "routed"
     return str(getattr(settings, f"{kind}_driver", "mock") or "mock")
 
 

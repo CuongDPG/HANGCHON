@@ -6,7 +6,7 @@ Mức tự động: **AI tự làm** (ghi nhật ký, hoàn tác được) · **
 
 ## Săn hàng
 
-Tìm sản phẩm theo đúng ý chị, từ nhiều nguồn, bằng nhiều thứ tiếng.
+Tìm sản phẩm theo đúng ý chị, từ nhiều nguồn, bằng nhiều thứ tiếng. Mỗi sàn lấy hàng bằng đường chị chọn ở *Cài đặt → Nguồn hàng* (giả lập, AI tìm trên web, OneBound, Rakuten API — xem [source-accounts.md](source-accounts.md)).
 
 | Mã | Chức năng | Mức | GĐ | Mô tả |
 |---|---|---|---|---|

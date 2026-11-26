@@ -13,6 +13,7 @@ class SourcePlatform(StrEnum):
     """Nơi lấy hàng / nơi có tín hiệu."""
 
     ALIBABA_1688 = "1688"
+    ALIBABA = "alibaba"  # Alibaba.com (bán sỉ quốc tế)
     TAOBAO = "taobao"
     TMALL = "tmall"
     PINDUODUO = "pinduoduo"

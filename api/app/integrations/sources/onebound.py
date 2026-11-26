@@ -1,7 +1,8 @@
 """Driver `onebound`: 1688 / Taobao qua API bên thứ ba OneBound (api-gw.onebound.cn).
 
-Bật bằng `SOURCES_DRIVER=onebound`, cần `ONEBOUND_API_KEY` (đã có trong config) và `ONEBOUND_API_SECRET`
-(chưa có trong `app/core/config.py` — đọc thẳng từ biến môi trường; người tích hợp nên thêm vào Settings).
+Bật ở *Cài đặt → Nguồn hàng* (thẻ OneBound + chọn «Qua OneBound» cho 1688/Taobao/Tmall) hoặc `SOURCES_DRIVER=onebound`.
+Khoá: `source_config.value("onebound", "api_key" | "api_secret")` — Cài đặt thắng `ONEBOUND_API_KEY` /
+`ONEBOUND_API_SECRET`.
 
 **CHƯA THỬ VỚI KHOÁ THẬT.** Viết theo tài liệu công khai của OneBound: mỗi API là
 `GET https://api-gw.onebound.cn/<api_type>/<api_name>/?key=..&secret=..&<tham số>` với `api_type` = `taobao` | `1688`,
@@ -23,8 +24,8 @@ from urllib.parse import parse_qs, urlparse
 
 import httpx
 
-from app.core.config import settings
 from app.core.enums import Language, SourcePlatform
+from app.integrations import source_config
 from app.integrations.base import IntegrationError, IntegrationNotConfigured, get_driver
 from app.integrations.sources import (
     MarketListing,
@@ -37,6 +38,7 @@ from app.integrations.sources import (
 )
 
 BASE_URL = "https://api-gw.onebound.cn"
+CHECK_ITEM_ID = "520813250866"  # món ví dụ trong tài liệu OneBound
 API_TYPE = {
     SourcePlatform.TAOBAO: "taobao",
     SourcePlatform.TMALL: "taobao",
@@ -89,17 +91,24 @@ def item_ref(url: str) -> tuple[SourcePlatform, str]:
 class Driver(SourcesDriver):
     name = "onebound"
 
-    def __init__(self, client: httpx.AsyncClient | None = None) -> None:
+    def __init__(self, client: httpx.AsyncClient | None = None, creds: dict[str, str] | None = None) -> None:
         self._client = client
+        self._override = creds or {}  # «Kiểm tra kết nối» với khoá đang nhập, chưa lưu
 
     def _creds(self) -> tuple[str, str]:
-        key = settings.onebound_api_key
-        secret = settings.onebound_api_secret or ""
+        key = self._override.get("api_key") or source_config.value("onebound", "api_key")
+        secret = self._override.get("api_secret") or source_config.value("onebound", "api_secret")
         if not key or not secret:
             raise IntegrationNotConfigured(
-                "Chưa cấu hình ONEBOUND_API_KEY / ONEBOUND_API_SECRET cho nguồn 1688/Taobao."
+                "Chưa có API key / API secret của OneBound: chị nhập ở Cài đặt → Nguồn hàng."
             )
         return key, secret
+
+    async def check(self) -> str:
+        """Gọi thử một lần `item_get` (món mẫu trong tài liệu OneBound, có bộ nhớ đệm phía họ). Tốn 1 lần gọi."""
+        data = await self._call("taobao", "item_get", num_iid=CHECK_ITEM_ID)
+        title = str((data.get("item") or {}).get("title") or "").strip()
+        return "Đã nối OneBound" + (f": đọc thử được «{title[:60]}»." if title else ".")
 
     async def _call(self, api_type: str, api_name: str, *, method: str = "GET", **params: Any) -> dict[str, Any]:
         key, secret = self._creds()

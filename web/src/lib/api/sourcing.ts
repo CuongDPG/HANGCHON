@@ -181,6 +181,7 @@ export type BriefPatch = Partial<{
 
 export const PLATFORM_LABELS: Record<string, string> = {
   "1688": "1688",
+  alibaba: "Alibaba.com",
   taobao: "Taobao",
   tmall: "Tmall",
   pinduoduo: "Pinduoduo",

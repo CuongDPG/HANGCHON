@@ -9,6 +9,7 @@ import { cn } from "@/lib/cn";
 export const SETTINGS_TABS = [
   { href: "/desk/cai-dat/cua-hang", label: "Cửa hàng" },
   { href: "/desk/cai-dat/mang-xa-hoi", label: "Mạng xã hội", owner: true },
+  { href: "/desk/cai-dat/nguon-hang", label: "Nguồn hàng", owner: true },
   { href: "/desk/cai-dat/tich-hop", label: "Tích hợp" },
   { href: "/desk/cai-dat/ai", label: "AI", owner: true },
   { href: "/desk/cai-dat/nguoi-phu-giup", label: "Người phụ giúp", owner: true },

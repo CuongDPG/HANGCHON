@@ -298,10 +298,16 @@ function OAuthBlock({
 }
 
 function Guide({ item }: { item: ChannelAccount }) {
-  const g = item.guide;
+  return <GuideBox title={`Hướng dẫn nối ${item.label}`} guide={item.guide} open={!item.ready} />;
+}
+
+export type GuideData = ChannelAccount["guide"] & { cost?: string[] };
+
+/** Hộp «Chị cần chuẩn bị… Bước 1, 2, 3…» dùng chung cho Mạng xã hội và Nguồn hàng. */
+export function GuideBox({ title, guide: g, open }: { title: string; guide: GuideData; open: boolean }) {
   return (
-    <details open={!item.ready} className="rounded-md bg-soft/60 p-3 text-[14px] [&[open]>summary]:mb-2">
-      <summary className="cursor-pointer font-semibold">Hướng dẫn nối {item.label}</summary>
+    <details open={open} className="rounded-md bg-soft/60 p-3 text-[14px] [&[open]>summary]:mb-2">
+      <summary className="cursor-pointer font-semibold">{title}</summary>
       {g.needs.length ? (
         <>
           <p className="font-semibold">Chị cần chuẩn bị:</p>
@@ -322,6 +328,16 @@ function Guide({ item }: { item: ChannelAccount }) {
           <p className="font-semibold">Lưu ý:</p>
           <ul className="mb-2 list-disc pl-5 text-ink-2">
             {g.limits.map((n) => (
+              <li key={n}>{n}</li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+      {g.cost?.length ? (
+        <>
+          <p className="font-semibold">Chi phí ước tính:</p>
+          <ul className="mb-2 list-disc pl-5 text-ink-2">
+            {g.cost.map((n) => (
               <li key={n}>{n}</li>
             ))}
           </ul>

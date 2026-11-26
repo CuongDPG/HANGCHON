@@ -87,6 +87,7 @@ PLATFORMS: dict[SourcePlatform, tuple[str, str, str]] = {
     SourcePlatform.TAOBAO: ("Taobao", "CNY", "zh"),
     SourcePlatform.TMALL: ("Tmall", "CNY", "zh"),
     SourcePlatform.PINDUODUO: ("Pinduoduo", "CNY", "zh"),
+    SourcePlatform.ALIBABA: ("Alibaba.com", "USD", "en"),
     SourcePlatform.RAKUTEN: ("Rakuten", "JPY", "ja"),
     SourcePlatform.AMAZON_JP: ("Amazon Nhật", "JPY", "ja"),
     SourcePlatform.AMAZON: ("Amazon", "USD", "en"),

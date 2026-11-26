@@ -1,6 +1,6 @@
 # Sổ trạng thái chức năng
 
-Cập nhật 26/11/2026 (thêm Cài đặt → Mạng xã hội); 25/11/2026 (chiều), sau đợt rà đối chiếu thiết kế và 4 lát cắt bù phần thiếu (`feat/gu-chon`, `feat/don-khach`, `feat/nguon-noidung`, `feat/dieu-khien`). Danh mục gốc: [features.md](features.md).
+Cập nhật 26/11/2026 (thêm Cài đặt → Mạng xã hội, Cài đặt → Nguồn hàng); 25/11/2026 (chiều), sau đợt rà đối chiếu thiết kế và 4 lát cắt bù phần thiếu (`feat/gu-chon`, `feat/don-khach`, `feat/nguon-noidung`, `feat/dieu-khien`). Danh mục gốc: [features.md](features.md).
 
 **Cách đọc cột «Trạng thái»** (chỉ ghi «chạy thật» cho thứ đã tự thấy chạy — trong bài test tích hợp
 `api/tests/integration/test_lifecycle.py`, bài Playwright `web/e2e/lifecycle.spec.ts`, bài rà route `web/e2e/routes.spec.ts`
@@ -16,9 +16,9 @@ hoặc mở tay trên máy dev với dữ liệu mẫu `uv run python -m app.see
 | Mã | Chức năng | Trạng thái | Màn hình |
 |---|---|---|---|
 | a1 | Ra đề bằng lời | chạy với AI giả, cần khoá Anthropic (nói bằng giọng dùng Web Speech của trình duyệt) | `/desk/san-hang`, `/desk/san-hang/de/[id]` |
-| a2 | Dán link, lấy hồ sơ | chạy với mock, cần khoá Anthropic (driver `web`) hoặc tài khoản Onebound (driver `onebound`) | `/desk/san-hang` |
-| a3 | Tìm bằng ảnh | chạy với mock, cần tài khoản Onebound | `/desk/san-hang` |
-| a4 | Quét nhiều nguồn | chạy với mock, cần tài khoản Onebound / khoá Anthropic có web search | `/desk/san-hang/de/[id]` |
+| a2 | Dán link, lấy hồ sơ | chạy với mock; chọn đường từng sàn ở *Cài đặt → Nguồn hàng*: AI tìm trên web (cần AI thật), OneBound (1688/Taobao/Tmall) hoặc Rakuten API — driver thật chưa thử với khoá thật | `/desk/san-hang` |
+| a3 | Tìm bằng ảnh | chạy với mock, cần tài khoản OneBound (hoặc AI tìm trên web) | `/desk/san-hang` |
+| a4 | Quét nhiều nguồn | chạy với mock; mỗi sàn đi đường chị chọn ở *Cài đặt → Nguồn hàng* (OneBound, Rakuten API, AI tìm trên web) | `/desk/san-hang/de/[id]` |
 | a5 | Radar xu hướng | chạy với mock, cần khoá Anthropic (web search) | `/desk/san-hang` |
 | a6 | Nghe khách muốn gì | chạy với AI giả (gom từ tin nhắn, «Nhờ tìm», trợ lý web) | `/desk/san-hang` (nhu cầu) |
 | a7 | Săn theo lịch | chạy thật phần lịch (cron 7 ngày, ngưỡng báo); quét bằng mock | `/desk/san-hang/de/[id]` |
@@ -94,13 +94,14 @@ hoặc mở tay trên máy dev với dữ liệu mẫu `uv run python -m app.see
 ## Cần chị/anh cung cấp để bật driver thật
 
 Mạng xã hội và sàn (Facebook, Instagram, Threads, TikTok, Zalo OA, Shopee, TikTok Shop): chị nhập ở *Cài đặt → Mạng xã hội*
-(thắng biến môi trường; hướng dẫn từng kênh ở [channel-accounts.md](channel-accounts.md)). Phần còn lại đặt vào `api/.env`
+(thắng biến môi trường; hướng dẫn từng kênh ở [channel-accounts.md](channel-accounts.md)). Nguồn hàng (cách lấy hàng từng
+sàn, khoá OneBound / Rakuten): *Cài đặt → Nguồn hàng*, xem [source-accounts.md](source-accounts.md). Phần còn lại đặt vào `api/.env`
 (xem `api/.env.example`).
 
 | Việc | Cần | Biến |
 |---|---|---|
 | AI thật (mọi chức năng «AI giả») | Khoá Claude API hoặc OpenRouter, đặt trần chi phí tháng — nhập ở *Cài đặt → AI và khoá API* (mã hoá trong CSDL) | `SECRETS_ENCRYPTION_KEY` (bắt buộc ở prod); hoặc qua env: `AI_PROVIDER=anthropic`/`openrouter`, `ANTHROPIC_API_KEY`/`OPENROUTER_API_KEY`, `AI_MONTHLY_BUDGET_VND` |
-| Săn hàng 1688/Taobao | Tài khoản Onebound (key + secret) | `SOURCES_DRIVER=onebound`, `ONEBOUND_API_KEY`, `ONEBOUND_API_SECRET` (hoặc `SOURCES_DRIVER=web` chỉ cần khoá Anthropic) |
+| Săn hàng 1688/Taobao/Tmall, Rakuten | *Cài đặt → Nguồn hàng* (chọn đường từng sàn + khoá). 1688/Taobao: tài khoản OneBound (key + secret, trả theo lần gọi); Rakuten: Application ID + Access key (miễn phí); sàn khác: AI tìm trên web (cần AI thật) | Hoặc env: `SOURCES_DRIVER=web`/`onebound`/`rakuten`, `ONEBOUND_API_KEY`, `ONEBOUND_API_SECRET`, `RAKUTEN_APPLICATION_ID`, `RAKUTEN_ACCESS_KEY` |
 | Facebook Page, Instagram, Threads (đăng bài + hộp thư) | *Cài đặt → Mạng xã hội* hoặc env. Ứng dụng Meta đã duyệt quyền `pages_manage_posts`, `pages_messaging`, `instagram_content_publish`, `instagram_manage_messages`; Page token dài hạn; webhook trỏ về `/api/hooks/social/facebook` | `META_APP_ID`, `META_APP_SECRET`, `META_PAGE_ID`, `META_PAGE_TOKEN`, `META_IG_USER_ID`, `META_WEBHOOK_VERIFY_TOKEN`, `THREADS_USER_ID`, `THREADS_ACCESS_TOKEN` |
 | Zalo OA (tin nhắn, bài viết OA) | *Cài đặt → Mạng xã hội* hoặc env. OA đã xác thực + ứng dụng Zalo, access token OA (làm mới định kỳ), webhook `/api/hooks/social/zalo_oa` | `ZALO_APP_ID`, `ZALO_OA_ID`, `ZALO_OA_ACCESS_TOKEN`, `ZALO_OA_SECRET` |
 | TikTok (đẩy bản nháp) | *Cài đặt → Mạng xã hội* (bấm «Kết nối TikTok», token 2 giờ tự làm mới). Ứng dụng TikTok for Developers có Login Kit + Content Posting API | `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET`, `TIKTOK_ACCESS_TOKEN` |

@@ -19,9 +19,9 @@ from app.core.errors import BadRequest, Conflict, NotFound, Unauthorized
 from app.core.pagination import Page, Paginated, paginate
 from app.core.security import create_access_token, hash_password, verify_password
 from app.core.timeutil import VN_TZ, now_utc
-from app.integrations import channel_config
+from app.integrations import channel_config, source_config
 from app.integrations.base import KINDS, driver_name
-from app.modules.control import ai_settings, channels, links, service
+from app.modules.control import ai_settings, channels, links, service, sources
 from app.modules.control.models import (
     ActivityMode,
     AIActivity,
@@ -65,6 +65,11 @@ from app.modules.control.schemas import (
     SettingOut,
     SettingsBulkUpdate,
     SettingUpdate,
+    SourceAccountIn,
+    SourceAccountOut,
+    SourceCheckOut,
+    SourceRouteIn,
+    SourcesOverviewOut,
     TodayOut,
     UserCreate,
     UserOut,
@@ -399,6 +404,8 @@ async def update_settings(body: SettingsBulkUpdate, user: OwnerUser, db: DbSessi
 
 @router.patch("/settings/{key}", response_model=SettingOut)
 async def update_setting(key: str, body: SettingUpdate, user: OwnerUser, db: DbSession) -> dict:
+    if key.startswith((channel_config.PREFIX, source_config.PREFIX)):  # có khoá mã hoá: chỉ sửa qua màn hình riêng
+        raise BadRequest("Cài đặt này sửa ở Cài đặt → Mạng xã hội / Nguồn hàng.")
     await service.set_setting(db, key, body.value, user)
     return next(s for s in await service.list_settings(db) if s["key"] == key)
 
@@ -455,6 +462,29 @@ async def connect_channel_account(channel: str, user: OwnerUser, db: DbSession) 
     return await channels.start_connect(db, channel, user)
 
 
+# nguồn hàng: Cài đặt → Nguồn hàng — chỉ owner (khoá chỉ trả dạng che)
+
+
+@router.get("/sources", response_model=SourcesOverviewOut, summary="Cách lấy hàng từng sàn + khoá dịch vụ")
+async def list_sources(_: OwnerUser, db: DbSession) -> dict:
+    return await sources.overview(db)
+
+
+@router.patch("/sources/platforms/{platform}", response_model=SourcesOverviewOut, summary="Chọn cách lấy hàng một sàn")
+async def save_source_route(platform: str, body: SourceRouteIn, user: OwnerUser, db: DbSession) -> dict:
+    return await sources.set_route(db, platform, body.driver, user)
+
+
+@router.patch("/sources/accounts/{account}", response_model=SourceAccountOut, summary="Lưu khoá dịch vụ nguồn hàng")
+async def save_source_account(account: str, body: SourceAccountIn, user: OwnerUser, db: DbSession) -> dict:
+    return await sources.save_account(db, account, values=body.values, clear=body.clear, user=user)
+
+
+@router.post("/sources/accounts/{account}/check", response_model=SourceCheckOut, summary="Gọi thử dịch vụ nguồn hàng")
+async def check_source_account(account: str, body: ChannelCheckIn, user: OwnerUser, db: DbSession) -> dict:
+    return await sources.run_check(db, account, body.values, user)
+
+
 oauth_hooks = APIRouter(prefix="/api/hooks/oauth", tags=["hooks"])
 
 
@@ -503,6 +533,8 @@ async def list_integrations(_: CurrentUser) -> list[IntegrationOut]:
                         for c in chans
                     )
                 )
+        if kind == "sources" and name == "routed":  # cách lấy hàng từng sàn ở Cài đặt → Nguồn hàng
+            used = source_config.drivers_in_use()
         any_mock = "mock" in used
         out.append(
             IntegrationOut(

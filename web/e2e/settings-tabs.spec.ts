@@ -20,11 +20,12 @@ test("Cài đặt mở tab đầu, đi qua các tab bằng thanh tab", async ({ 
   await page.goto("/desk/cai-dat");
   await expect(page).toHaveURL(/\/desk\/cai-dat\/cua-hang$/);
   await expect(page.getByRole("heading", { level: 1, name: "Cửa hàng" })).toBeVisible();
-  await expect(tabs(page).getByRole("link")).toHaveText(["Cửa hàng", "Mạng xã hội", "Tích hợp", "AI", "Người phụ giúp", "Tài khoản", "Sao lưu"]);
+  await expect(tabs(page).getByRole("link")).toHaveText(["Cửa hàng", "Mạng xã hội", "Nguồn hàng", "Tích hợp", "AI", "Người phụ giúp", "Tài khoản", "Sao lưu"]);
   await expect(tabs(page).getByRole("link", { name: "Cửa hàng" })).toHaveAttribute("aria-current", "page");
 
   for (const [tab, h1] of [
     ["Mạng xã hội", "Mạng xã hội"],
+    ["Nguồn hàng", "Nguồn hàng"],
     ["Tích hợp", "Tích hợp"],
     ["AI", "AI và khoá API"],
     ["Tài khoản", "Tài khoản của chị"],

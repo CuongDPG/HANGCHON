@@ -1,6 +1,7 @@
 """Nguồn hàng: tìm theo từ khoá (đã dịch), lấy hồ sơ từ link, tìm bằng ảnh, đọc đánh giá, xu hướng, giá thị trường VN.
 
-Driver: `mock` (mặc định), `web` (AI + web search/fetch), `onebound` (1688/Taobao, cần ONEBOUND_API_KEY)."""
+Driver: `mock` (mặc định), `web` (AI + web search/fetch), `onebound` (1688/Taobao/Tmall, cần khoá OneBound), `rakuten`
+(Rakuten Ichiba API), `routed` (mỗi sàn một đường, chị chọn ở Cài đặt → Nguồn hàng — `app.integrations.source_config`)."""
 
 from __future__ import annotations
 

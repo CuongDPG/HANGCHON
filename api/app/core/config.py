@@ -183,6 +183,8 @@ class Settings(BaseSettings):
     zalo_oa_author: str = "Hàng Chọn"
     zalo_oa_broadcast: bool = False  # True: bài viết OA gửi luôn tới người quan tâm (tốn hạn mức tin)
     onebound_api_secret: str | None = None
+    rakuten_application_id: str | None = None  # Rakuten Web Service (openapi.rakuten.co.jp), Cài đặt → Nguồn hàng thắng
+    rakuten_access_key: str | None = None
     ghn_env: Literal["dev", "prod"] = "prod"
     ghtk_env: Literal["dev", "prod"] = "prod"
     ghtk_pick_name: str | None = None

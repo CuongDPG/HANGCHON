@@ -418,7 +418,10 @@ _snap = _Snapshot()
 def reset() -> None:
     """Xoá bản chụp (test, sau khi xoá CSDL)."""
     global _snap
+    from app.integrations import source_config
+
     _snap = _Snapshot()
+    source_config.reset()
 
 
 def invalidate() -> None:
@@ -446,12 +449,15 @@ async def read_all(db: AsyncSession) -> dict[str, dict[str, Any]]:
 
 async def refresh(db: AsyncSession | None = None) -> None:
     from app.core.db import SessionLocal
+    from app.integrations import source_config  # nguồn hàng (Cài đặt → Nguồn hàng) đọc lại cùng nhịp
 
     if db is not None:
         raw = await read_all(db)
+        await source_config.refresh(db)
     else:
         async with SessionLocal() as s:
             raw = await read_all(s)
+            await source_config.refresh(s)
     _snap.raw = raw
     _snap.plain = {c: _decode(r) for c, r in raw.items()}
     _snap.loaded_at = time.monotonic()
