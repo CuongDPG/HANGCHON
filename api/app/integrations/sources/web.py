@@ -10,16 +10,21 @@ hàm giả lấy dữ liệu từ driver mock nên chạy được trọn luồn
 from __future__ import annotations
 
 import hashlib
+import logging
 import re
 from datetime import date
 from decimal import Decimal
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
+import httpx
 from pydantic import BaseModel, Field
 
 from app import ai
 from app.ai.schema import OptStr
+from app.core.config import settings
 from app.core.enums import Language, SourcePlatform
+from app.integrations import safe_http
+from app.integrations import source_profiles as sp
 from app.integrations.sources import (
     MarketListing,
     SourceItem,
@@ -53,42 +58,47 @@ _DATA_NOTE = (
     "món đó hoặc để trống trường đó. URL phải là đường dẫn thật tới trang sản phẩm."
 )
 
+_SYS_SEARCH = (
+    "Vai trò: người tìm hàng trên các sàn (1688, Taobao, Rakuten, Amazon Nhật...). Dùng web_search với từ khoá đã "
+    "cho (kèm `site:<tên miền>` của sàn) để tìm TIN RAO SẢN PHẨM cụ thể, mở trang bằng web_fetch khi cần xem giá.\n"
+    "Trả về tối đa `limit` tin rao, mỗi tin: sàn, URL trang sản phẩm, tên gốc, giá gốc kèm tiền tệ, người bán, số sao, "
+    "số đánh giá, số đã bán nếu thấy, và `image_url` = URL ảnh chính của món nếu thấy trong kết quả hoặc trang đã mở "
+    "(link tệp ảnh thật, thường ở CDN của sàn; không thấy thì để trống, không đoán). Bỏ tin rao vượt `price_max` (nếu "
+    "có).\n" + _DATA_NOTE
+)
+_SYS_FETCH = (
+    "Vai trò: đọc trang sản phẩm ở `url` bằng web_fetch và trích hồ sơ: tên gốc, giá, tiền tệ, ảnh (URL ảnh thật "
+    "trên trang), mô tả, thông số (tên/giá trị), phân loại, số lượng tối thiểu, cân nặng (gram) nếu ghi, người bán, "
+    "số sao, số đánh giá, và tối đa 30 đánh giá người mua thấy trên trang (số sao, nội dung nguyên văn, ngày).\n"
+    "Mở ĐÚNG `url` đã cho (đã rút gọn sẵn): web_fetch chỉ mở được link có trong cuộc trò chuyện, đừng tự dựng "
+    "link khác.\n"
+    "Không đọc được trang (bị chặn, cần đăng nhập) thì đặt `readable=false` và ghi lý do ở `note`.\n" + _DATA_NOTE
+)
+_SYS_IMAGE = (
+    "Vai trò: nhìn ảnh món hàng, nhận ra món (kiểu dáng, cơ chế, chất liệu thấy được), rồi dùng web_search với từ "
+    "khoá tiếng Trung/Nhật như người bán đặt tên để tìm ĐÚNG MẪU đó trên các sàn đã cho. Trả về tin rao như khi "
+    "tìm theo từ khoá.\n" + _DATA_NOTE
+)
 ai.task(
     "sources.web_search",
     tier="smart",
     web=True,
     description="Driver web: tìm tin rao theo từ khoá trên các sàn",
-    system=(
-        "Vai trò: người tìm hàng trên các sàn (1688, Taobao, Rakuten, Amazon Nhật...). Dùng web_search với từ khoá đã "
-        "cho (kèm `site:<tên miền>` của sàn) để tìm TIN RAO SẢN PHẨM cụ thể, mở trang bằng web_fetch khi cần xem giá.\n"
-        "Trả về tối đa `limit` tin rao, mỗi tin: sàn, URL trang sản phẩm, tên gốc, giá gốc kèm tiền tệ, người bán, số sao, "
-        "số đánh giá, số đã bán nếu thấy, và `image_url` = URL ảnh chính của món nếu thấy trong kết quả hoặc trang đã mở "
-        "(link tệp ảnh thật, thường ở CDN của sàn; không thấy thì để trống, không đoán). Bỏ tin rao vượt `price_max` (nếu "
-        "có).\n" + _DATA_NOTE
-    ),
+    system=_SYS_SEARCH,
 )
 ai.task(
     "sources.web_fetch_product",
     tier="smart",
     web=True,
     description="Driver web: đọc hồ sơ sản phẩm từ một link",
-    system=(
-        "Vai trò: đọc trang sản phẩm ở `url` bằng web_fetch và trích hồ sơ: tên gốc, giá, tiền tệ, ảnh (URL ảnh thật "
-        "trên trang), mô tả, thông số (tên/giá trị), phân loại, số lượng tối thiểu, cân nặng (gram) nếu ghi, người bán, "
-        "số sao, số đánh giá, và tối đa 30 đánh giá người mua thấy trên trang (số sao, nội dung nguyên văn, ngày).\n"
-        "Không đọc được trang (bị chặn, cần đăng nhập) thì đặt `readable=false` và ghi lý do ở `note`.\n" + _DATA_NOTE
-    ),
+    system=_SYS_FETCH,
 )
 ai.task(
     "sources.web_image_search",
     tier="smart",
     web=True,
     description="Driver web: tìm cùng mẫu từ ảnh",
-    system=(
-        "Vai trò: nhìn ảnh món hàng, nhận ra món (kiểu dáng, cơ chế, chất liệu thấy được), rồi dùng web_search với từ "
-        "khoá tiếng Trung/Nhật như người bán đặt tên để tìm ĐÚNG MẪU đó trên các sàn đã cho. Trả về tin rao như khi "
-        "tìm theo từ khoá.\n" + _DATA_NOTE
-    ),
+    system=_SYS_IMAGE,
 )
 ai.task(
     "sources.web_reviews",
@@ -297,6 +307,9 @@ def _platforms(ps: list[SourcePlatform] | None, default: list[SourcePlatform]) -
 
 
 def platform_of(url: str) -> SourcePlatform:
+    prof = sp.detect(url)  # hồ sơ nguồn (tên miền + mẫu link, chị sửa được) trước, rồi bảng tên miền
+    if prof.platform != sp.GENERIC:
+        return SourcePlatform(prof.platform)
     host = urlparse(url).netloc.lower()
     for p, d in DOMAINS.items():
         if host == d or host.endswith("." + d):
@@ -304,19 +317,82 @@ def platform_of(url: str) -> SourcePlatform:
     return SourcePlatform.WEB
 
 
+def _with_hints(system: str, platforms: list[str]) -> str:
+    """Dặn thêm AI theo hồ sơ từng sàn (`prompt_hints`, chị sửa ở Cài đặt → Nguồn hàng → Cấu hình nâng cao)."""
+    hints = [f"- {p.label}: {p.prompt_hints}" for p in (sp.get(x) for x in dict.fromkeys(platforms)) if p.prompt_hints]
+    return system + ("\nLưu ý riêng từng sàn:\n" + "\n".join(hints) if hints else "")
+
+
+log = logging.getLogger("app.sources.web")
+PAGE_MAX_BYTES = 4 * 1024 * 1024
+PAGE_TIMEOUT = 12.0
+_PAGE_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/130.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+}
+
+
+def page_fetch_enabled() -> bool:
+    """Máy chủ tự đọc trang lấy ảnh (không tốn AI). Tắt trong test (test bật bằng monkeypatch)."""
+    return not settings.is_test
+
+
+def page_client() -> httpx.AsyncClient:
+    """Tách riêng để test thay bằng `httpx.MockTransport`; thật thì ghim IP đã kiểm (`safe_http`)."""
+    return safe_http.client(PAGE_TIMEOUT)
+
+
+async def read_page(url: str, prof: sp.Profile) -> str | None:
+    """HTML trang sản phẩm do máy chủ đọc thẳng (chặn IP nội bộ, ≤ 3 lần chuyển hướng, ≤ 4 MB). Lỗi → None."""
+    headers = {**_PAGE_HEADERS, **prof.fetch_headers}
+    current = url
+    try:
+        async with page_client() as client:
+            for _ in range(4):
+                if urlparse(current).scheme not in ("http", "https"):
+                    return None
+                async with client.stream("GET", current, headers=headers) as r:
+                    if r.status_code in (301, 302, 303, 307, 308) and r.headers.get("location"):
+                        current = urljoin(current, r.headers["location"])
+                        continue
+                    if r.status_code != 200:
+                        log.info("Đọc trang %s: mã %s", current, r.status_code)
+                        return None
+                    buf = bytearray()
+                    async for chunk in r.aiter_bytes():
+                        buf += chunk
+                        if len(buf) > PAGE_MAX_BYTES:
+                            break
+                    return bytes(buf).decode(r.encoding or "utf-8", errors="replace")
+    except (httpx.HTTPError, safe_http.BlockedAddress) as e:
+        log.info("Đọc trang %s lỗi: %s", current, e)
+    return None
+
+
+async def page_images(url: str, prof: sp.Profile) -> list[str]:
+    """Ảnh lấy thẳng từ HTML trang theo `page_image_patterns` của hồ sơ (vd Amazon: khối "hiRes")."""
+    if not prof.page_image_patterns or not page_fetch_enabled():
+        return []
+    html = await read_page(url, prof)
+    return sp.page_images(html, prof) if html else []
+
+
 class Driver(SourcesDriver):
     name = "web"
 
     async def search(self, query: SourceQuery) -> list[SourceItem]:
+        platforms = _platforms(query.platforms, [SourcePlatform.ALIBABA_1688, SourcePlatform.TAOBAO])
         res = await ai.run(
             "sources.web_search",
             _SearchIn(
                 keywords=query.keywords,
-                platforms=_platforms(query.platforms, [SourcePlatform.ALIBABA_1688, SourcePlatform.TAOBAO]),
+                platforms=platforms,
                 price_max=f"{query.price_max} {query.currency}" if query.price_max is not None else None,
                 limit=query.limit,
             ),
             _SearchOut,
+            system=_with_hints(_SYS_SEARCH, [p["platform"] for p in platforms]),
         )
         items = [_item(x) for x in res.output.items if x.url.startswith("http")]
         if query.platforms:
@@ -326,15 +402,30 @@ class Driver(SourcesDriver):
     async def fetch_product(self, url: str) -> SourceProduct:
         from app.integrations import IntegrationError
 
-        res = await ai.run("sources.web_fetch_product", _UrlIn(url=url), _ProductOut)
+        prof = sp.detect(url)
+        if prof.fetch_via == "skip":
+            raise IntegrationError(
+                f"Trang {prof.label} đang đặt «không đọc trang» (Cài đặt → Nguồn hàng → Cấu hình nâng cao)."
+            )
+        url = sp.canonical(url, prof)  # web_fetch nhận tối đa 250 ký tự và chỉ mở link có trong cuộc trò chuyện
+        direct = await page_images(url, prof)
+        res = await ai.run(
+            "sources.web_fetch_product",
+            _UrlIn(url=url),
+            _ProductOut,
+            system=_with_hints(_SYS_FETCH, [prof.platform]),
+        )
         p = res.output
-        if not p.readable:
+        if not p.readable and not direct:
             raise IntegrationError(p.note or "Không đọc được trang sản phẩm này.")
-        base = _item(p.model_copy(update={"url": url, "platform": p.platform or platform_of(url)}))
+        platform = platform_of(url) if p.platform == SourcePlatform.WEB else p.platform
+        base = _item(p.model_copy(update={"url": url, "platform": platform}))
+        if not p.readable:  # AI không mở được trang nhưng máy chủ đọc được ảnh: chỉ lấy ảnh + tên, bỏ số liệu đoán
+            return SourceProduct(**base.model_dump(), images=direct)
         return SourceProduct(
             **base.model_dump(),
             description=p.description,
-            images=p.images or ([p.image_url] if p.image_url else []),
+            images=list(dict.fromkeys([*direct, *(p.images or ([p.image_url] if p.image_url else []))])),
             specs={s.name: s.value for s in p.specs},
             variants=[{"name": v} for v in p.variants],
             moq=p.moq,
@@ -345,13 +436,13 @@ class Driver(SourcesDriver):
     async def search_by_image(
         self, image: bytes | str, *, platforms: list[SourcePlatform] | None = None, limit: int = 20
     ) -> list[SourceItem]:
+        ps = _platforms(platforms, [SourcePlatform.ALIBABA_1688, SourcePlatform.TAOBAO])
         res = await ai.run(
             "sources.web_image_search",
-            _ImageIn(
-                platforms=_platforms(platforms, [SourcePlatform.ALIBABA_1688, SourcePlatform.TAOBAO]), limit=limit
-            ),
+            _ImageIn(platforms=ps, limit=limit),
             _SearchOut,
             images=[image],
+            system=_with_hints(_SYS_IMAGE, [p["platform"] for p in ps]),
         )
         return [_item(x) for x in res.output.items if x.url.startswith("http")][:limit]
 

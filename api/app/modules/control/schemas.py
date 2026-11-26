@@ -590,10 +590,68 @@ class SourceAccountOut(BaseModel):
     guide: SourceGuideOut
 
 
+class ImageRewriteRule(BaseModel):
+    pattern: str
+    replace: str = ""
+
+
+class SourceProfileFields(BaseModel):
+    """Một hồ sơ nguồn (xem `app.integrations.source_profiles.Profile`, docs/source-accounts.md)."""
+
+    domains: list[str]
+    url_patterns: list[str]
+    canonical_url: str
+    keep_params: list[str]
+    image_hosts: list[str]
+    image_rewrites: list[ImageRewriteRule]
+    fetch_headers: dict[str, str]
+    fetch_via: Literal["route", "skip"]
+    page_image_patterns: list[str]
+    prompt_hints: str
+    max_images: int
+
+
+class SourceProfileOut(BaseModel):
+    platform: str
+    label: str
+    effective: SourceProfileFields = Field(description="Đang dùng (mặc định + phần chị sửa)")
+    defaults: SourceProfileFields
+    overridden: list[str] = Field(description="Các ô chị đã sửa")
+
+
+class SourceProfileIn(BaseModel):
+    fields: dict[str, Any] = Field(description="Ô cần đổi; null = về mặc định")
+
+
+class SourceProfileTryIn(BaseModel):
+    url: str = Field(max_length=2000)
+    image_url: str | None = Field(default=None, max_length=2000)
+    platform: str | None = Field(default=None, description="Thử với bản đang sửa (chưa lưu) của sàn này")
+    fields: dict[str, Any] | None = None
+
+
+class SourceProfileImageTry(BaseModel):
+    input: str
+    output: str
+    rules_applied: list[str]
+    allowed: bool
+
+
+class SourceProfileTryOut(BaseModel):
+    platform: str
+    label: str
+    id: str | None
+    matched_pattern: str | None
+    canonical_url: str
+    fetch_via: str
+    image: SourceProfileImageTry | None = None
+
+
 class SourcesOverviewOut(BaseModel):
     platforms: list[SourcePlatformOut]
     accounts: list[SourceAccountOut]
     general_driver: str = Field(description="Driver cho xu hướng, giá sàn VN, link trang lạ")
+    profiles: list[SourceProfileOut] = Field(description="Cấu hình nâng cao từng nguồn (cả nguồn không có thẻ)")
 
 
 class SourceRouteIn(BaseModel):

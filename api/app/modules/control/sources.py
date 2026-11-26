@@ -19,6 +19,7 @@ from app.core.secrets import redact
 from app.core.timeutil import now_utc
 from app.integrations import channel_config as cc
 from app.integrations import source_config as sc
+from app.integrations import source_profiles as sprof
 from app.integrations.base import IntegrationError, IntegrationNotConfigured, get_driver
 from app.modules.control.channels import mask4
 from app.modules.control.models import User
@@ -121,6 +122,7 @@ async def overview(db: AsyncSession) -> dict[str, Any]:
         "platforms": [platform_view(p, ai_fake=ai_fake) for p in sc.PLATFORMS],
         "accounts": [account_view(a) for a in sc.ACCOUNTS],
         "general_driver": sc.general(),
+        "profiles": [profile_view(p) for p in sprof.DEFAULTS],
     }
 
 
@@ -210,3 +212,121 @@ async def run_check(db: AsyncSession, account: str, overrides: dict[str, str], u
     await db.commit()
     await cc.refresh(db)
     return {"ok": ok, "message": message}
+
+
+# ---- cấu hình nâng cao từng nguồn (hồ sơ đọc link và ảnh — `source_profiles`) -----------------------------------
+
+
+def _profile_key(platform: str) -> str:
+    if platform not in sprof.DEFAULTS:
+        raise NotFound("Không có nguồn này.")
+    return platform
+
+
+def _fields(p: sprof.Profile) -> dict[str, Any]:
+    v = p.view()
+    return {k: v[k] for k in sprof.EDITABLE}
+
+
+def profile_view(platform: str) -> dict[str, Any]:
+    eff = sprof.get(platform)
+    return {
+        "platform": platform,
+        "label": eff.label,
+        "effective": _fields(eff),
+        "defaults": _fields(sprof.DEFAULTS[platform]),
+        "overridden": sorted(sprof.overrides(platform)),
+    }
+
+
+async def save_profile(db: AsyncSession, platform: str, changes: dict[str, Any], user: User) -> dict[str, Any]:
+    """Sửa vài ô của hồ sơ; giá trị `null` (hoặc bằng mặc định) = về mặc định. Sai → 400 kèm câu tiếng Việt."""
+    key = _profile_key(platform)
+    await cc.refresh(db)
+    current = sprof.overrides(key)
+    defaults = _fields(sprof.DEFAULTS[key])
+    reset = [k for k, v in changes.items() if v is None]
+    try:
+        cleaned = sprof.clean({k: v for k, v in changes.items() if v is not None})
+    except ValueError as e:
+        raise BadRequest(str(e)) from e
+    new = {k: v for k, v in current.items() if k not in reset}
+    for k, v in cleaned.items():
+        if v == defaults[k]:
+            new.pop(k, None)
+        else:
+            new[k] = v
+    changed = sorted(k for k in {*new, *current} if new.get(k) != current.get(k))
+    if changed:
+        await _write_profile(db, key, new, user)
+        await audit(
+            db,
+            "control.source_profile_saved",
+            user=user,
+            entity_type="source_profile",
+            entity_id=key,
+            summary=f"Cấu hình nâng cao {sprof.DEFAULTS[key].label}: đổi {', '.join(changed)}",
+            data={"changed": changed, "overridden": sorted(new)},
+        )
+        await db.commit()
+    await cc.refresh(db)
+    return profile_view(key)
+
+
+async def reset_profile(db: AsyncSession, platform: str, user: User) -> None:
+    key = _profile_key(platform)
+    await cc.refresh(db)
+    if sprof.overrides(key):
+        await _write_profile(db, key, {}, user)
+        await audit(
+            db,
+            "control.source_profile_saved",
+            user=user,
+            entity_type="source_profile",
+            entity_id=key,
+            summary=f"Cấu hình nâng cao {sprof.DEFAULTS[key].label}: khôi phục mặc định",
+            data={"reset": True},
+        )
+        await db.commit()
+    await cc.refresh(db)
+
+
+async def _write_profile(db: AsyncSession, platform: str, fields: dict[str, Any], user: User) -> None:
+    from app.modules.control.models import AppSetting
+
+    row = await db.get(AppSetting, sprof.PREFIX + platform)
+    if not fields:
+        if row is not None:
+            await db.delete(row)
+            await db.flush()
+        return
+    if row is None:
+        row = AppSetting(key=sprof.PREFIX + platform, value={"fields": fields})
+        db.add(row)
+    row.value = {"fields": fields}
+    row.updated_at = now_utc()
+    row.updated_by_id = user.id
+    await db.flush()
+
+
+async def try_link(
+    db: AsyncSession, url: str, image_url: str | None, platform: str | None, draft: dict[str, Any] | None
+) -> dict[str, Any]:
+    """«Thử với một link»: nhận ra sàn, mã món, link chuẩn, đổi link ảnh — chỉ tính tại chỗ, không gọi AI hay mạng.
+    Có `platform` + `draft` (các ô đang sửa, chưa lưu) thì thử với bản đang sửa của sàn đó."""
+    await cc.refresh(db)
+    profiles = sprof.all_profiles()
+    if platform is not None and draft:
+        key = _profile_key(platform)
+        try:
+            cleaned = sprof.clean({k: v for k, v in draft.items() if v is not None})
+        except ValueError as e:
+            raise BadRequest(str(e)) from e
+        merged = {**sprof.overrides(key), **cleaned}
+        for k in (k for k, v in draft.items() if v is None):
+            merged.pop(k, None)
+        profiles = [sprof.build(key, merged) if p.platform == key else p for p in profiles]
+    u = url.strip()
+    if not u.startswith(("http://", "https://")):
+        raise BadRequest("Link phải bắt đầu bằng http:// hoặc https://.")
+    return sprof.try_link(u, image_url.strip() if image_url and image_url.strip() else None, profiles)

@@ -239,7 +239,10 @@ _snap = _Snapshot()
 
 def reset() -> None:
     global _snap
+    from app.integrations import source_profiles
+
     _snap = _Snapshot()
+    source_profiles.reset()
 
 
 async def read_all(db: AsyncSession) -> dict[str, dict[str, Any]]:
@@ -250,8 +253,10 @@ async def read_all(db: AsyncSession) -> dict[str, dict[str, Any]]:
 
 
 async def refresh(db: AsyncSession) -> None:
+    from app.integrations import source_profiles  # cấu hình nâng cao từng sàn đọc lại cùng nhịp
     from app.integrations.channel_config import _decode
 
+    await source_profiles.refresh(db)
     raw = await read_all(db)
     routes = (raw.pop(ROUTES_KEY, None) or {}).get("routes") or {}
     _snap.raw = {k: v for k, v in raw.items() if k in ACCOUNTS}

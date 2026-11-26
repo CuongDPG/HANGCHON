@@ -5,7 +5,9 @@ alicdn / Rakuten / Amazon có thể chặn nhúng ảnh từ trang khác và lin
 hiện link gốc (web đặt `referrerPolicy="no-referrer"`). Không bao giờ dùng ở website cho khách.
 
 Tải an toàn: chỉ http/https, tên miền phải trỏ tới địa chỉ công khai (chặn IP nội bộ, kiểm lại sau mỗi lần chuyển
-hướng), có thời hạn, chỉ nhận ảnh JPG/PNG/WEBP/GIF ≤ `MAX_BYTES`, tối đa `MAX_IMAGES` ảnh mỗi ứng viên, ghi link gốc."""
+hướng; kết nối ghim đúng IP đã kiểm — `app.integrations.safe_http`, chống DNS rebinding), có thời hạn, chỉ nhận ảnh
+JPG/PNG/WEBP/GIF ≤ `MAX_BYTES`, tối đa `MAX_IMAGES` ảnh mỗi ứng viên, ghi link gốc. Theo hồ sơ nguồn của link sản phẩm
+(`source_profiles`): chỉ tải từ máy chủ ảnh của sàn (`image_hosts`) và gửi header sàn cần (`fetch_headers`, vd Referer)."""
 
 from __future__ import annotations
 
@@ -22,6 +24,7 @@ from PIL import Image, UnidentifiedImageError
 from app.core.config import settings
 from app.core.storage import get_storage
 from app.core.timeutil import now_utc
+from app.integrations import safe_http, source_profiles
 from app.modules.sourcing.imagehash import _public_host
 
 if TYPE_CHECKING:
@@ -37,7 +40,8 @@ MAX_REDIRECTS = 3
 CONCURRENCY = 4
 TYPES = {"JPEG": ("image/jpeg", "jpg"), "PNG": ("image/png", "png"), "WEBP": ("image/webp", "webp"),
          "GIF": ("image/gif", "gif")}  # fmt: skip
-# một số CDN trả 403 cho trình khách lạ; không gửi Referer (giống referrerPolicy="no-referrer" ở web)
+# một số CDN trả 403 cho trình khách lạ; mặc định không gửi Referer (giống referrerPolicy="no-referrer" ở web) —
+# sàn cần Referer thì khai ở hồ sơ nguồn (`fetch_headers`)
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/130.0 Safari/537.36",
@@ -49,11 +53,16 @@ class FetchError(Exception):
     """Không tải được một ảnh — câu tiếng Việt ngắn, lưu vào `image_cache[].error`."""
 
 
+def profile(c: Candidate) -> source_profiles.Profile:
+    """Hồ sơ nguồn theo link sản phẩm (link giả lập / trang lạ → hồ sơ chung, không giới hạn máy chủ ảnh)."""
+    return source_profiles.detect(c.source_url or "")
+
+
 def source_urls(c: Candidate) -> list[str]:
-    """Ảnh nguồn của ứng viên theo thứ tự hiển thị: ảnh chính trước, khử trùng, tối đa `MAX_IMAGES`."""
+    """Ảnh nguồn của ứng viên theo thứ tự hiển thị: ảnh chính trước, khử trùng, tối đa `MAX_IMAGES` (và `max_images`)."""
     urls = [c.main_image_url, *[u for u in (c.images or []) if isinstance(u, str)]]
     out = [u for u in dict.fromkeys(u for u in urls if u) if urlparse(u).scheme in ("http", "https")]
-    return out[:MAX_IMAGES]
+    return out[: min(MAX_IMAGES, profile(c).max_images)]
 
 
 def file_url(key: str) -> str:
@@ -125,14 +134,21 @@ def _inspect(data: bytes) -> tuple[str, str, int, int]:
     return ctype, ext, w, h
 
 
-async def download(url: str, client: httpx.AsyncClient) -> tuple[bytes, str, str, int, int]:
+async def download(
+    url: str, client: httpx.AsyncClient, prof: source_profiles.Profile | None = None
+) -> tuple[bytes, str, str, int, int]:
     """Tải một ảnh nguồn an toàn → (bytes, content_type, đuôi, rộng, cao). Lỗi → FetchError."""
+    prof = prof or source_profiles.get(source_profiles.GENERIC)
+    headers = {**HEADERS, **prof.fetch_headers}
+    _check_url(url)
+    if not source_profiles.image_allowed(url, prof):  # chuyển hướng sau đó chỉ kiểm địa chỉ (CDN hay đổi máy chủ)
+        raise FetchError(f"Link ảnh không thuộc máy chủ ảnh của {prof.label} (xem Cấu hình nâng cao).")
     current = url
     for _ in range(MAX_REDIRECTS + 1):
         _check_url(current)
         await _guard_host(current)
         try:
-            async with client.stream("GET", current, headers=HEADERS) as r:
+            async with client.stream("GET", current, headers=headers) as r:
                 if r.status_code in (301, 302, 303, 307, 308) and r.headers.get("location"):
                     current = urljoin(current, r.headers["location"])
                     continue
@@ -148,6 +164,8 @@ async def download(url: str, client: httpx.AsyncClient) -> tuple[bytes, str, str
                     buf += chunk
                     if len(buf) > MAX_BYTES:
                         raise FetchError("Ảnh lớn quá 5 MB.")
+        except safe_http.BlockedAddress as e:  # lúc kết nối, IP thật trỏ vào mạng nội bộ (DNS rebinding)
+            raise FetchError("Link ảnh trỏ tới địa chỉ nội bộ hoặc không phân giải được.") from e
         except httpx.TimeoutException as e:
             raise FetchError("Máy chủ ảnh trả lời quá chậm.") from e
         except httpx.HTTPError as e:
@@ -158,8 +176,9 @@ async def download(url: str, client: httpx.AsyncClient) -> tuple[bytes, str, str
 
 
 def http_client() -> httpx.AsyncClient:
-    """Tách riêng để test thay bằng `httpx.MockTransport`. Không tự theo chuyển hướng (kiểm từng bước ở `download`)."""
-    return httpx.AsyncClient(timeout=TIMEOUT, follow_redirects=False)
+    """Tách riêng để test thay bằng `httpx.MockTransport`. Không tự theo chuyển hướng (kiểm từng bước ở `download`);
+    kết nối ghim IP đã kiểm (`safe_http`)."""
+    return safe_http.client(TIMEOUT)
 
 
 def caching_enabled() -> bool:
@@ -184,6 +203,7 @@ async def cache_images(c: Candidate, *, retry_failed: bool = False) -> dict[str,
     storage = get_storage()
     sem = asyncio.Semaphore(CONCURRENCY)
     results: dict[str, dict[str, Any]] = {}
+    prof = profile(c)
 
     async with http_client() as client:
 
@@ -191,7 +211,7 @@ async def cache_images(c: Candidate, *, retry_failed: bool = False) -> dict[str,
             at = now_utc().isoformat()
             async with sem:
                 try:
-                    data, ctype, ext, w, h = await download(url, client)
+                    data, ctype, ext, w, h = await download(url, client, prof)
                     key = _key(c, url, ext)
                     await storage.put(key, data, ctype)
                     results[url] = {"url": url, "key": key, "type": ctype, "bytes": len(data), "width": w,

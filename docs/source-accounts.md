@@ -133,7 +133,7 @@ Chỉ cần AI thật (Claude hoặc OpenRouter) ở *Cài đặt → AI*. Khi A
 - **Làm được:** tìm tin rao bằng `web_search` (`site:<sàn>`) và đọc trang công khai bằng `web_fetch`. Kết quả tốt với
   Rakuten, Amazon Nhật, Alibaba.com và phần lớn trang bán lẻ.
 - **Không làm được:** `web_fetch` không chạy JavaScript và không đăng nhập. Nó chỉ đọc URL đã xuất hiện trong cuộc trò
-  chuyện, bị robots.txt chặn và nhận tối đa URL 250 ký tự. Theo các nhà cung cấp công cụ cào dữ liệu, từ 2025 trang
+  chuyện, bị robots.txt chặn và nhận tối đa URL 250 ký tự (hệ thống rút gọn link trước, xem «Cấu hình nâng cao»). Theo các nhà cung cấp công cụ cào dữ liệu, từ 2025 trang
   `s.taobao.com`, `item.taobao.com`, `detail.tmall.com` chuyển khách chưa đăng nhập sang trang đăng nhập hoặc bắt giải mã
   xác minh. Một số trang 1688 xem được. Vì vậy với Taobao/Tmall, AI thường chỉ thấy tên và giá trong kết quả tìm kiếm,
   ít khi có đánh giá. Đây là nhận định của bên thứ ba; chưa tự thử.
@@ -142,8 +142,61 @@ Chỉ cần AI thật (Claude hoặc OpenRouter) ở *Cài đặt → AI*. Khi A
   Nguồn: [Web fetch tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-fetch-tool) ·
   [Web search tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool).
 
+## Cấu hình nâng cao từng nguồn (hồ sơ đọc link và ảnh)
+
+Mỗi thẻ sàn có mục gập **«Cấu hình nâng cao»**. Dưới các thẻ có phần **«Nguồn khác»** cho Amazon (Mỹ), Tiểu Hồng Thư và
+**«Trang khác»**: hồ sơ chung cho link không thuộc sàn nào. Hồ sơ cho hệ thống biết cách nhận ra link sản phẩm của sàn,
+rút gọn link, lấy ảnh cỡ lớn và tải ảnh. Mặc định viết sẵn trong code (`api/app/integrations/source_profiles.py`). Ô nào
+chị sửa thì ô đó thắng mặc định, các ô khác vẫn theo mặc định. Ô đã sửa có nhãn «đã sửa» và nút «dùng mặc định».
+«Khôi phục mặc định» bỏ mọi ô đã sửa của nguồn đó.
+
+Hồ sơ được dùng ở mọi chỗ có link và ảnh:
+
+- **kết quả tìm** (theo từ khoá, bằng ảnh): link chuẩn, mã món, ảnh cỡ lớn, bỏ ảnh lạ;
+- **«Dán link lấy hồ sơ»** và **«Lấy ảnh và chi tiết»**: nhận ra sàn của link, đưa link chuẩn cho driver;
+- **khử trùng**: cùng một món dán hai lần với tham số khác nhau vẫn là một ứng viên, vì khoá khử trùng là mã món;
+- **lưu ảnh về kho**: chỉ tải ảnh ở máy chủ ảnh của sàn, kèm header sàn cần.
+
+Dữ liệu từ đường «Giả lập» không bị lọc theo máy chủ ảnh, vì ảnh giữ chỗ placehold.co không nằm trên máy chủ ảnh của sàn.
+
+| Ô | Dùng làm gì | Ví dụ (mặc định) |
+|---|---|---|
+| **Tên miền của sàn** | Link có tên miền này (gồm cả tên miền con) là của sàn này. | `amazon.co.jp` · `1688.com` · `tmall.com`, `tmall.hk` |
+| **Mẫu link sản phẩm** | Biểu thức (regex) có nhóm `(?P<id>…)` để lấy **mã món**. Nhiều dòng thì thử lần lượt. | Amazon: `amazon\.co\.jp/(?:.*/)?(?:dp\|gp/product\|…)/(?P<id>[A-Z0-9]{10})` (ASIN) · 1688: `1688\.com/offer/(?P<id>\d{6,})\.html` · Taobao: `taobao\.com/.*[?&](?:id\|itemId)=(?P<id>\d{6,})` · Rakuten: `item\.rakuten\.co\.jp/(?P<id>cửa-hàng/món)` |
+| **Link chuẩn** | Dựng lại link ngắn từ mã món, phải có `{id}`. Để trống thì giữ link gốc, chỉ bỏ tham số. | `https://www.amazon.co.jp/dp/{id}` · `https://detail.1688.com/offer/{id}.html` · `https://item.taobao.com/item.htm?id={id}` · `https://item.rakuten.co.jp/{id}/` |
+| **Tham số giữ lại** | Khi không dựng link chuẩn: tham số nào được giữ. `*` là giữ mọi tham số trừ tham số theo dõi (`utm_*`, `spm`, `fbclid`…). Để trống là bỏ hết. | Tiểu Hồng Thư: `xsec_token, xsec_source` (thiếu thì trang không mở) · Trang khác: `*` |
+| **Máy chủ ảnh** | Chỉ nhận ảnh ở đây: ảnh AI trả về và ảnh tải về kho. Mẫu là tên máy chủ, có thể kèm đường dẫn; `*` thay cho một đoạn bất kỳ. Để trống là nhận mọi nơi. | `*.alicdn.com` · `m.media-amazon.com/images/I/*` (bỏ logo, ảnh khung trang `/images/G/`) · `*.rakuten.co.jp`, `*.r10s.jp` |
+| **Đổi link ảnh sang ảnh lớn** | Mỗi dòng `tìm => thay bằng` (regex, áp lần lượt từ trên xuống). | Amazon: `\._[A-Za-z0-9_,+-]+_\.(jpe?g\|png\|gif\|webp)$ => .\1` (`…/61SrKBHi8ML._AC_SX300_.jpg` → `…/61SrKBHi8ML.jpg`) · alicdn: `(\.(?:jpe?g\|png\|gif\|webp))_[^/]*$ => \1` (`….jpg_400x400q90.jpg_.webp` → `….jpg`) · Rakuten: `thumbnail.image.rakuten.co.jp/@0_mall/` → `image.rakuten.co.jp/`, bỏ `?_ex=128x128` |
+| **Header khi tải ảnh / đọc trang** | Mỗi dòng `Tên: giá trị`. Dùng được `Referer`, `User-Agent`, `Accept-Language`, `Origin`, `Accept`. Mặc định hệ thống **không** gửi Referer. | 1688: `Referer: https://detail.1688.com/` (CDN alicdn hay đòi) · Amazon: `Accept-Language: ja-JP,ja;q=0.9` |
+| **Cách đọc trang chi tiết** | «Theo cách lấy hàng» là đi đường chị chọn ở thẻ sàn (giả lập, AI, OneBound…). «Không đọc trang» là báo lỗi ngay, không gọi AI; dùng khi trang luôn bị chặn (captcha) để khỏi tốn tiền. | Mặc định «Theo cách lấy hàng» |
+| **Mẫu ảnh trong trang** | Máy chủ tự đọc trang sản phẩm (không qua AI, không tốn tiền) rồi lấy ảnh theo các regex này; nhóm `(…)` đầu tiên là link ảnh. Để trống là không đọc. | Amazon: `"hiRes":"(https://m\.media-amazon\.com/images/I/[^"]+)"` |
+| **Dặn thêm AI** | Vài dòng thêm vào lời dặn AI khi tìm hoặc đọc trang của sàn này: ảnh nằm ở đâu, giá nào là giá thật. | Amazon: «giá thật ở khối mua, không lấy giá mục 一緒に購入» |
+| **Số ảnh tối đa** | Số ảnh giữ cho mỗi món, từ 1 đến 12. | 12 |
+
+**«Thử với một link»** (trong mục nâng cao): chị dán link sản phẩm, có thể thêm một link ảnh, rồi bấm «Thử». Kết quả
+gồm nguồn nhận ra, mã món, link chuẩn, link ảnh sau khi đổi và ảnh có thuộc máy chủ ảnh hay không. Nếu chị đang sửa dở
+thì hệ thống thử theo bản đang sửa (chưa cần lưu). Phần thử chỉ tính trên máy chủ: không gọi AI, không mở trang.
+
+**Khi lưu, hệ thống kiểm:** regex phải dịch được; «Mẫu link sản phẩm» phải có nhóm `(?P<id>…)`; «Link chuẩn» phải bắt
+đầu bằng `https://` và chỉ dùng `{id}`; «thay bằng» không được nhắc tới nhóm không có (`\2` khi chỉ có một nhóm); header
+chỉ nhận tên trong danh sách trên và không được xuống dòng. Sai thì hiện câu báo lỗi và không lưu gì.
+
+**Amazon Nhật (26/11/2026).** Lỗi cũ có hai nguyên nhân. (1) Link Amazon lưu nguyên tên món tiếng Nhật đã mã hoá
+(`%E3%83%98…`), dài hơn 250 ký tự là giới hạn của web_fetch. (2) AI tự rút gọn thành `/dp/<ASIN>`, nhưng web_fetch chỉ
+mở link **đã có trong cuộc trò chuyện**, nên link AI tự dựng bị từ chối. Nay hệ thống tự rút gọn thành
+`https://www.amazon.co.jp/dp/<ASIN>` trước khi đưa cho AI. Máy chủ cũng tự đọc trang để lấy ảnh `hiRes`, nên vẫn có ảnh
+khi AI không đọc được trang.
+
 ## Lưu trữ và an toàn (cho người cài máy chủ)
 
+- Cấu hình nâng cao: `app_settings` khoá `source_profile.<sàn>` = `{"fields": {ô: giá trị}}` (chỉ ô đã sửa; khôi phục
+  mặc định là xoá dòng). Không hiện ở `GET /api/desk/control/settings`, và `PATCH /settings/{key}` từ chối. Lưu vết
+  `control.source_profile_saved` (tên ô đã đổi). Điểm cuối (chỉ owner): `PATCH /api/desk/control/sources/profiles/{sàn}`
+  (`{"fields": {ô: giá trị | null}}`, `null` là về mặc định) · `DELETE …/profiles/{sàn}` · `POST …/profiles/try`
+  (`{url, image_url?, platform?, fields?}`). Hồ sơ hiệu lực nằm ở `profiles` của `GET /api/desk/control/sources`.
+- Tải link bên ngoài (ảnh, trang sản phẩm) đi qua `app/integrations/safe_http.py`. Bước phân giải tên miền và kiểm IP
+  chạy ngay lúc mở kết nối, và kết nối đi thẳng tới IP vừa kiểm (chống DNS rebinding). TLS vẫn kiểm theo tên miền gốc.
+  Mỗi lần chuyển hướng (tối đa 3) được kiểm lại.
 - Lưu ở bảng `app_settings`. Lựa chọn từng sàn nằm ở `source_account.routes` = `{"routes": {sàn: driver}}`; khoá của
   từng dịch vụ nằm ở `source_account.onebound` và `source_account.rakuten`, cùng dạng JSON với `channel_account.*`. Ô bí
   mật mã hoá Fernet bằng `SECRETS_ENCRYPTION_KEY`. API chỉ trả 4 ký tự cuối. Các dòng này không hiện trong

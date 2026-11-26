@@ -574,12 +574,14 @@ async def set_setting(db: AsyncSession, key: str, value: Any, user: User | None 
 async def list_settings(db: AsyncSession) -> list[dict[str, Any]]:
     from app.integrations.channel_config import PREFIX as CHANNEL_PREFIX
     from app.integrations.source_config import PREFIX as SOURCE_PREFIX
+    from app.integrations.source_profiles import PREFIX as PROFILE_PREFIX
 
-    # tài khoản kênh / nguồn hàng (có khoá mã hoá) đọc/ghi riêng qua /control/channels, /control/sources
+    # tài khoản kênh / nguồn hàng (có khoá mã hoá) và cấu hình nâng cao nguồn (có kiểm riêng) đọc/ghi qua
+    # /control/channels, /control/sources
     rows = {
         r.key: r
         for r in (await db.execute(select(AppSetting))).scalars()
-        if not r.key.startswith((CHANNEL_PREFIX, SOURCE_PREFIX))
+        if not r.key.startswith((CHANNEL_PREFIX, SOURCE_PREFIX, PROFILE_PREFIX))
     }
     keys = sorted(set(SETTINGS) | set(rows))
     out = []

@@ -146,7 +146,8 @@ async def test_fetch_details_button_gets_images_and_caches_them(owner_client, fa
         return p.model_copy(update={"images": [f"https://cdn.example.com/ok-{i}.jpg" for i in range(3)]})
 
     monkeypatch.setattr(Mock, "fetch_product", fetch)
-    c = await make_candidate(source_url="https://item.rakuten.co.jp/shop/item-1/")
+    # trang lạ → hồ sơ chung (không giới hạn máy chủ ảnh); hồ sơ từng sàn: tests/sourcing/test_source_profiles.py
+    c = await make_candidate(source_url="https://shop.example.com/item-1")
     g = (await owner_client.get(f"{API}/candidates/{c.id}/gallery")).json()
     assert g["images"] == [] and g["detail_fetch"] is None
 

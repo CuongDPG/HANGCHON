@@ -11,15 +11,18 @@ import {
   useSources,
   type SourceAccount,
   type SourcePlatformCard,
+  type SourceProfile,
 } from "@/lib/api/control";
 import { SettingsNav } from "./settings-nav";
+import { SourceProfileSection } from "./source-profile-section";
 import { OwnerOnly } from "./settings-screens";
 import { GuideBox } from "./social-accounts-screen";
 
 /**
  * Cài đặt → Nguồn hàng: mỗi sàn một thẻ — lấy hàng bằng Giả lập / AI tìm trên web / tài khoản dịch vụ (OneBound,
  * Rakuten API); rồi mỗi dịch vụ một thẻ — ô khoá (bí mật chỉ ghi, hiện 4 ký tự cuối), «Kiểm tra kết nối», hướng dẫn và
- * chi phí. Nội dung lấy từ backend `source_config` (xem docs/source-accounts.md).
+ * chi phí. Nội dung lấy từ backend `source_config` (xem docs/source-accounts.md). Mỗi sàn (và các nguồn không có thẻ
+ * riêng) có «Cấu hình nâng cao» gập sẵn: hồ sơ đọc link và ảnh (`source_profiles`).
  */
 export function SourceAccountsScreen() {
   const { user } = useSession();
@@ -41,9 +44,10 @@ export function SourceAccountsScreen() {
         <>
           <section aria-label="Các sàn" className="grid gap-4 lg:grid-cols-2">
             {data.platforms.map((p) => (
-              <PlatformCard key={p.platform} item={p} accounts={data.accounts} />
+              <PlatformCard key={p.platform} item={p} accounts={data.accounts} profile={data.profiles.find((x) => x.platform === p.platform)} />
             ))}
           </section>
+          <OtherProfiles profiles={data.profiles.filter((x) => !data.platforms.some((p) => p.platform === x.platform))} />
           <h2 className="mt-2 text-[18px]">Tài khoản dịch vụ lấy hàng</h2>
           <p className="-mt-2 text-[14px] text-ink-2">
             Khoá dùng khi một sàn ở trên chọn «Qua …». Xu hướng, giá sàn Việt Nam và link trang lạ:{" "}
@@ -65,7 +69,27 @@ const STATUS: Record<SourcePlatformCard["status"], { label: string; tone: "succe
   not_connected: { label: "Chưa nối", tone: "danger" },
 };
 
-function PlatformCard({ item, accounts }: { item: SourcePlatformCard; accounts: SourceAccount[] }) {
+function OtherProfiles({ profiles }: { profiles: SourceProfile[] }) {
+  if (!profiles.length) return null;
+  return (
+    <section aria-label="Nguồn khác" className="flex flex-col gap-3">
+      <h2 className="mt-2 text-[18px]">Nguồn khác</h2>
+      <p className="-mt-2 text-[14px] text-ink-2">
+        Các nguồn không có thẻ riêng luôn đi «AI tìm trên web». «Trang khác» áp cho mọi link không thuộc sàn nào ở trên.
+      </p>
+      <div className="grid gap-4 lg:grid-cols-2">
+        {profiles.map((p) => (
+          <Card key={p.platform} role="region" aria-label={p.label} className="flex flex-col gap-3">
+            <h3 className="text-[16px]">{p.label}</h3>
+            <SourceProfileSection profile={p} />
+          </Card>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function PlatformCard({ item, accounts, profile }: { item: SourcePlatformCard; accounts: SourceAccount[]; profile?: SourceProfile }) {
   const save = useSaveSourceRoute();
   const confirm = useConfirm();
   const status = STATUS[item.status];
@@ -126,6 +150,7 @@ function PlatformCard({ item, accounts }: { item: SourcePlatformCard; accounts: 
           <li key={n}>{n}</li>
         ))}
       </ul>
+      {profile ? <SourceProfileSection profile={profile} /> : null}
     </Card>
   );
 }

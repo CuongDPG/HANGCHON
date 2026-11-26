@@ -98,7 +98,9 @@ LEGACY_KEYS = {"cong_nang", "do_ben", "an_toan", "de_dung", "tham_my", "gia_tri"
 
 
 def sources():
-    return get_driver("sources")
+    from app.integrations.sources._profiled import wrap
+
+    return wrap(get_driver("sources"))  # link chuẩn + ảnh cỡ lớn theo hồ sơ nguồn (Cài đặt → Nguồn hàng)
 
 
 async def _rates(db: AsyncSession) -> dict[str, Any]:

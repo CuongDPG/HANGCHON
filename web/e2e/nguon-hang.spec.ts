@@ -85,7 +85,51 @@ test("người phụ giúp không thấy tab Nguồn hàng", async ({ page, brow
   await helper.goto("/desk/cai-dat/nguon-hang");
   await expect(main(helper).getByText("Chỉ chị (chủ cửa hàng) xem được phần này")).toBeVisible();
   expect((await helper.request.get("/api/desk/control/sources")).status()).toBe(403);
+  expect((await helper.request.patch("/api/desk/control/sources/profiles/amazon_jp", { data: { fields: { max_images: 3 } } })).status()).toBe(403);
+  expect((await helper.request.post("/api/desk/control/sources/profiles/try", { data: { url: "https://www.amazon.co.jp/dp/B08B69661S" } })).status()).toBe(403);
   await ctx.close();
+});
+
+test("cấu hình nâng cao: thử với một link, sửa một ô rồi khôi phục mặc định", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "ghi dữ liệu: chỉ chạy một lần");
+  await ownerLogin(page);
+  await page.goto("/desk/cai-dat/nguon-hang");
+  const amazon = main(page).getByRole("region", { name: "Amazon Nhật", exact: true });
+  await amazon.getByText("Cấu hình nâng cao").click();
+  await expect(amazon.getByLabel("Link chuẩn", { exact: true })).toHaveValue("https://www.amazon.co.jp/dp/{id}");
+  await expect(amazon.getByText("(đang dùng mặc định)")).toBeVisible();
+
+  const tryBox = amazon.getByRole("region", { name: "Thử với một link" });
+  await tryBox.getByLabel("Link sản phẩm").fill("https://www.amazon.co.jp/%E3%83%98%E3%82%A2%E3%82%B4%E3%83%A0/dp/B08B69661S/ref=sr_1_1?qid=1");
+  await tryBox.getByLabel("Link ảnh (không bắt buộc)").fill("https://m.media-amazon.com/images/I/61SrKBHi8ML._AC_SX300_.jpg");
+  await tryBox.getByRole("button", { name: "Thử" }).click();
+  const out = tryBox.getByLabel("Kết quả thử");
+  await expect(out.getByText("B08B69661S", { exact: true })).toBeVisible();
+  await expect(out.getByText("https://www.amazon.co.jp/dp/B08B69661S", { exact: true })).toBeVisible();
+  await expect(out.getByText("https://m.media-amazon.com/images/I/61SrKBHi8ML.jpg", { exact: true })).toBeVisible();
+  await expect(out.getByText("hợp lệ", { exact: true })).toBeVisible();
+
+  try {
+    // sai thì báo ngay, không lưu
+    await amazon.getByLabel("Link chuẩn", { exact: true }).fill("https://www.amazon.co.jp/dp/");
+    await amazon.getByRole("button", { name: "Lưu cấu hình" }).click();
+    await expect(page.getByText(/phải bắt đầu bằng https:\/\/ và có \{id\}/)).toBeVisible(); // chỉ một: toast, không có lỗi chưa bắt (overlay)
+    await amazon.getByLabel("Link chuẩn", { exact: true }).fill("https://www.amazon.co.jp/dp/{id}");
+
+    await amazon.getByLabel("Số ảnh tối đa", { exact: true }).fill("6");
+    await amazon.getByRole("button", { name: "Lưu cấu hình" }).click();
+    await expect(page.getByText("Đã lưu cấu hình nâng cao Amazon Nhật")).toBeVisible();
+    await expect(amazon.getByText("Đã sửa 1 ô")).toBeVisible();
+    if (process.env.E2E_SHOTS) {
+      await amazon.screenshot({ path: path.join("test-results", "shots", "nguon-hang", "advanced-amazon.png") });
+    }
+    await amazon.getByRole("button", { name: "Khôi phục mặc định" }).click();
+    await page.getByRole("alertdialog").or(page.getByRole("dialog")).getByRole("button", { name: "Khôi phục" }).click();
+    await expect(amazon.getByText("(đang dùng mặc định)")).toBeVisible();
+    await expect(amazon.getByLabel("Số ảnh tối đa", { exact: true })).toHaveValue("12");
+  } finally {
+    expect((await page.request.delete("/api/desk/control/sources/profiles/amazon_jp")).status()).toBe(204);
+  }
 });
 
 test("màn Nguồn hàng gọn ở 390px và 1280px", async ({ page }, info) => {

@@ -116,7 +116,9 @@ def platform_label(p: SourcePlatform | str) -> str:
 
 
 def sources() -> SourcesDriver:
-    return get_driver("sources")
+    from app.integrations.sources._profiled import wrap
+
+    return wrap(get_driver("sources"))  # link chuẩn + ảnh cỡ lớn theo hồ sơ nguồn (Cài đặt → Nguồn hàng)
 
 
 async def fx_rates(db: AsyncSession) -> dict[str, Any]:

@@ -19,7 +19,7 @@ from app.core.errors import BadRequest, Conflict, NotFound, Unauthorized
 from app.core.pagination import Page, Paginated, paginate
 from app.core.security import create_access_token, hash_password, verify_password
 from app.core.timeutil import VN_TZ, now_utc
-from app.integrations import channel_config, source_config
+from app.integrations import channel_config, source_config, source_profiles
 from app.integrations.base import KINDS, driver_name
 from app.modules.control import ai_settings, channels, links, service, sources
 from app.modules.control.models import (
@@ -68,6 +68,10 @@ from app.modules.control.schemas import (
     SourceAccountIn,
     SourceAccountOut,
     SourceCheckOut,
+    SourceProfileIn,
+    SourceProfileOut,
+    SourceProfileTryIn,
+    SourceProfileTryOut,
     SourceRouteIn,
     SourcesOverviewOut,
     TodayOut,
@@ -404,7 +408,9 @@ async def update_settings(body: SettingsBulkUpdate, user: OwnerUser, db: DbSessi
 
 @router.patch("/settings/{key}", response_model=SettingOut)
 async def update_setting(key: str, body: SettingUpdate, user: OwnerUser, db: DbSession) -> dict:
-    if key.startswith((channel_config.PREFIX, source_config.PREFIX)):  # có khoá mã hoá: chỉ sửa qua màn hình riêng
+    if key.startswith(
+        (channel_config.PREFIX, source_config.PREFIX, source_profiles.PREFIX)
+    ):  # chỉ sửa qua màn hình riêng
         raise BadRequest("Cài đặt này sửa ở Cài đặt → Mạng xã hội / Nguồn hàng.")
     await service.set_setting(db, key, body.value, user)
     return next(s for s in await service.list_settings(db) if s["key"] == key)
@@ -473,6 +479,25 @@ async def list_sources(_: OwnerUser, db: DbSession) -> dict:
 @router.patch("/sources/platforms/{platform}", response_model=SourcesOverviewOut, summary="Chọn cách lấy hàng một sàn")
 async def save_source_route(platform: str, body: SourceRouteIn, user: OwnerUser, db: DbSession) -> dict:
     return await sources.set_route(db, platform, body.driver, user)
+
+
+@router.post("/sources/profiles/try", response_model=SourceProfileTryOut, summary="Thử hồ sơ nguồn với một link")
+async def try_source_profile(body: SourceProfileTryIn, _: OwnerUser, db: DbSession) -> dict:
+    return await sources.try_link(db, body.url, body.image_url, body.platform, body.fields)
+
+
+@router.patch(
+    "/sources/profiles/{platform}", response_model=SourceProfileOut, summary="Sửa cấu hình nâng cao một nguồn"
+)
+async def save_source_profile(platform: str, body: SourceProfileIn, user: OwnerUser, db: DbSession) -> dict:
+    return await sources.save_profile(db, platform, body.fields, user)
+
+
+@router.delete(
+    "/sources/profiles/{platform}", status_code=status.HTTP_204_NO_CONTENT, summary="Khôi phục mặc định một nguồn"
+)
+async def reset_source_profile(platform: str, user: OwnerUser, db: DbSession) -> None:
+    await sources.reset_profile(db, platform, user)
 
 
 @router.patch("/sources/accounts/{account}", response_model=SourceAccountOut, summary="Lưu khoá dịch vụ nguồn hàng")

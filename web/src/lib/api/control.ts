@@ -531,7 +531,45 @@ export type SourceAccount = {
   guide: { needs: string[]; steps: string[]; limits: string[]; cost: string[]; links: { label: string; url: string }[] };
 };
 
-export type SourcesOverview = { platforms: SourcePlatformCard[]; accounts: SourceAccount[]; general_driver: string };
+/** Hồ sơ nguồn: cách đọc link và ảnh của một sàn (Cài đặt → Nguồn hàng → Cấu hình nâng cao). */
+export type SourceProfileFields = {
+  domains: string[];
+  url_patterns: string[];
+  canonical_url: string;
+  keep_params: string[];
+  image_hosts: string[];
+  image_rewrites: { pattern: string; replace: string }[];
+  fetch_headers: Record<string, string>;
+  fetch_via: "route" | "skip";
+  page_image_patterns: string[];
+  prompt_hints: string;
+  max_images: number;
+};
+
+export type SourceProfile = {
+  platform: string;
+  label: string;
+  effective: SourceProfileFields;
+  defaults: SourceProfileFields;
+  overridden: (keyof SourceProfileFields)[];
+};
+
+export type SourceProfileTry = {
+  platform: string;
+  label: string;
+  id: string | null;
+  matched_pattern: string | null;
+  canonical_url: string;
+  fetch_via: string;
+  image: { input: string; output: string; rules_applied: string[]; allowed: boolean } | null;
+};
+
+export type SourcesOverview = {
+  platforms: SourcePlatformCard[];
+  accounts: SourceAccount[];
+  general_driver: string;
+  profiles: SourceProfile[];
+};
 
 export function useSources(enabled: boolean) {
   return useQuery({ queryKey: controlKeys.sources(), queryFn: () => api.get<SourcesOverview>(`${BASE}/sources`), enabled });
@@ -569,6 +607,33 @@ export function useCheckSourceAccount() {
     mutationFn: ({ account, values }: { account: string; values?: Record<string, string> }) =>
       api.post<{ ok: boolean; message: string }>(`${BASE}/sources/accounts/${account}/check`, { values: values ?? {} }),
     onSuccess: done,
+  });
+}
+
+/** Sửa vài ô của hồ sơ nguồn; `null` = về mặc định. */
+export function useSaveSourceProfile() {
+  const done = useSourcesInvalidate();
+  return useMutation({
+    mutationFn: ({ platform, fields }: { platform: string; fields: Partial<Record<keyof SourceProfileFields, unknown>> }) =>
+      api.patch<SourceProfile>(`${BASE}/sources/profiles/${platform}`, { fields }),
+    onSuccess: done,
+  });
+}
+
+export function useResetSourceProfile() {
+  const done = useSourcesInvalidate();
+  return useMutation({
+    mutationFn: (platform: string) => api.delete<void>(`${BASE}/sources/profiles/${platform}`),
+    onSuccess: done,
+  });
+}
+
+/** «Thử với một link»: tính tại chỗ trên máy chủ, không gọi AI. Lỗi hiện ngay tại ô thử. */
+export function useTrySourceProfile() {
+  return useMutation({
+    mutationFn: (input: { url: string; image_url?: string | null; platform?: string; fields?: Record<string, unknown> }) =>
+      api.post<SourceProfileTry>(`${BASE}/sources/profiles/try`, input),
+    meta: { silentError: true },
   });
 }
 
