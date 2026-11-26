@@ -207,6 +207,11 @@ class _UrlIn(BaseModel):
     url: str
     limit: int = 30
 
+    def model_dump_json(self, **_: object) -> str:  # type: ignore[override]
+        # web_fetch chỉ mở link «đã có trong cuộc trò chuyện»; link nằm trong JSON liền ({"url":"…"}) không được nhận ra
+        # (chạy thật 26/11: lỗi url_not_in_prior_context), dạng «url: …» trên một dòng riêng thì được.
+        return f"url: {self.url}\nlimit: {self.limit}"
+
 
 class _ReviewsOut(BaseModel):
     reviews: list[_Review]

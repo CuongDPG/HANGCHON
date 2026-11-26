@@ -295,3 +295,11 @@ async def test_pasted_links_with_tracking_dedupe_to_one_candidate(owner_client):
     assert ids[0] == ids[1]
     c = (await owner_client.get(f"/api/desk/sourcing/candidates/{ids[0]}")).json()
     assert c["source_url"] == "https://detail.1688.com/offer/612233445.html"
+
+
+def test_url_input_puts_link_on_its_own_line():
+    """web_fetch không nhận ra link trong JSON liền; dữ liệu gửi AI để link trên một dòng riêng."""
+    from app.ai.runner import _input_json
+
+    text = _input_json(web_driver._UrlIn(url="https://www.amazon.co.jp/dp/B08B69661S", limit=30))
+    assert "\nurl: https://www.amazon.co.jp/dp/B08B69661S\n" in text and '"url"' not in text

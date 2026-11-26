@@ -181,11 +181,15 @@ thì hệ thống thử theo bản đang sửa (chưa cần lưu). Phần thử 
 đầu bằng `https://` và chỉ dùng `{id}`; «thay bằng» không được nhắc tới nhóm không có (`\2` khi chỉ có một nhóm); header
 chỉ nhận tên trong danh sách trên và không được xuống dòng. Sai thì hiện câu báo lỗi và không lưu gì.
 
-**Amazon Nhật (26/11/2026).** Lỗi cũ có hai nguyên nhân. (1) Link Amazon lưu nguyên tên món tiếng Nhật đã mã hoá
-(`%E3%83%98…`), dài hơn 250 ký tự là giới hạn của web_fetch. (2) AI tự rút gọn thành `/dp/<ASIN>`, nhưng web_fetch chỉ
-mở link **đã có trong cuộc trò chuyện**, nên link AI tự dựng bị từ chối. Nay hệ thống tự rút gọn thành
-`https://www.amazon.co.jp/dp/<ASIN>` trước khi đưa cho AI. Máy chủ cũng tự đọc trang để lấy ảnh `hiRes`, nên vẫn có ảnh
-khi AI không đọc được trang.
+**Amazon Nhật (chạy thật 26/11/2026).** Có ba nguyên nhân. (1) Link Amazon chứa nguyên tên món tiếng Nhật đã mã hoá
+(`%E3%83%98…`), dài hơn 250 ký tự là giới hạn của web_fetch; nay hệ thống tự rút gọn thành
+`https://www.amazon.co.jp/dp/<ASIN>`. (2) web_fetch chỉ mở link «đã có trong cuộc trò chuyện». Link nằm trong JSON liền
+(`{"url":"…"}`) không được nhận ra, nên lỗi `url_not_in_prior_context` xảy ra với **mọi sàn**. Nay link được gửi AI trên
+một dòng riêng (`url: …`). (3) Kể cả khi link hợp lệ, web_fetch vẫn **từ chối amazon.co.jp** (`url_not_allowed`): AI
+không đọc được trang Amazon. Vì vậy ảnh Amazon lấy theo «Mẫu ảnh trong trang»: máy chủ tự đọc trang và lấy các ảnh
+`hiRes`, không tốn tiền AI. Cách này chạy được từ máy dev, chưa kiểm từ IP máy chủ thật (Amazon có thể bắt captcha). Thông
+số, giá và đánh giá Amazon vẫn chỉ lấy được từ đoạn trích trong kết quả tìm kiếm. Trang 1688 trả trang captcha
+(`_____tmd_____/punish`) cho web_fetch.
 
 ## Lưu trữ và an toàn (cho người cài máy chủ)
 
