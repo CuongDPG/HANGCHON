@@ -71,7 +71,7 @@ export function ScoringScreen() {
   const canEdit = session.user?.role === "owner";
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader backHref="/desk/san-hang" title="Khung chấm điểm" description="AI chấm nháp theo khung này, chị sửa điểm trên từng hồ sơ." />
+      <PageHeader backHref="/desk/san-hang" title="Khung chấm điểm" />
       {isPending ? (
         <SkeletonList rows={3} />
       ) : error ? (

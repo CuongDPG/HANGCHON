@@ -62,7 +62,6 @@ export function DropsScreen() {
     <div className="flex flex-col gap-4">
       <PageHeader
         title="Đợt bán"
-        description="Gom đơn theo đợt: hạn chót, số suất, ngày hàng về dự kiến. Hết hạn thì tự đóng."
         actions={
           <Button size="sm" icon={<CalendarPlus className="size-4" />} onClick={() => setOpen(true)}>
             Tạo đợt

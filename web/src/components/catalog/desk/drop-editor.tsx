@@ -101,63 +101,71 @@ export function DropEditor({ id }: { id: string }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader title={`${d.label} · ${d.title}`} backHref="/desk/san-pham/dot" actions={<Badge tone={DROP_TONE[d.status]}>{DROP_STATUS_LABELS[d.status]}</Badge>} />
+      <PageHeader
+        title={`${d.label} · ${d.title}`}
+        backHref="/desk/san-pham/dot"
+        actions={
+          <>
+            <Badge tone={DROP_TONE[d.status]}>{DROP_STATUS_LABELS[d.status]}</Badge>
+            {["draft", "pending_review"].includes(d.status) ? (
+              <Button
+                size="sm"
+                icon={<Rocket className="size-4" />}
+                loading={open.isPending}
+                onClick={() =>
+                  open.mutate(dirty ? toInput(draft) : null, {
+                    onSuccess: (x) => notifySuccess(x.status === "open" ? "Đã mở đợt" : x.status === "scheduled" ? "Đã hẹn giờ mở" : "Đã gửi chị duyệt"),
+                  })
+                }
+              >
+                {isOwner ? "Mở đợt" : "Gửi chị duyệt mở đợt"}
+              </Button>
+            ) : null}
+            {dirty && editable ? (
+              <Button size="sm" variant="secondary" loading={save.isPending} onClick={() => save.mutate(toInput(draft), { onSuccess: () => notifySuccess("Đã lưu") })}>
+                Lưu thay đổi
+              </Button>
+            ) : null}
+            {isOwner && ["open", "scheduled"].includes(d.status) ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                icon={<Square className="size-4" />}
+                onClick={async () => {
+                  if (await confirm({ title: "Đóng đợt ngay?", message: "Khách không đặt thêm được. Hệ thống sẽ tổng hợp số lượng để đặt nguồn.", confirmLabel: "Đóng đợt" }))
+                    close.mutate(undefined, { onSuccess: () => notifySuccess("Đã đóng đợt") });
+                }}
+              >
+                Đóng đợt
+              </Button>
+            ) : null}
+            {isOwner && ["closed", "sourcing", "arriving"].includes(d.status) ? (
+              <Button size="sm" variant="secondary" icon={<PackageCheck className="size-4" />} onClick={() => setArrivedOpen(true)}>
+                Hàng đã về
+              </Button>
+            ) : null}
+            {d.status !== "draft" && d.status !== "pending_review" && d.status !== "cancelled" ? (
+              <ButtonLink size="sm" href={`/dot/${d.slug}`} variant="ghost" icon={<ExternalLink className="size-4" />} target="_blank">
+                Xem trên web
+              </ButtonLink>
+            ) : null}
+            {isOwner && ["draft", "pending_review", "scheduled"].includes(d.status) ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                icon={<XCircle className="size-4" />}
+                onClick={async () => {
+                  if (await confirm({ title: "Huỷ đợt này?", message: "Đợt sẽ không hiện trên web nữa.", confirmLabel: "Huỷ đợt", tone: "danger" }))
+                    cancel.mutate(undefined);
+                }}
+              >
+                Huỷ đợt
+              </Button>
+            ) : null}
+          </>
+        }
+      />
       <DeskSubnav active="drops" />
-
-      <div className="flex flex-wrap gap-2">
-        {["draft", "pending_review"].includes(d.status) ? (
-          <Button
-            icon={<Rocket className="size-4" />}
-            loading={open.isPending}
-            onClick={() =>
-              open.mutate(dirty ? toInput(draft) : null, {
-                onSuccess: (x) => notifySuccess(x.status === "open" ? "Đã mở đợt" : x.status === "scheduled" ? "Đã hẹn giờ mở" : "Đã gửi chị duyệt"),
-              })
-            }
-          >
-            {isOwner ? "Mở đợt" : "Gửi chị duyệt mở đợt"}
-          </Button>
-        ) : null}
-        {dirty && editable ? (
-          <Button variant="secondary" loading={save.isPending} onClick={() => save.mutate(toInput(draft), { onSuccess: () => notifySuccess("Đã lưu") })}>
-            Lưu thay đổi
-          </Button>
-        ) : null}
-        {isOwner && ["open", "scheduled"].includes(d.status) ? (
-          <Button
-            variant="secondary"
-            icon={<Square className="size-4" />}
-            onClick={async () => {
-              if (await confirm({ title: "Đóng đợt ngay?", message: "Khách không đặt thêm được. Hệ thống sẽ tổng hợp số lượng để đặt nguồn.", confirmLabel: "Đóng đợt" }))
-                close.mutate(undefined, { onSuccess: () => notifySuccess("Đã đóng đợt") });
-            }}
-          >
-            Đóng đợt
-          </Button>
-        ) : null}
-        {isOwner && ["closed", "sourcing", "arriving"].includes(d.status) ? (
-          <Button variant="secondary" icon={<PackageCheck className="size-4" />} onClick={() => setArrivedOpen(true)}>
-            Hàng đã về
-          </Button>
-        ) : null}
-        {d.status !== "draft" && d.status !== "pending_review" && d.status !== "cancelled" ? (
-          <ButtonLink href={`/dot/${d.slug}`} variant="ghost" icon={<ExternalLink className="size-4" />} target="_blank">
-            Xem trên web
-          </ButtonLink>
-        ) : null}
-        {isOwner && ["draft", "pending_review", "scheduled"].includes(d.status) ? (
-          <Button
-            variant="ghost"
-            icon={<XCircle className="size-4" />}
-            onClick={async () => {
-              if (await confirm({ title: "Huỷ đợt này?", message: "Đợt sẽ không hiện trên web nữa.", confirmLabel: "Huỷ đợt", tone: "danger" }))
-                cancel.mutate(undefined);
-            }}
-          >
-            Huỷ đợt
-          </Button>
-        ) : null}
-      </div>
       {d.reminder_count ? (
         <p className="text-[14px] text-ink-2">{d.reminder_count} khách đã bấm «Nhắc mình». Khi đợt mở, AI soạn tin nhắc để chị duyệt.</p>
       ) : null}

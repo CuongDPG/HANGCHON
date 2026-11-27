@@ -57,7 +57,7 @@ export function CreateOrderScreen() {
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader title="Tạo đơn" backHref="/desk/don-hang" description="Khách đặt qua điện thoại, tin nhắn hoặc gặp trực tiếp." />
+      <PageHeader title="Tạo đơn" backHref="/desk/don-hang" />
       <Card className="flex flex-col gap-3">
         <CardHeader title="Món" />
         {catalog.isPending ? (

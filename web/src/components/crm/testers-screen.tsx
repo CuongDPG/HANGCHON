@@ -25,7 +25,7 @@ export function TestersScreen() {
   const { data, isPending, error, refetch } = useTrialCandidates();
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader title="Khách thử hàng" description="Mời vài khách quen dùng thử mẫu trước khi chị quyết định chọn." />
+      <PageHeader title="Khách thử hàng" />
       <KhachNav active="testers" />
       {isPending ? (
         <SkeletonList rows={2} />

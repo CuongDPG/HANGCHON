@@ -54,7 +54,7 @@ export function ProductsScreen() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Sản phẩm" description="Mỗi món theo hai chiều: đã chọn ra sao, và đang bán tới đâu — nội dung, kênh, đơn." />
+      <PageHeader title="Sản phẩm" />
       <DeskSubnav active="products" />
       {selectable.data?.length ? (
         <Card tone="accent" className="flex flex-col gap-2">

@@ -271,11 +271,16 @@ export function HelpersScreen() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Người phụ giúp" description="Người phụ xem được mọi thứ, ghi chi phí; không duyệt, không đổi cài đặt." />
+      <PageHeader
+        title="Người phụ giúp"
+        description="Người phụ xem được mọi thứ, ghi chi phí; không duyệt, không đổi cài đặt."
+        actions={
+          <Button size="sm" icon={<UserPlus className="size-4" />} onClick={() => setCreating(true)}>
+            Thêm người phụ giúp
+          </Button>
+        }
+      />
       <SettingsNav />
-      <Button icon={<UserPlus className="size-4" />} onClick={() => setCreating(true)} className="self-start">
-        Thêm người phụ giúp
-      </Button>
       {users.isPending ? (
         <SkeletonList rows={2} />
       ) : users.error ? (
@@ -463,7 +468,7 @@ export function IntegrationsScreen() {
   const { user } = useSession();
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Tích hợp" description="Các dịch vụ bên ngoài cửa hàng nối tới. «Giả lập» nghĩa là chưa nối tài khoản thật, không gửi gì ra ngoài." />
+      <PageHeader title="Tích hợp" description="«Giả lập» nghĩa là chưa nối tài khoản thật, không gửi gì ra ngoài." />
       <SettingsNav />
       {isPending ? (
         <SkeletonList rows={4} />

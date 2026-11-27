@@ -61,7 +61,6 @@ export function SupplyScreen() {
     <div className="flex flex-col gap-4">
       <PageHeader
         title="Nguồn cung"
-        description="Từ lúc hỏi giá tới lúc hàng về tới nhà."
         actions={<IconLink href="/desk/nguon-cung/cai-dat" label="Tham số giá vốn" icon={<Settings2 />} />}
       />
       <Tabs

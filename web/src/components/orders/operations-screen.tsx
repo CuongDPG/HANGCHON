@@ -56,7 +56,7 @@ export function OperationsScreen() {
   const c = useOrderCounts().data;
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Vận hành" backHref="/desk/don-hang" description="Tiền về, đổi trả, tồn kho, sàn, mẫu tin báo khách." />
+      <PageHeader title="Vận hành" backHref="/desk/don-hang" />
       <Tabs
         aria-label="Mục vận hành"
         value={tab}

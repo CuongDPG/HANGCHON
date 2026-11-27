@@ -33,7 +33,7 @@ export function SourceAccountsScreen() {
     <div className="flex flex-col gap-4">
       <PageHeader
         title="Nguồn hàng"
-        description="Chọn cách Hàng Chọn lấy hàng ở từng sàn khi săn hàng và đọc link. Sàn còn «Giả lập» thì trả món mẫu, chưa lấy hàng thật."
+        description="Sàn còn «Giả lập» thì trả món mẫu, chưa lấy hàng thật."
       />
       <SettingsNav />
       {isPending ? (

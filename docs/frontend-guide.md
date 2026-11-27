@@ -66,6 +66,7 @@ export function ApprovalsScreen() {
 ### Quy ước chung
 
 - Mỗi trang đúng một `PageHeader` (một `<h1>`). Nút quay lại chỉ là mũi tên (`backHref`).
+- Bàn làm việc: đầu trang gọn một hàng (khung `data-desk` tự thu `PageHeader`: tiêu đề 21/22px, eyebrow + mô tả cùng hàng); nút thao tác đặt vào `actions`, không thêm hàng nút riêng; không viết câu hướng dẫn cách dùng màn hình (chỉ giữ số liệu, trạng thái, cảnh báo). Desk phủ hết bề ngang màn hình; chỉ form/đoạn đọc dài mới tự giới hạn bề rộng.
 - Trang gốc bọc nội dung trong `<div className="flex flex-col gap-4">` (hoặc `gap-6`); khung đã lo lề và khoảng chừa cho thanh điều hướng.
 - Website cho khách: thiết kế ở **390px trước**, rồi nới bằng `md:` (768px). Bàn làm việc: **máy tính trước** (1280/1440/1920, 1024 vẫn phải dùng được); điện thoại chỉ giữ thanh tab dưới như hiện có.
   `md:` cũng là mốc điều hướng chuyển từ thanh dưới sang hàng menu trên (`DeskTopBar`: logo trái; mục chính + «Thêm» + ảnh đại diện là một cụm canh phải, lấy từ `desk-nav.ts`, mục không đủ chỗ tự dồn vào «Thêm»; Cài đặt chỉ ở menu ảnh đại diện; sáng/tối chọn ở *Cài đặt → Tài khoản*).
@@ -147,7 +148,7 @@ Token khai báo một lần trong `src/app/globals.css` (sáng, tối, theo máy
 | `auto`, `auto-wash` | | xanh cổ vịt: «AI tự làm», thành công (bí danh `success`) |
 
 - Chữ: `font-sans` (Be Vietnam Pro, mặc định) và `font-display` (Bricolage Grotesque — tiêu đề, con số lớn). `h1–h4` tự dùng `font-display`, giãn 0.01em.
-  Cỡ thường dùng: tiêu đề trang 26/30px (do `PageHeader`), khối 20px, thẻ 15px đậm, thân 15–16px, phụ 13–14px.
+  Cỡ thường dùng: tiêu đề trang 26/30px ở website, 21/22px ở desk (do `PageHeader`), khối 20px, thẻ 15px đậm, thân 15–16px, phụ 13–14px.
 - Góc: `rounded-md` = 4px là chuẩn; `rounded-sm` 2px; `rounded-lg` 6px (mép sheet); `rounded-full` chỉ cho dấu, chấm, công tắc.
 - Khoảng cách: bội số 4px. Kích thước bố cục: `h-header` 56px, `h-tabbar` 64px, `w-sidebar` 248px, `max-w-page` 1120px, `max-w-prose` 40rem.
 - Vùng an toàn điện thoại: `pb-safe`, `pt-safe`.

@@ -46,7 +46,7 @@ export function ActivityScreen() {
   const { user } = useSession();
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Nhật ký AI" description="AI đã làm gì, dựa vào đâu; hoàn tác được. Lưu vết ai duyệt gì, lúc nào." />
+      <PageHeader title="Nhật ký AI" />
       <Tabs
         aria-label="Loại nhật ký"
         value={tab}

@@ -47,7 +47,6 @@ export function ReorderScreen() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Nhắc mua lại"
-        description="Chỉ nhắc đúng người, đúng lúc. Mỗi chu kỳ nhắc tối đa một lần."
         actions={
           <Button
             size="sm"

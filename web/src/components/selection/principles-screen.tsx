@@ -53,7 +53,6 @@ export function PrinciplesScreen() {
     <div className="flex flex-col gap-4">
       <PageHeader
         title="Nguyên tắc chọn hàng"
-        description="Khi săn hàng, món trái nguyên tắc «Không chọn» hoặc «Nên tránh» bị hạ hạng và ghi rõ lý do, không bị ẩn đi. Nguyên tắc chung áp cho mọi nhóm."
         backHref="/desk/ban-chon"
         actions={
           <Button size="sm" icon={<Plus className="size-4" aria-hidden />} onClick={() => setEditing("new")}>
