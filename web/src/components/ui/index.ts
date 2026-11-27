@@ -22,4 +22,5 @@ export * from "./page-header";
 export * from "./seal";
 export * from "./segmented";
 export * from "./tabs";
+export * from "./toolbar";
 export * from "./toast";

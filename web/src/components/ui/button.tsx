@@ -70,6 +70,7 @@ export function Button({
       type={type}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
+      data-icon={icon ? "" : undefined}
       className={buttonClasses({ variant, size, block, className })}
       {...props}
     >
@@ -84,7 +85,7 @@ export type ButtonLinkProps = ComponentProps<typeof Link> & CommonProps;
 /** Liên kết trông như nút (điều hướng sang trang khác). */
 export function ButtonLink({ variant, size, block, icon, className, children, ...props }: ButtonLinkProps) {
   return (
-    <Link className={buttonClasses({ variant, size, block, className })} {...props}>
+    <Link data-icon={icon ? "" : undefined} className={buttonClasses({ variant, size, block, className })} {...props}>
       {icon}
       {children}
     </Link>
