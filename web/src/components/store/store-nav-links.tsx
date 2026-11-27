@@ -39,7 +39,7 @@ export function StoreHeaderNavActive() {
 
 export function StoreTabBarList({ pathname }: { pathname: string | null }) {
   return (
-    <ul className="grid h-tabbar grid-cols-5">
+    <ul className="grid h-tabbar grid-cols-6">
       {STORE_NAV.map((item) => {
         const active = pathname !== null && isStoreNavActive(item.href, pathname);
         const Icon = item.icon;

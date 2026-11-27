@@ -5,6 +5,7 @@ const LINKS = [
   { href: "/ve-nguoi-chon", label: "Về người chọn" },
   { href: "/dot", label: "Mua chung" },
   { href: "/nho-tim", label: "Nhờ tìm" },
+  { href: "/dung-thu", label: "Dùng thử cùng mình" },
   { href: "/don", label: "Tra cứu đơn" },
   { href: "/hoi", label: "Hỏi trợ lý" },
 ];
