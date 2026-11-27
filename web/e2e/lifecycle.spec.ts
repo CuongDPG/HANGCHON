@@ -257,16 +257,26 @@ test("một món hàng từ đề tìm tới đánh giá của khách", async ({
 
   // ---- i1/i4/i5: «Hôm nay», nhật ký AI, báo cáo tuần phản ánh đúng ----------------------------------------------
   await login(page);
-  const today = await api<{ stats: { key: string; value: number }[]; pending: { total: number } }>(page.request, "get", "/api/desk/control/today");
-  const stat = (k: string) => today.stats.find((s) => s.key === k)?.value ?? 0;
-  expect(stat("orders.new_today")).toBeGreaterThanOrEqual(1);
-  expect(stat("orders.cash_today")).toBeGreaterThanOrEqual(detail.total_vnd);
-  expect(stat("control.pending")).toBe(today.pending.total);
+  type Today = { stats: { key: string; value: number }[]; pending: { total: number } };
+  const stat = (t: Today, k: string) => t.stats.find((s) => s.key === k)?.value ?? 0;
+  const today = await api<Today>(page.request, "get", "/api/desk/control/today");
+  expect(stat(today, "orders.new_today")).toBeGreaterThanOrEqual(1);
+  expect(stat(today, "orders.cash_today")).toBeGreaterThanOrEqual(detail.total_vnd);
+  // «việc chờ» là số đếm chung của cả hệ thống: các bài chạy song song thêm / duyệt việc chờ cả giữa hai câu đếm trong
+  // cùng một lần đọc → so hai số của cùng một lần đọc, đọc lại tới khi khớp; màn hình so với đúng lần đọc nó hiện
+  await expect.poll(async () => {
+    const t = await api<Today>(page.request, "get", "/api/desk/control/today");
+    return stat(t, "control.pending") - t.pending.total;
+  }).toBe(0);
+  const shown = page.waitForResponse((r) => new URL(r.url()).pathname === "/api/desk/control/today" && r.ok());
   await page.goto("/desk");
+  const pendingShown = ((await (await shown).json()) as Today).pending.total;
   await expect(main.getByRole("heading", { level: 1, name: "Hôm nay" })).toBeVisible();
-  await expect(main.getByRole("heading", { level: 2, name: new RegExp(`${today.pending.total} việc chờ chị`) })).toBeVisible();
-  await page.goto(`/desk/nhat-ky-ai?ngay=hom-nay`);
-  await expect(main.getByText(/Đăng bài|Soạn bài/).first()).toBeVisible();
+  await expect(main.getByRole("heading", { level: 2, name: new RegExp(`^${pendingShown} việc chờ chị`) })).toBeVisible();
+  // nhật ký AI hôm nay: trang đầu chỉ 20 việc mới nhất, các bài song song (và chính bài này sau khi đăng) đẩy bài đăng
+  // xuống trang sau → lọc theo việc «Đăng bài lên mạng xã hội» và tìm đúng bài Facebook của món này
+  await page.goto(`/desk/nhat-ky-ai?ngay=hom-nay&action=content.publish_post`);
+  await expect(main.getByText(`Đăng Facebook: ${product.name}`).first()).toBeVisible();
   await page.goto("/desk/bao-cao");
   await main.getByRole("button", { name: "Lập lại tuần này" }).click();
   await expect(page.getByText("Đã lập báo cáo tuần này")).toBeVisible();

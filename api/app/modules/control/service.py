@@ -10,6 +10,7 @@ from typing import Any, Literal
 
 from pydantic import ValidationError
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.runner import BUDGET_SETTING_KEY, monthly_budget_vnd, monthly_spend_vnd
@@ -177,8 +178,15 @@ async def set_level(db: AsyncSession, action: str, level: AutonomyLevel, user: U
     row = await db.get(AutonomySetting, action)
     old = row.level if row else spec.default_level
     if row is None:
-        row = AutonomySetting(action=action, level=level)
-        db.add(row)
+        # lần đầu đổi mức việc này mà chị bấm hai lần liền → hai yêu cầu cùng chèn dòng đầu: chèn-nếu-chưa-có (yêu cầu
+        # sau chờ yêu cầu trước commit) rồi khoá dòng để cập nhật, thay vì vỡ khoá chính → 500
+        await db.execute(
+            pg_insert(AutonomySetting)
+            .values(action=action, level=level)
+            .on_conflict_do_nothing(index_elements=["action"])
+        )
+        row = await db.get(AutonomySetting, action, with_for_update=True, populate_existing=True)
+        assert row is not None
     row.level = level
     row.updated_at = now_utc()
     row.updated_by_id = user.id if user else None

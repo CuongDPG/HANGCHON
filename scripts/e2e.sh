@@ -69,7 +69,10 @@ grep "Dữ liệu mẫu" "$RUN/seed.log" || true
 echo "▶ e2e: API :$API_PORT + worker"
 # hãng giao giả lên nấc mỗi 3 giây (thay vì 1 giờ) để bài vòng đời đi tới «đã giao»
 export MOCK_SHIPPING_STEP_SECONDS=3
-(exec uv run uvicorn app.main:app --host 127.0.0.1 --port "$API_PORT" >"$RUN/api.log" 2>&1) &
+# web chuyển /api/* sang API bằng agent keep-alive của Node (đóng kết nối rỗi sau 5 giây), trùng mức mặc định của
+# uvicorn (5 giây) → thỉnh thoảng Node gửi vào đúng kết nối uvicorn vừa đóng: ECONNRESET, web trả 500 «Failed to proxy».
+# Giữ kết nối phía API lâu hơn để luôn là Node đóng trước.
+(exec uv run uvicorn app.main:app --host 127.0.0.1 --port "$API_PORT" --timeout-keep-alive 65 >"$RUN/api.log" 2>&1) &
 PIDS+=($!)
 (exec uv run arq app.worker.WorkerSettings >"$RUN/worker.log" 2>&1) &
 PIDS+=($!)

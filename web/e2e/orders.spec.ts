@@ -30,9 +30,25 @@ async function login(page: Page): Promise<boolean> {
 test("khách đặt hàng trong đợt, chuyển khoản QR, chị thấy đơn đã trả", async ({ page }, info) => {
   test.skip(!(await login(page)), "Cần API đang chạy với tài khoản chị");
   const catalog = (await (await page.request.get("/api/desk/orders/catalog")).json()) as Sellable[];
-  const product = catalog.find((p) => p.drops.some((d) => d.status === "open" && (d.available ?? 99) > 0));
-  test.skip(!product, "Cần một đợt đang mở (chạy seed)");
-  const drop = product!.drops.find((d) => d.status === "open")!;
+  const product = catalog.find((p) => p.drops.some((d) => d.status === "open"));
+  test.skip(!product, "Cần một món đang bán theo đợt (chạy seed)");
+  // đợt riêng của bài này: lấy «đợt đang mở đầu tiên» có thể trúng đợt của bài vòng đời chạy song song (món mới, tên
+  // đứng đầu danh sách) — bài đó chốt đợt và cho lô về ngay → đơn của bài này thành «Chờ giao» trước khi kịp kiểm
+  const created = await page.request.post("/api/desk/catalog/drops", {
+    data: {
+      title: `Đợt thử đặt hàng ${info.project.name} ${Date.now() % 100000}`,
+      closes_at: new Date(Date.now() + 3 * 86400_000).toISOString(),
+      expected_arrival_date: new Date(Date.now() + 20 * 86400_000).toISOString().slice(0, 10),
+      items: [{ product_id: product!.product_id, slots_total: 5, max_per_order: 3 }],
+    },
+  });
+  expect(created.ok(), await created.text()).toBe(true);
+  const { id: dropId } = (await created.json()) as { id: string };
+  const opened = await page.request.post(`/api/desk/catalog/drops/${dropId}/open`);
+  expect(opened.ok(), await opened.text()).toBe(true);
+  const { code: dropCode, status } = (await opened.json()) as { code: string; status: string };
+  expect(status).toBe("open");
+  const drop = { drop_id: dropId, code: dropCode, price_vnd: product!.price_vnd };
   await page.context().clearCookies(); // khách không đăng nhập
 
   await page.goto("/");

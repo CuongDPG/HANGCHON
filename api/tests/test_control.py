@@ -149,6 +149,25 @@ async def test_change_autonomy_then_propose_applies(calls: dict, owner_client: h
     assert missing.status_code == 404
 
 
+async def test_first_autonomy_change_twice_concurrently(calls: dict, owner: User) -> None:
+    """Lần đầu đổi mức mà bấm hai lần liền: yêu cầu sau chờ yêu cầu trước rồi ghi đè, không vỡ khoá chính."""
+    import asyncio
+
+    from app.modules.control import service
+
+    async with SessionLocal() as a, SessionLocal() as b:
+        await service.set_level(a, "test.post", AutonomyLevel.OFF, owner)
+        await a.flush()  # dòng đã chèn nhưng chưa commit
+        second = asyncio.create_task(service.set_level(b, "test.post", AutonomyLevel.AUTO, owner))
+        await asyncio.sleep(0.2)
+        assert not second.done()  # đang chờ yêu cầu đầu commit
+        await a.commit()
+        await second
+        await b.commit()
+    async with SessionLocal() as s:
+        assert await service.get_level(s, "test.post") == AutonomyLevel.AUTO
+
+
 async def test_helper_cannot_decide(calls: dict, helper_client: httpx.AsyncClient) -> None:
     out = await _propose("test.post")
     assert (await helper_client.get("/api/desk/control/approvals")).status_code == 200
