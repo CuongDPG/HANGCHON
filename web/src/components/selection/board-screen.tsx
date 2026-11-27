@@ -2,18 +2,20 @@
 
 import { Mic, Settings2, Sparkles, ListChecks, Stamp } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState, type DragEvent } from "react";
+import { useEffect, useState, type DragEvent } from "react";
 import {
   Button,
   Card,
   EmptyState,
   IconButton,
   IconLink,
+  InlineSelect,
   Input,
   PageHeader,
   Sheet,
   SkeletonList,
   Tabs,
+  notifyInfo,
   notifySuccess,
 } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -29,7 +31,16 @@ import {
   type Decision,
   type Stage,
 } from "@/lib/api/selection";
-import { BOARD_PAGE, pageOf } from "./board-paging";
+import {
+  BOARD_PAGE,
+  BOARD_SORT_KEY,
+  BOARD_SORT_OPTIONS,
+  isBoardSort,
+  pageOf,
+  sortFromParam,
+  sortParam,
+  type BoardSort,
+} from "./board-paging";
 import { CandidateCard, ContentQuickLink } from "./candidate-card";
 import { NoteComposer } from "./note-composer";
 import { ReasonsCard } from "./reasons-card";
@@ -51,7 +62,9 @@ export function BoardScreen() {
   const pathname = usePathname();
   const tabParam = params.get("tab") as Stage | null;
   const tab: Stage = tabParam && STAGES.includes(tabParam) ? tabParam : "trial";
-  const { data, isPending, error, refetch } = useBoard();
+  // cách xếp: URL (?xep=moi|cu) là nguồn chính; thiếu thì lấy lựa chọn nhớ trên máy này
+  const sort: BoardSort = sortFromParam(params.get("xep")) ?? "manual";
+  const { data, isPending, error, refetch } = useBoard(undefined, sort);
   const move = useMoveStage();
   const [rejecting, setRejecting] = useState<BoardCard | null>(null);
   const [selectedDecision, setSelectedDecision] = useState<Decision | null>(null);
@@ -63,9 +76,42 @@ export function BoardScreen() {
   const shownOf = (s: Stage) => shown[s] ?? BOARD_PAGE;
   const showMore = (s: Stage) => setShown((v) => ({ ...v, [s]: (v[s] ?? BOARD_PAGE) + BOARD_PAGE }));
 
-  function setTab(t: Stage) {
-    router.replace(`${pathname}?tab=${t}`, { scroll: false });
+  function replaceQuery(patch: Record<string, string | null>) {
+    const next = new URLSearchParams(params.toString());
+    for (const [k, v] of Object.entries(patch)) {
+      if (v === null) next.delete(k);
+      else next.set(k, v);
+    }
+    const qs = next.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }
+
+  function setTab(t: Stage) {
+    replaceQuery({ tab: t });
+  }
+
+  function setSort(s: BoardSort) {
+    try {
+      window.localStorage.setItem(BOARD_SORT_KEY, s);
+    } catch {
+      // trình duyệt chặn localStorage: vẫn đổi được qua URL
+    }
+    replaceQuery({ xep: sortParam(s) });
+  }
+
+  // vào trang (kể cả quay lại từ menu, trang được giữ ẩn) mà URL không có ?xep: áp cách xếp chị chọn lần trước trên máy này
+  const xepParam = params.get("xep");
+  useEffect(() => {
+    if (xepParam) return;
+    let stored: string | null = null;
+    try {
+      stored = window.localStorage.getItem(BOARD_SORT_KEY);
+    } catch {
+      return;
+    }
+    if (isBoardSort(stored) && stored !== "manual") replaceQuery({ xep: sortParam(stored) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy lại khi ?xep đổi
+  }, [xepParam]);
 
   async function moveTo(card: BoardCard, to: Stage, position?: number) {
     if (to === card.stage && position === undefined) return;
@@ -86,13 +132,23 @@ export function BoardScreen() {
     setDragId(null);
     setOver(null);
     if (!card) return;
+    if (card.stage === stage && sort !== "manual") {
+      // đang xếp theo thời gian: không đổi chỗ trong cột được, mời chị chuyển sang «Tự xếp» (thứ tự cũ vẫn giữ nguyên)
+      const from = data!.columns[stage].findIndex((c) => c.id === card.id);
+      if (index !== undefined && index !== from && index !== from + 1) {
+        notifyInfo("Đang xếp theo thời gian nên chưa đổi chỗ trong cột được.", { label: "Chuyển sang Tự xếp", onClick: () => setSort("manual") });
+      }
+      return;
+    }
     if (card.stage === stage) {
       const col = data!.columns[stage];
       const from = col.findIndex((c) => c.id === card.id);
       if (index === undefined || index === from || index === from + 1) return;
       void moveTo(card, stage, index > from ? index - 1 : index);
     } else {
-      void moveTo(card, stage, stage === "rejected" || stage === "selected" ? undefined : index);
+      // đang xếp theo thời gian thì không ghi vị trí: thẻ nằm theo cách xếp đang chọn
+      const keepPosition = sort === "manual" && stage !== "rejected" && stage !== "selected";
+      void moveTo(card, stage, keepPosition ? index : undefined);
     }
   }
 
@@ -134,6 +190,7 @@ export function BoardScreen() {
                 </span>
               </Button>
             ) : null}
+            <InlineSelect appearance="inline" aria-label="Xếp thẻ trong cột" value={sort} onChange={setSort} options={BOARD_SORT_OPTIONS} />
             <IconLink href="/desk/ban-chon/nguyen-tac" label="Bộ nguyên tắc của chị" icon={<ListChecks />} />
             <IconLink href="/desk/ban-chon/gu" label="AI hiểu gu chị thế nào" icon={<Sparkles />} />
             <IconButton label="Cài đặt bàn chọn" icon={<Settings2 />} onClick={() => setSettingsOpen(true)} />
@@ -165,7 +222,7 @@ export function BoardScreen() {
               items={STAGES.map((s) => ({ value: s, label: STAGE_LABELS[s], count: data.counts[s] }))}
             />
             {tab === "rejected" ? <RejectionSummary /> : null}
-            <Column cards={data.columns[tab]} total={data.counts[tab]} stage={tab} shown={shownOf(tab)} onMore={() => showMore(tab)} />
+            <Column cards={data.columns[tab]} total={data.counts[tab]} stage={tab} sort={sort} shown={shownOf(tab)} onMore={() => showMore(tab)} />
           </div>
 
           {/* Máy tính: kanban kéo thả */}
@@ -196,7 +253,7 @@ export function BoardScreen() {
                     <div data-column-list className="-mx-1.5 flex max-h-[calc(100dvh-11rem)] min-h-0 flex-col gap-2 overflow-y-auto overscroll-contain px-1.5 pt-1.5 pb-0.5">
                       {page.visible.map((c, i) => (
                         <div key={c.id} className="relative">
-                          {over?.stage === s && over.index === i && dragId ? (
+                          {over?.stage === s && over.index === i && dragId && sort === "manual" ? (
                             <div aria-hidden className="absolute -top-1.5 right-1 left-1 h-0.5 rounded-full bg-accent" />
                           ) : null}
                           <CandidateCard
@@ -214,7 +271,7 @@ export function BoardScreen() {
                         </div>
                       ))}
                       {!data.columns[s].length ? <p className="px-1 py-4 text-[13px] text-ink-3">{EMPTY[s]}</p> : null}
-                      <MoreCards more={page.more} notLoaded={page.notLoaded} onMore={() => showMore(s)} compact />
+                      <MoreCards more={page.more} notLoaded={page.notLoaded} sort={sort} onMore={() => showMore(s)} compact />
                     </div>
                   </section>
                 );
@@ -246,9 +303,9 @@ export function BoardScreen() {
   );
 }
 
-type ColumnProps = { cards: BoardCard[]; total: number; stage: Stage; shown: number; onMore: () => void };
+type ColumnProps = { cards: BoardCard[]; total: number; stage: Stage; sort: BoardSort; shown: number; onMore: () => void };
 
-function Column({ cards, total, stage, shown, onMore }: ColumnProps) {
+function Column({ cards, total, stage, sort, shown, onMore }: ColumnProps) {
   if (!cards.length) return <EmptyState icon={<Stamp />} title={`Chưa có món nào ở «${STAGE_LABELS[stage]}»`} description={EMPTY[stage]} />;
   const page = pageOf(cards, shown, total);
   return (
@@ -261,13 +318,25 @@ function Column({ cards, total, stage, shown, onMore }: ColumnProps) {
           </li>
         ))}
       </ul>
-      <MoreCards more={page.more} notLoaded={page.notLoaded} onMore={onMore} />
+      <MoreCards more={page.more} notLoaded={page.notLoaded} sort={sort} onMore={onMore} />
     </div>
   );
 }
 
 /** «Xem thêm (n)» cuối cột; cột vượt trần tải thì nói rõ còn bao nhiêu món chưa hiện. */
-function MoreCards({ more, notLoaded, onMore, compact = false }: { more: number; notLoaded: number; onMore: () => void; compact?: boolean }) {
+function MoreCards({
+  more,
+  notLoaded,
+  sort,
+  onMore,
+  compact = false,
+}: {
+  more: number;
+  notLoaded: number;
+  sort: BoardSort;
+  onMore: () => void;
+  compact?: boolean;
+}) {
   return (
     <>
       {more > 0 ? (
@@ -276,7 +345,9 @@ function MoreCards({ more, notLoaded, onMore, compact = false }: { more: number;
         </Button>
       ) : null}
       {more === 0 && notLoaded > 0 ? (
-        <p className="px-1 text-[12.5px] text-ink-3">Còn {notLoaded} món cũ hơn chưa hiện trên bàn chọn.</p>
+        <p className="px-1 text-[12.5px] text-ink-3">
+          Còn {notLoaded} món {sort === "oldest" ? "mới" : "cũ"} hơn chưa hiện trên bàn chọn.
+        </p>
       ) : null}
     </>
   );

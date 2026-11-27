@@ -97,3 +97,28 @@ test("kanban 5 cột trên máy tính, nguồn cung mở được", async ({ pag
   await expect(page.getByRole("heading", { level: 1, name: "Nguồn cung" })).toBeVisible();
   await expect(page.getByText("Xưởng inox Phật Sơn (ví dụ)")).toBeVisible();
 });
+
+test("xếp thẻ theo thời gian, nhớ trên URL, thả trong cột mời về «Tự xếp»", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "Kéo thả chỉ có trên máy tính");
+  test.skip(!(await login(page.request)), "API chưa chạy hoặc chưa có dữ liệu mẫu");
+  await page.goto("/desk/ban-chon");
+  const main = page.getByRole("main");
+  const sortBox = main.getByRole("combobox", { name: "Xếp thẻ trong cột" });
+  await expect(sortBox).toHaveText(/Tự xếp/);
+
+  const newest = page.waitForResponse((r) => r.url().includes("/selection/board") && r.url().includes("sort=newest"));
+  await sortBox.click();
+  await page.getByRole("option", { name: "Mới nhất" }).click();
+  await newest;
+  await expect(page).toHaveURL(/xep=moi/);
+  await page.reload();
+  await expect(main.getByRole("combobox", { name: "Xếp thẻ trong cột" })).toHaveText(/Mới nhất/);
+
+  // thả một thẻ xuống dưới trong cùng cột → không đổi chỗ, thông báo kèm nút chuyển về «Tự xếp»
+  const cards = main.getByRole("region", { name: "Ứng viên" }).locator("[data-card-id]");
+  await expect(cards.nth(2)).toBeVisible();
+  await cards.first().dragTo(cards.nth(2), { targetPosition: { x: 20, y: 60 } });
+  await page.getByRole("button", { name: "Chuyển sang Tự xếp" }).click();
+  await expect(page).not.toHaveURL(/xep=/);
+  await expect(main.getByRole("combobox", { name: "Xếp thẻ trong cột" })).toHaveText(/Tự xếp/);
+});

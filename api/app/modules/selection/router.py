@@ -140,8 +140,8 @@ async def _create_note(
 
 
 @router.get("/board", response_model=BoardOut, summary="Bảng chọn (c1)")
-async def get_board(_: CurrentUser, db: DbSession, q: str | None = None) -> dict:
-    return await service.board(db, q)
+async def get_board(_: CurrentUser, db: DbSession, q: str | None = None, sort: service.BoardSort = "manual") -> dict:
+    return await service.board(db, q, sort)
 
 
 @router.get("/settings", response_model=SelectionSettings)
