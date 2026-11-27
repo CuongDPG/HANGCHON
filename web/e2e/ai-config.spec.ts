@@ -32,7 +32,7 @@ test("chị nhập khoá, lưu, thấy khoá bị che; kiểm tra kết nối v�
 
   await page.goto("/desk/cai-dat");
   await main(page).getByRole("navigation", { name: "Mục cài đặt" }).getByRole("link", { name: "AI", exact: true }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "AI và khoá API" })).toBeVisible();
+  await expect(page.getByRole("main").getByRole("navigation", { name: "Mục cài đặt" }).getByRole("link", { name: "AI", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(main(page).getByText("Đang dùng: AI giả")).toBeVisible();
 
   // nhập khoá Anthropic, chỉ lưu sẵn (không chuyển provider → các bài khác vẫn chạy AI giả)
@@ -83,7 +83,7 @@ test("người phụ giúp không thấy, không vào được cấu hình AI", 
   const helper = await ctx.newPage();
   await login(helper, email, password);
   await helper.goto("/desk/cai-dat");
-  await expect(helper.getByRole("heading", { level: 1, name: "Cửa hàng" })).toBeVisible();
+  await expect(helper.getByRole("main").getByRole("navigation", { name: "Mục cài đặt" }).getByRole("link", { name: "Cửa hàng", exact: true })).toHaveAttribute("aria-current", "page");
   const tabs = main(helper).getByRole("navigation", { name: "Mục cài đặt" });
   await expect(tabs.getByRole("link", { name: "Tích hợp" })).toBeVisible();
   await expect(tabs.getByRole("link", { name: "AI", exact: true })).toHaveCount(0);
@@ -98,7 +98,7 @@ test("người phụ giúp không thấy, không vào được cấu hình AI", 
 test("màn cấu hình AI gọn ở 390px và 1280px", async ({ page }, info) => {
   await login(page, OWNER.email, OWNER.password);
   await page.goto("/desk/cai-dat/ai");
-  await expect(page.getByRole("heading", { level: 1, name: "AI và khoá API" })).toBeVisible();
+  await expect(page.getByRole("main").getByRole("navigation", { name: "Mục cài đặt" }).getByRole("link", { name: "AI", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(main(page).getByRole("combobox", { name: "Nhà cung cấp AI" })).toBeVisible();
   await pickProvider(page, /Anthropic/);
   await expect(main(page).getByLabel("Khoá API")).toBeVisible();

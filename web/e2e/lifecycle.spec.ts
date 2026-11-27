@@ -278,7 +278,7 @@ test("một món hàng từ đề tìm tới đánh giá của khách", async ({
   await page.goto(`/desk/nhat-ky-ai?ngay=hom-nay&action=content.publish_post`);
   await expect(main.getByText(`Đăng Facebook: ${product.name}`).first()).toBeVisible();
   await page.goto("/desk/bao-cao");
-  await main.getByRole("button", { name: "Lập lại tuần này" }).click();
+  await main.getByRole("button", { name: "Lập lại" }).click();
   await expect(page.getByText("Đã lập báo cáo tuần này")).toBeVisible();
   const reports = await api<{ items: { revenue_vnd: number; week_start: string }[] }>(page.request, "get", "/api/desk/finance/reports");
   expect(reports.items[0].revenue_vnd).toBeGreaterThanOrEqual(detail.total_vnd);

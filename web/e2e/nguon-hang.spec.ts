@@ -21,7 +21,7 @@ test("chị chọn cách lấy hàng từng sàn và lưu khoá OneBound giả",
   test.skip(info.project.name !== "desktop", "ghi dữ liệu: chỉ chạy một lần (bàn làm việc ưu tiên máy tính)");
   await ownerLogin(page);
   await page.goto("/desk/cai-dat/nguon-hang");
-  await expect(page.getByRole("heading", { level: 1, name: "Nguồn hàng" })).toBeVisible();
+  await expect(page.getByRole("main").getByRole("navigation", { name: "Mục cài đặt" }).getByRole("link", { name: "Nguồn hàng", exact: true })).toHaveAttribute("aria-current", "page");
   for (const name of PLATFORMS) await expect(main(page).getByRole("region", { name, exact: true })).toBeVisible();
   const ob = main(page).getByRole("region", { name: "OneBound (1688, Taobao, Tmall)" });
   const rk = main(page).getByRole("region", { name: "Rakuten Web Service (Rakuten Ichiba)" });

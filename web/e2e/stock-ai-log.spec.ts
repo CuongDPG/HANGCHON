@@ -36,7 +36,7 @@ test("chị nhập tồn đầu kỳ, điều chỉnh có lý do, đặt ngưỡ
   const name = pick.name;
 
   await page.goto("/desk/don-hang/van-hanh?tab=ton");
-  await expect(page.getByRole("heading", { level: 1, name: "Vận hành" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Tồn kho" })).toBeVisible();
   await page.getByRole("button", { name: "Thêm món giữ sẵn" }).first().click();
   const add = page.getByRole("dialog").filter({ has: page.getByRole("heading", { name: "Thêm món giữ sẵn" }) });
   await add.getByRole("combobox", { name: "Món" }).click();

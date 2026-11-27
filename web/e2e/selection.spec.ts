@@ -94,7 +94,7 @@ test("kanban 5 cột trên máy tính, nguồn cung mở được", async ({ pag
     await expect(page.getByRole("region", { name: col })).toBeVisible();
   }
   await page.goto("/desk/nguon-cung?tab=ncc");
-  await expect(page.getByRole("heading", { level: 1, name: "Nguồn cung" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Nhà cung cấp" })).toBeVisible();
   await expect(page.getByText("Xưởng inox Phật Sơn (ví dụ)")).toBeVisible();
 });
 

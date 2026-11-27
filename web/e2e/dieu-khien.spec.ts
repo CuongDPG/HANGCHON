@@ -44,7 +44,7 @@ test("Sao lưu: sao lưu ngay, kiểm khôi phục, thấy lần thành công v�
   test.skip(info.project.name !== "desktop", "ghi dữ liệu: chỉ chạy một lần (bàn làm việc ưu tiên máy tính)");
   await login(page);
   await page.goto("/desk/cai-dat/sao-luu");
-  await expect(page.getByRole("heading", { level: 1, name: "Sao lưu" })).toBeVisible();
+  await expect(page.getByRole("main").getByRole("navigation", { name: "Mục cài đặt" }).getByRole("link", { name: "Sao lưu", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(page.getByText("Bản ngoài máy chủ")).toBeVisible();
   await page.getByRole("button", { name: "Sao lưu ngay" }).click();
   await expect(page.getByText(/^Đã sao lưu/)).toBeVisible({ timeout: 30_000 });
@@ -59,7 +59,7 @@ test("Cài đặt: thẻ cho biết tích hợp nào chạy thật, cái nào c�
   await login(page);
   await page.goto("/desk/cai-dat");
   await page.getByRole("navigation", { name: "Mục cài đặt" }).getByRole("link", { name: "Tích hợp" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Tích hợp" })).toBeVisible();
+  await expect(page.getByRole("main").getByRole("navigation", { name: "Mục cài đặt" }).getByRole("link", { name: "Tích hợp", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(page.getByRole("main").getByText(/còn giả lập/).first()).toBeVisible();
   await expect(page.getByRole("main").getByText(/Còn giả lập: .*Báo tin cho khách/)).toBeVisible();
   await expect(page.getByText("Tin báo khách ghi là đã gửi nhưng không tới khách.")).toBeVisible();

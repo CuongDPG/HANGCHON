@@ -84,7 +84,7 @@ test("Hôm nay → sửa rồi duyệt, trả lại, đổi mức tự chủ, ho
     await page.getByRole("alertdialog").getByRole("button", { name: "Hoàn tác" }).click();
     await expect(page.getByText("Đã hoàn tác").first()).toBeVisible();
   }
-  await main(page).getByRole("tab", { name: "Lưu vết duyệt" }).click();
+  await main(page).getByRole("navigation", { name: "Mục trong khu" }).getByRole("link", { name: "Lưu vết duyệt" }).click();
   await expect(main(page).getByText(/Duyệt|Trả lại|Hoàn tác/).first()).toBeVisible();
 
   // k1: ghi khoản chi kèm ảnh chứng từ
@@ -108,7 +108,7 @@ test("Hôm nay → sửa rồi duyệt, trả lại, đổi mức tự chủ, ho
 
   // i5: lập lại báo cáo tuần này
   await page.goto("/desk/bao-cao");
-  await main(page).getByRole("button", { name: "Lập lại tuần này" }).click();
+  await main(page).getByRole("button", { name: "Lập lại" }).click();
   await expect(page.getByText("Đã lập báo cáo tuần này")).toBeVisible();
   await expect(main(page).getByText("AI rút ra")).toBeVisible();
 });

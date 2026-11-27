@@ -19,7 +19,7 @@ async function login(page: Page) {
   await page.getByLabel("Email").fill(EMAIL);
   await page.getByLabel("Mật khẩu").fill(PASSWORD);
   await page.getByRole("button", { name: "Đăng nhập" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Nội dung" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Xưởng" })).toBeVisible();
 }
 
 async function shot(page: Page, name: string, project: string) {
@@ -38,7 +38,8 @@ test.describe.configure({ mode: "serial" });
 test("xưởng: viết lại, duyệt, xếp lịch", async ({ page }, info) => {
   await login(page);
   const main = page.getByRole("main");
-  await main.getByRole("button", { name: /Tất cả/ }).click();
+  await main.getByRole("tab", { name: /Tất cả/ }).click();
+  await expect(page).toHaveURL(/\/desk\/noi-dung\?tab=all$/);
   await shot(page, "noi-dung", info.project.name);
   await noOverflow(page);
 
@@ -69,21 +70,25 @@ test("xưởng: viết lại, duyệt, xếp lịch", async ({ page }, info) => 
 test("lịch đăng và các mục con", async ({ page }, info) => {
   await login(page);
   const main = page.getByRole("main");
-  await main.getByRole("link", { name: "Lịch đăng" }).first().click();
+  await main.getByRole("navigation", { name: "Mục trong khu" }).getByRole("link", { name: "Lịch đăng" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Lịch đăng" })).toBeVisible();
   await expect(main.getByText(/Đã duyệt, chờ giờ/).first()).toBeVisible();
   await main.getByRole("button", { name: "AI xếp lịch tuần" }).click();
   await shot(page, "lich", info.project.name);
   await noOverflow(page);
 
-  for (const [link, heading, name] of [
-    ["Bài ra đơn", "Bài nào ra đơn", "so-lieu"],
-    ["Giọng của chị", "Giọng của chị", "giong"],
-    ["Video ngắn", "Video ngắn", "video"],
-    ["Livestream", "Livestream", "livestream"],
+  // Giọng của chị: trang cấu hình sau nút bánh răng
+  await main.getByRole("link", { name: "Giọng của chị" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Giọng của chị" })).toBeVisible();
+  await main.getByRole("link", { name: "Quay lại" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Xưởng" })).toBeVisible();
+  for (const [link, name] of [
+    ["Ra đơn", "so-lieu"],
+    ["Video", "video"],
+    ["Livestream", "livestream"],
   ] as const) {
-    await main.getByRole("navigation", { name: "Mục nội dung" }).getByRole("link", { name: link }).click();
-    await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
+    await main.getByRole("navigation", { name: "Mục trong khu" }).getByRole("link", { name: link, exact: true }).click();
+    await expect(page.getByRole("heading", { level: 1, name: link })).toBeVisible();
     await shot(page, name, info.project.name);
     await noOverflow(page);
   }

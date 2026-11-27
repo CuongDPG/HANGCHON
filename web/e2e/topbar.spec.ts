@@ -38,7 +38,7 @@ test("đi bằng menu trên và «Thêm», đánh dấu mục đang mở, dùng 
   await expect(menu).toBeVisible();
   await expect(more(page)).toHaveAttribute("aria-expanded", "true");
   await menu.getByRole("menuitem", { name: "Sổ sách" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Sổ sách" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Thu chi" })).toBeVisible();
   await expect(menu).toBeHidden();
   await more(page).click();
   await expect(menu.getByRole("menuitem", { name: "Sổ sách" })).toHaveAttribute("aria-current", "page");

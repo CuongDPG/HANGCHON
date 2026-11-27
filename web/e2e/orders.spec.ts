@@ -154,20 +154,20 @@ test("«Của tôi»: đăng nhập bằng mã một lần, thấy đơn của m
 });
 
 for (const p of [
-  { path: "/desk/don-hang", name: "desk-don-hang", heading: "Đơn hàng" },
-  { path: "/desk/don-hang?nhom=cho_giao", name: "desk-cho-giao", heading: "Đơn hàng" },
+  { path: "/desk/don-hang", name: "desk-don-hang", heading: "Đơn" },
+  { path: "/desk/don-hang?nhom=cho_giao", name: "desk-cho-giao", heading: "Đơn" },
   { path: "/desk/don-hang/tao", name: "desk-tao-don", heading: "Tạo đơn" },
-  { path: "/desk/don-hang/van-hanh", name: "desk-van-hanh-tien", heading: "Vận hành" },
-  { path: "/desk/don-hang/van-hanh?tab=ton", name: "desk-van-hanh-ton", heading: "Vận hành" },
-  { path: "/desk/don-hang/van-hanh?tab=san", name: "desk-van-hanh-san", heading: "Vận hành" },
-  { path: "/desk/don-hang/van-hanh?tab=mau-tin", name: "desk-van-hanh-mau-tin", heading: "Vận hành" },
+  { path: "/desk/don-hang/van-hanh", name: "desk-van-hanh-tien", heading: "Tiền về" },
+  { path: "/desk/don-hang/van-hanh?tab=ton", name: "desk-van-hanh-ton", heading: "Tồn kho" },
+  { path: "/desk/don-hang/van-hanh?tab=san", name: "desk-van-hanh-san", heading: "Sàn" },
+  { path: "/desk/don-hang/van-hanh?tab=mau-tin", name: "desk-van-hanh-mau-tin", heading: "Mẫu tin" },
 ]) {
   test(`mở ${p.path}`, async ({ page }, info) => {
     test.skip(!(await login(page)), "Cần API đang chạy với tài khoản chị");
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     await page.goto(p.path);
-    await expect(page.getByRole("heading", { level: 1, name: p.heading })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: p.heading, exact: true })).toBeVisible();
     await page.waitForLoadState("networkidle");
     await shot(page, p.name, info.project.name);
     await noOverflow(page);

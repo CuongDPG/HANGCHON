@@ -66,8 +66,21 @@ export function ApprovalsScreen() {
 ### Quy ước chung
 
 - Mỗi trang đúng một `PageHeader` (một `<h1>`). Nút quay lại chỉ là mũi tên (`backHref`).
-- Bàn làm việc: đầu trang gọn một hàng (khung `data-desk` tự thu `PageHeader`: tiêu đề 21/22px, eyebrow + mô tả cùng hàng); nút thao tác đặt vào `actions`, không thêm hàng nút riêng; không viết câu hướng dẫn cách dùng màn hình (chỉ giữ số liệu, trạng thái, cảnh báo). Desk phủ hết bề ngang màn hình; chỉ form/đoạn đọc dài mới tự giới hạn bề rộng.
-- Trang gốc bọc nội dung trong `<div className="flex flex-col gap-4">` (hoặc `gap-6`); khung đã lo lề và khoảng chừa cho thanh điều hướng.
+- Bàn làm việc: đầu trang là **một hàng cao cố định 44px** (khung `data-desk` tự thu `PageHeader`: tiêu đề 21/22px, không xuống dòng) để chuyển màn không nhảy;
+  không viết câu hướng dẫn (`description`) — số đếm nằm ở tab/chip, chỉ giữ số liệu, trạng thái, cảnh báo. Trạng thái là `badge` cạnh tiêu đề (eyebrow không viết HOA).
+  Thao tác trong `actions`: cao 36px (`Button`/`IconButton` `size="sm"`), nhãn 1–2 chữ, tối đa 1 nút chính + 2 nút khác; phần còn lại và liên kết sang màn liên quan
+  vào menu «⋯» (`DeskMoreMenu`, `relatedItems()`). Trang cấu hình của khu: `settings={{ href, label }}` → một nút bánh răng cuối hàng tiêu đề.
+  Điện thoại: nút có icon chỉ còn icon. Desk phủ hết bề ngang màn hình; chỉ form/đoạn đọc dài mới tự giới hạn bề rộng.
+- **Ba tầng điều hướng của desk** (mỗi khu theo thứ tự công việc):
+  1. *Tiêu đề là tab* — các mục lớn của khu, mỗi mục một trang/URL: `<PageHeader sections={PRODUCT_SECTIONS} active="drops" />` → `Sản phẩm | Đợt bán | …`
+     (mục đang mở là h1, mục khác là liên kết mờ; tối đa 5; khai báo trong `src/lib/desk-sections.ts`). Hơn 5 mục (Cài đặt) → tiêu đề + tab tầng 2 theo route.
+  2. *Tab* (`Tabs`, gạch chân) — bước/giai đoạn trong một mục, có số đếm. Bước là trang riêng → `TabLinks` (cùng kiểu).
+  3. *Chip* — phân loại dữ liệu (nhóm, kênh, khoảng thời gian), cùng một hàng `Toolbar` với ô tìm/sắp xếp/chọn kỳ canh phải (`end`, `ToolbarSearch`).
+  Lựa chọn tầng 2/3 luôn nằm trong URL (`useUrlParam`, `router.replace`) để quay lại/tải lại vẫn đúng chỗ.
+- Trang chi tiết desk: mũi tên quay lại + tên + `badge` trạng thái trên hàng tiêu đề, phần của trang là tab tầng 2. Đang tải/lỗi vẫn dựng cùng khung
+  (`<PageHeader loading backHref=… />`, fallback `<Suspense>` dùng `DeskPageFallback`) với **đúng mũi tên quay lại** như khi đã tải — không bao giờ mất đầu trang.
+  `e2e/desk-layout.spec.ts` canh chiều cao 44px và việc nội dung không nhảy giữa các mục tầng 1.
+- Trang gốc bọc nội dung trong `<div className="flex flex-col gap-4">` (desk luôn `gap-4`); khung đã lo lề và khoảng chừa cho thanh điều hướng.
 - Website cho khách: thiết kế ở **390px trước**, rồi nới bằng `md:` (768px). Bàn làm việc: **máy tính trước** (1280/1440/1920, 1024 vẫn phải dùng được); điện thoại chỉ giữ thanh tab dưới như hiện có.
   `md:` cũng là mốc điều hướng chuyển từ thanh dưới sang hàng menu trên (`DeskTopBar`: logo trái; mục chính + «Thêm» + ảnh đại diện là một cụm canh phải, lấy từ `desk-nav.ts`, mục không đủ chỗ tự dồn vào «Thêm»; Cài đặt chỉ ở menu ảnh đại diện; sáng/tối chọn ở *Cài đặt → Tài khoản*).
 - Chỉ dùng token màu (mục 4). Bảng màu mặc định của Tailwind đã tắt: `bg-red-500` sẽ không có tác dụng.
@@ -167,8 +180,8 @@ Nhập từ một chỗ: `import { Button, Card, Money } from "@/components/ui";
 | `InlineSelect` | `<InlineSelect label="Hãng giao" value={v} onChange={setV} options={[{ value: "ghn", label: "GHN", hint: "22.000đ" }]} />` · `appearance="inline"` để chen trong câu |
 | `Checkbox`, `Radio`, `RadioGroup`, `Switch` | `<Checkbox label="Chỉ hàng Nhật" />` · `<RadioGroup name="pay" value={v} onChange={setV} options={[…]} />` · `<Switch label="Tự đăng" checked={on} onChange={setOn} />` |
 | `Segmented` | `<Segmented aria-label="Mức tự chủ" value={lv} onChange={setLv} options={[{value:"auto",label:"Tự làm"},…]} />` (2–4 lựa chọn ngắn) |
-| `Tabs` | `<Tabs aria-label="Trạng thái" value={t} onChange={setT} items={[{ value: "cho", label: "Chờ thanh toán", count: 3 }]} />` |
-| `Chip`, `ChipRow` | `<ChipRow><Chip selected count={38}>Tất cả</Chip>…</ChipRow>` (bộ lọc bấm được) |
+| `Tabs`, `TabLinks` | `<Tabs aria-label="Trạng thái" value={t} onChange={setT} items={[{ value: "cho", label: "Chờ thanh toán", count: 3 }]} />` · `<TabLinks aria-label="Chăm khách" active="regulars" items={[{ key, href, label }]} />` (tab theo route) |
+| `Chip`, `ChipRow`, `Toolbar`, `ToolbarSearch` | `<ChipRow><Chip selected count={38}>Tất cả</Chip>…</ChipRow>` (bộ lọc bấm được) · desk: `<Toolbar end={<ToolbarSearch aria-label="Tìm" … />}>{chips}</Toolbar>` |
 | `Badge` | `<Badge tone="neutral\|accent\|success\|warning\|danger\|outline">Chờ chuyển khoản</Badge>` (nhãn tĩnh) |
 | `LevelTag`, `LevelMark`, `LEVEL_LABELS` | `<LevelTag level="owner\|review\|auto" />` · `<LevelTag level="review">Chờ duyệt</LevelTag>` — vuông đỏ son / nửa tròn vàng nâu / tròn cổ vịt |
 | `Seal` | `<Seal size={48} />` — con dấu «ĐÃ CHỌN», đi theo món hàng ở mọi nơi; desk thêm `chosen={1} total={24}` → «ĐÃ CHỌN 1/24» (website không hiện số) |
@@ -179,7 +192,7 @@ Nhập từ một chỗ: `import { Button, Card, Money } from "@/components/ui";
 | `ProgressBar`, `ScoreBar` | `<ProgressBar value={86} max={120} label="86 trên 120 suất" />` · `<ScoreBar label="Chất lượng" score={22} max={25} />` |
 | `Skeleton`, `SkeletonList` | `<Skeleton className="h-5 w-40" />` · `<SkeletonList rows={3} />` |
 | `EmptyState` | `<EmptyState icon={<Search />} title="Chưa có ứng viên" description="…" action={<Button>Ra đề</Button>} tone="error" />` |
-| `PageHeader` | `<PageHeader eyebrow="Thứ tư, 25/11" title="Hôm nay" description="…" backHref="/desk" actions={…} />` |
+| `PageHeader` | `<PageHeader title="Hôm nay" backHref="/desk" badge={<Badge>…</Badge>} actions={…} settings={{ href, label }} />` · desk tầng 1: `sections={…} active="…"` · `loading` (khung khi đang tải) · website thêm `eyebrow`, `description` |
 | `ImageBox` | `<ImageBox src={url} alt="…" ratio="1/1\|4/5\|3/4\|4/3\|16/9" placeholder="Ảnh chị chụp" overlay={<Seal … />} priority />` · ảnh từ máy chủ ngoài (link ảnh nhà cung cấp chưa lưu) thêm `referrerPolicy="no-referrer"` |
 | `Money` | `<Money value={385000} />` → 385.000đ · `compact` → 3,4 tr · `strike` |
 | `DateTime`, `useNow()` | `<DateTime value={iso} format="date\|dayMonth\|time\|dateTime\|weekday\|relative" />` |
@@ -191,7 +204,8 @@ Tiện ích (`src/lib`): `format.ts` (`formatVnd`, `formatVndCompact`, `formatNu
 `formatDateTime`, `formatWeekday`, `formatRelative`), `text.ts` (`normalizeVi`, `matchesVi`, `slugifyVi`), `cn.ts` (ghép className, lớp sau thắng).
 
 Khung: `components/layout/brand.tsx` (`Brand`, `BrandMark`), `components/store/*` (đầu trang, thanh dưới, chân trang, `StorePlaceholder`),
-`components/desk/*` (`DeskShell`, `DeskTopBar`, `MoreSheet`, `CommandButton`, `DeskPlaceholder`).
+`components/desk/*` (`DeskShell`, `DeskTopBar`, `MoreSheet`, `CommandButton`, `DeskMoreMenu` + `relatedItems()`, `DeskPageFallback`), menu thả xuống dùng chung `components/ui/menu.tsx`.
+Desk: `src/lib/desk-sections.ts` (mục tầng 1 từng khu), `src/lib/use-url-param.ts` (`useUrlParam`).
 
 ## 6. Bản đồ route
 
@@ -235,7 +249,7 @@ Nguồn duy nhất: `src/lib/desk-nav.ts` (`DESK_PRIMARY_NAV`, `DESK_MORE_NAV`, 
 | `/desk/nhat-ky-ai` | Nhật ký AI *(Thêm)* | i4, k3 |
 | `/desk/bao-cao` | Báo cáo *(Thêm)* | i5, f7 |
 | `/desk/so-sach` | Sổ sách *(Thêm)* | k1, k5 |
-| `/desk/cai-dat` | Cài đặt *(menu tài khoản)* — chuyển tới tab đầu; tab theo URL (`SettingsNav`): `cua-hang` · `mang-xa-hoi` · `nguon-hang` · `tich-hop` · `ai` · `nguoi-phu-giup` · `tai-khoan` (gồm chọn sáng/tối) · `sao-luu` | k4, f4, h1, g9 |
+| `/desk/cai-dat` | Cài đặt *(menu tài khoản)* — chuyển tới tab đầu; tab tầng 2 theo URL (`SettingsHeader`): `cua-hang` · `mang-xa-hoi` · `nguon-hang` · `tich-hop` · `ai` · `nguoi-phu-giup` · `tai-khoan` (gồm chọn sáng/tối) · `sao-luu` | k4, f4, h1, g9 |
 | `/desk/dang-nhap` | Đăng nhập (ngoài khung, không cần đăng nhập) | — |
 | `/desk/kit` | Trưng bày hệ thiết kế (ngoài khung, không cần đăng nhập) | — |
 | `/desk/manifest.webmanifest` | Manifest PWA (phạm vi `/desk`) | — |

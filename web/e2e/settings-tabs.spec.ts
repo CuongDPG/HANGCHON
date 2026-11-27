@@ -19,20 +19,14 @@ test.beforeEach(async ({ page }) => {
 test("Cài đặt mở tab đầu, đi qua các tab bằng thanh tab", async ({ page }) => {
   await page.goto("/desk/cai-dat");
   await expect(page).toHaveURL(/\/desk\/cai-dat\/cua-hang$/);
-  await expect(page.getByRole("heading", { level: 1, name: "Cửa hàng" })).toBeVisible();
+  await expect(page.getByRole("main").getByRole("navigation", { name: "Mục cài đặt" }).getByRole("link", { name: "Cửa hàng", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(tabs(page).getByRole("link")).toHaveText(["Cửa hàng", "Mạng xã hội", "Nguồn hàng", "Tích hợp", "AI", "Người phụ giúp", "Tài khoản", "Sao lưu"]);
   await expect(tabs(page).getByRole("link", { name: "Cửa hàng" })).toHaveAttribute("aria-current", "page");
 
-  for (const [tab, h1] of [
-    ["Mạng xã hội", "Mạng xã hội"],
-    ["Nguồn hàng", "Nguồn hàng"],
-    ["Tích hợp", "Tích hợp"],
-    ["AI", "AI và khoá API"],
-    ["Tài khoản", "Tài khoản của chị"],
-    ["Sao lưu", "Sao lưu"],
-  ] as const) {
+  await expect(page.getByRole("heading", { level: 1, name: "Cài đặt" })).toBeVisible();
+  for (const tab of ["Mạng xã hội", "Nguồn hàng", "Tích hợp", "AI", "Tài khoản", "Sao lưu"]) {
     await tabs(page).getByRole("link", { name: tab, exact: true }).click();
-    await expect(page.getByRole("heading", { level: 1, name: h1 })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Cài đặt" })).toBeVisible();
     await expect(tabs(page).getByRole("link", { name: tab, exact: true })).toHaveAttribute("aria-current", "page");
   }
   // Tài khoản có chọn sáng/tối (thay nút trên hàng menu)
@@ -43,7 +37,7 @@ test("Cài đặt mở tab đầu, đi qua các tab bằng thanh tab", async ({ 
 test("Mạng xã hội: lưu khoá giả cho Trang Facebook, chỉ hiện 4 ký tự cuối", async ({ page }, info) => {
   test.skip(info.project.name !== "desktop", "ghi dữ liệu: chỉ chạy một lần (bàn làm việc ưu tiên máy tính)");
   await page.goto("/desk/cai-dat/mang-xa-hoi");
-  await expect(page.getByRole("heading", { level: 1, name: "Mạng xã hội" })).toBeVisible();
+  await expect(page.getByRole("main").getByRole("navigation", { name: "Mục cài đặt" }).getByRole("link", { name: "Mạng xã hội", exact: true })).toHaveAttribute("aria-current", "page");
   for (const name of ["Trang Facebook", "Instagram", "Threads", "TikTok", "Zalo OA", "Nhóm Zalo", "Shopee", "TikTok Shop"]) {
     await expect(main(page).getByRole("region", { name, exact: true })).toBeVisible();
   }
