@@ -9,6 +9,13 @@ from pydantic import BaseModel, Field
 ChannelKey = Literal["facebook", "instagram", "threads", "tiktok", "zalo_oa"]
 
 
+class CustomerQuote(BaseModel):
+    """Lý do chọn của một khách đã mua (đánh giá chị đã duyệt) — trích nguyên văn, ghi rõ là lời khách."""
+
+    name: str
+    text: str
+
+
 class ProductFacts(BaseModel):
     """Hồ sơ sản phẩm — nguồn sự thật duy nhất cho số liệu trong bài. Không kèm quá trình chọn (số món đã xem, mẫu bị loại)."""
 
@@ -28,6 +35,10 @@ class ProductFacts(BaseModel):
     trial_notes: list[str] = Field(default_factory=list, description="Ghi chú thử hàng của chị (nguồn sự thật)")
     safety_warnings: list[str] = Field(
         default_factory=list, description="Cảnh báo an toàn bắt buộc phải có trong MỌI bài, mọi kênh"
+    )
+    customer_reasons: list[CustomerQuote] = Field(
+        default_factory=list,
+        description="«Vì sao khách chọn»: lời khách đã mua, chị đã duyệt; được trích 1–2 câu, không bắt buộc",
     )
 
 

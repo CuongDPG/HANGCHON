@@ -114,6 +114,20 @@ async function ProductBody({ params }: { params: PageProps<"/san-pham/[slug]">["
             </Card>
           ) : null}
 
+          {p.customer_reasons?.length ? (
+            <Card tone="soft">
+              <h2 className="text-[17px] font-bold">Vì sao khách chọn</h2>
+              <ul className="mt-2 flex flex-col gap-2.5">
+                {p.customer_reasons.slice(0, 5).map((r, i) => (
+                  <li key={i}>
+                    <blockquote className="border-l-2 border-accent/40 pl-3 text-[15px]">“{r.text}”</blockquote>
+                    <p className="mt-0.5 pl-3 text-[13px] text-ink-2">— {r.display_name}, đã mua</p>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          ) : null}
+
           {p.not_satisfied ? (
             <Card>
               <h2 className="flex items-center gap-1.5 text-[17px] font-bold">

@@ -29,6 +29,7 @@ log = logging.getLogger("app.catalog")
 
 REVIEW_TTL_DAYS = 60
 MAX_PHOTOS = 4
+MAX_REASON = 300  # «Vì sao bạn chọn món này?»
 
 
 def short_name(full: str | None) -> str | None:
@@ -126,7 +127,14 @@ async def get_by_token(db: AsyncSession, token: str) -> Review:
 
 
 async def submit(
-    db: AsyncSession, review: Review, *, rating: int, body: str | None, display_name: str | None, photos: list[bytes]
+    db: AsyncSession,
+    review: Review,
+    *,
+    rating: int,
+    body: str | None,
+    display_name: str | None,
+    photos: list[bytes],
+    choice_reason: str | None = None,
 ) -> Review:
     if review.status == ReviewStatus.EXPIRED:
         raise Conflict("Đường link này đã hết hạn.", code="review_expired")
@@ -137,6 +145,9 @@ async def submit(
     body = (body or "").strip()
     if len(body) > 2000:
         raise BadRequest("Lời đánh giá dài quá 2.000 chữ.")
+    choice_reason = " ".join((choice_reason or "").split())
+    if len(choice_reason) > MAX_REASON:
+        raise BadRequest(f"Lý do chọn dài quá {MAX_REASON} chữ.")
     if len(photos) > MAX_PHOTOS:
         raise BadRequest(f"Tối đa {MAX_PHOTOS} ảnh.")
     stored = []
@@ -145,6 +156,7 @@ async def submit(
         stored.append({"files": await img_lib.store_renditions(f"public/reviews/{review.id}", processed)})
     review.rating = rating
     review.body = body or None
+    review.choice_reason = choice_reason or None
     review.display_name = (display_name or "").strip()[:60] or review.display_name
     review.photos = stored
     review.submitted_at = now_utc()
@@ -156,7 +168,11 @@ async def submit(
 
 async def moderate_and_propose(db: AsyncSession, review: Review) -> control.ProposeOutcome:
     product = await db.get(Product, review.product_id)
-    inp = ModerateIn(kind="review", text=review.body or "", product_name=product.name if product else None,
+    # AI lọc cả lời đánh giá lẫn lý do chọn (cả hai đều hiện công khai)
+    text = "\n".join(
+        t for t in (review.body, f"Vì sao chọn: {review.choice_reason}" if review.choice_reason else None) if t
+    )
+    inp = ModerateIn(kind="review", text=text, product_name=product.name if product else None,
                      rating=review.rating)  # fmt: skip
     rules = moderate_rules(inp)
     run_id = None
@@ -185,6 +201,7 @@ async def moderate_and_propose(db: AsyncSession, review: Review) -> control.Prop
             "product": product.name if product else None,
             "rating": review.rating,
             "body": review.body,
+            "choice_reason": review.choice_reason,
             "display_name": review.display_name,
             "photos": [photo_url(p, 400) for p in review.photos],
             "flags": review.ai_flags,

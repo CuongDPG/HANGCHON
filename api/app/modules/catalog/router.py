@@ -238,7 +238,7 @@ async def _invite(db: AsyncSession, r: Review) -> dict[str, Any]:
     return {
         "status": r.status, "product_name": p.name, "product_slug": p.slug,
         "product_image": image_set(img) if img else None, "display_name": r.display_name,
-        "rating": r.rating, "body": r.body,
+        "rating": r.rating, "body": r.body, "choice_reason": r.choice_reason,
     }  # fmt: skip
 
 
@@ -255,6 +255,7 @@ async def submit_review(
     rating: Annotated[int, Form(ge=1, le=5)],
     body: Annotated[str | None, Form(max_length=2000)] = None,
     display_name: Annotated[str | None, Form(max_length=60)] = None,
+    choice_reason: Annotated[str | None, Form(max_length=review_svc.MAX_REASON)] = None,
     photos: Annotated[list[UploadFile] | None, File()] = None,
 ) -> Any:
     await limit(f"review:{client_ip(request)}", 10, 600)
@@ -266,7 +267,8 @@ async def submit_review(
     if any((f.size or 0) > MAX_UPLOAD_BYTES for f in files):
         raise BadRequest("Ảnh lớn quá 15 MB, bạn chọn ảnh nhỏ hơn nhé.", code="image_too_large")
     blobs = [await f.read() for f in files]
-    await review_svc.submit(db, r, rating=rating, body=body, display_name=display_name, photos=blobs)
+    await review_svc.submit(db, r, rating=rating, body=body, display_name=display_name, photos=blobs,
+                            choice_reason=choice_reason)  # fmt: skip
     return await _invite(db, r)
 
 
@@ -618,9 +620,15 @@ async def reject_review(review_id: uuid.UUID, body: RewriteIn, user: OwnerUser, 
 @desk.patch("/reviews/{review_id}", response_model=DeskReview)
 async def reply_review(review_id: uuid.UUID, body: ReviewReplyIn, user: OwnerUser, db: DbSession) -> Any:
     r = await review_svc.get_review(db, review_id)
-    r.owner_reply = (body.owner_reply or "").strip() or None
-    await control.audit(db, "catalog.review_replied", user=user, entity_type="reviews", entity_id=r.id,
-                        summary="Chị trả lời đánh giá")  # fmt: skip
+    if "owner_reply" in body.model_fields_set:
+        r.owner_reply = (body.owner_reply or "").strip() or None
+        await control.audit(db, "catalog.review_replied", user=user, entity_type="reviews", entity_id=r.id,
+                            summary="Chị trả lời đánh giá")  # fmt: skip
+    if body.reason_public is not None and body.reason_public != r.reason_public:
+        r.reason_public = body.reason_public
+        await control.audit(db, "catalog.review_reason_visibility", user=user, entity_type="reviews", entity_id=r.id,
+                            summary="Chị hiện lý do chọn" if r.reason_public else "Chị ẩn lý do chọn")  # fmt: skip
+    await db.flush()
     return await _desk_review(db, r)
 
 

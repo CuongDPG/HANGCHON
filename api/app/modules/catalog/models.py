@@ -336,6 +336,10 @@ class Review(UUIDPk, Timestamps, Base):
     display_name: Mapped[str | None] = mapped_column(String(120))
     rating: Mapped[int | None] = mapped_column(SmallInteger)
     body: Mapped[str | None] = mapped_column(Text)
+    choice_reason: Mapped[str | None] = mapped_column(
+        Text, comment="«Vì sao bạn chọn món này?» (≤ 300 chữ, không bắt buộc)"
+    )
+    reason_public: Mapped[bool] = flag(True, comment="Chị tắt để ẩn riêng lý do chọn mà vẫn hiện đánh giá")
     photos: Mapped[list[Any]] = json_list(comment="storage key public/... sau khi duyệt")
     requested_at: Mapped[datetime | None]
     submitted_at: Mapped[datetime | None]

@@ -81,6 +81,9 @@ def _facebook(p: ProductFacts, notes: list[str], instruction: str | None) -> Cha
     ]
     if notes:
         lines += ["", f"Ghi chú lúc thử: «{_first_sentence(notes[0])}.»"]
+    if p.customer_reasons:  # trích nguyên văn lời một khách đã mua (chị đã duyệt), không bắt buộc
+        q = p.customer_reasons[0]
+        lines += ["", f"Bạn {q.name} đã mua kể: “{q.text}”"]
     if meh:
         lines += ["", f"Điều mình chưa ưng: {_lower_first(meh)}. Bạn cân nhắc giúp mình nhé."]
     lines += ["", f"Giá {vnd(p.price_vnd)}. Cần thì nhắn mình, hoặc xem chi tiết ở link bên dưới."]

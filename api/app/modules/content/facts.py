@@ -12,8 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.storage import get_storage
 from app.core.timeutil import to_local
-from app.modules.catalog.models import Drop, Product
-from app.modules.content.ai_io import DropFacts, DropItemFacts, ProductFacts, VoiceCard
+from app.modules.catalog.models import Drop, Product, Review, ReviewStatus
+from app.modules.content.ai_io import CustomerQuote, DropFacts, DropItemFacts, ProductFacts, VoiceCard
 from app.modules.content.models import ContentInsight, VoiceProfile
 from app.modules.selection.models import TrialNote
 
@@ -84,6 +84,7 @@ async def product_facts_full(db: AsyncSession, p: Product) -> ProductFacts:
 
     pf = product_facts(p)
     pf.trial_notes = await trial_notes(db, p)
+    pf.customer_reasons = await customer_reasons(db, p)
     if p.candidate_id:
         safety = await db.scalar(select(Assessment.safety).where(Assessment.candidate_id == p.candidate_id))
         pf.safety_warnings = customer_warnings(safety)
@@ -127,6 +128,22 @@ async def trial_notes(db: AsyncSession, p: Product, limit: int = 5) -> list[str]
         .limit(limit)
     )
     return [t for t in rows.scalars() if t and t.strip()]
+
+
+async def customer_reasons(db: AsyncSession, p: Product, limit: int = 3) -> list[CustomerQuote]:
+    """Lý do chọn của khách đã mua (đọc bảng catalog): chỉ đánh giá chị đã duyệt và lý do chưa bị chị ẩn."""
+    rows = await db.execute(
+        select(Review.display_name, Review.choice_reason)
+        .where(
+            Review.product_id == p.id,
+            Review.status == ReviewStatus.PUBLISHED,
+            Review.reason_public.is_(True),
+            Review.choice_reason.is_not(None),
+        )
+        .order_by(Review.published_at.desc())
+        .limit(limit)
+    )
+    return [CustomerQuote(name=n or "Khách", text=t.strip()) for n, t in rows if t and t.strip()]
 
 
 # ---- giọng của chị (f2) ------------------------------------------------------------------------------------------

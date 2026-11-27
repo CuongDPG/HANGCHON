@@ -205,6 +205,8 @@ class ReviewOut(ORM):
     display_name: str | None
     rating: int | None
     body: str | None
+    choice_reason: str | None
+    reason_public: bool
     photos: list[Any]
     requested_at: datetime | None
     submitted_at: datetime | None
@@ -347,6 +349,7 @@ class ArrivedIn(BaseModel):
 
 class ReviewReplyIn(BaseModel):
     owner_reply: str | None = Field(default=None, max_length=1000)
+    reason_public: bool | None = Field(default=None, description="Tắt để ẩn riêng lý do chọn, vẫn hiện đánh giá")
 
 
 class FindStatusIn(BaseModel):
@@ -482,6 +485,13 @@ class PublicReview(BaseModel):
     owner_reply: str | None
 
 
+class CustomerReason(BaseModel):
+    """«Vì sao khách chọn»: lý do chọn của người đã mua, chỉ từ đánh giá chị đã duyệt và chưa ẩn lý do."""
+
+    display_name: str
+    text: str
+
+
 class Funnel(BaseModel):
     viewed: int | None = None
     compared: int | None = None
@@ -508,6 +518,7 @@ class ProductDetail(ProductCard):
     updated_at: datetime
     ai_generated: bool
     reviews: list[PublicReview]
+    customer_reasons: list[CustomerReason] = Field(default_factory=list)
     url: str
     picker_name: str | None = None
 
@@ -650,6 +661,7 @@ class ReviewInvite(BaseModel):
     display_name: str | None
     rating: int | None
     body: str | None
+    choice_reason: str | None = None
 
 
 class SitemapEntry(BaseModel):

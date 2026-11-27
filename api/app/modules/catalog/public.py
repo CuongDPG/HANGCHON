@@ -214,6 +214,22 @@ async def published_reviews(db: AsyncSession, product_id: uuid.UUID, limit: int 
     ]
 
 
+async def customer_reasons(db: AsyncSession, product_id: uuid.UUID, limit: int = 5) -> list[dict[str, Any]]:
+    """«Vì sao khách chọn»: chỉ đánh giá chị đã duyệt (published) và lý do chưa bị chị ẩn."""
+    rows = await db.execute(
+        select(Review.display_name, Review.choice_reason)
+        .where(
+            Review.product_id == product_id,
+            Review.status == ReviewStatus.PUBLISHED,
+            Review.reason_public.is_(True),
+            Review.choice_reason.is_not(None),
+        )
+        .order_by(Review.published_at.desc())
+        .limit(limit)
+    )
+    return [{"display_name": name or "Khách", "text": text} for name, text in rows if text and text.strip()]
+
+
 async def product_detail(db: AsyncSession, p: Product) -> dict[str, Any]:
     cats = await _categories(db)
     drops, stock = await _open_drop_items(db, [p.id]), await _stock(db, [p.id])
@@ -240,6 +256,7 @@ async def product_detail(db: AsyncSession, p: Product) -> dict[str, Any]:
         "updated_at": p.updated_at,
         "ai_generated": p.ai_generated,
         "reviews": await published_reviews(db, p.id),
+        "customer_reasons": await customer_reasons(db, p.id),
         "url": f"{settings.web_base_url.rstrip('/')}/san-pham/{p.slug}",
         # tên người chọn cho nhãn «… trả lời» (chưa đặt thì là tên trung tính mặc định)
         "picker_name": await setting(db, "store.picker_name"),

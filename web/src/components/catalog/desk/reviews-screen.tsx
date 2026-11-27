@@ -13,7 +13,14 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Tabs } from "@/components/ui/tabs";
 import { notifySuccess } from "@/components/ui/toast";
 import { useSession } from "@/lib/api/auth";
-import { useDeskReviews, useReplyReview, useReviewAction, type DeskReview, type ReviewStatus } from "@/lib/api/catalog";
+import {
+  useDeskReviews,
+  useReplyReview,
+  useReviewAction,
+  useReviewReasonVisibility,
+  type DeskReview,
+  type ReviewStatus,
+} from "@/lib/api/catalog";
 import { formatDate } from "@/lib/format";
 import { DeskSubnav } from "./desk-subnav";
 
@@ -63,6 +70,7 @@ function ReviewCard({ r }: { r: DeskReview }) {
   const isOwner = user?.role === "owner";
   const act = useReviewAction();
   const reply = useReplyReview();
+  const reasonVis = useReviewReasonVisibility();
   const [text, setText] = useState(r.owner_reply ?? "");
   const flags = Object.entries(FLAG_LABELS).filter(([k]) => r.ai_flags[k as keyof DeskReview["ai_flags"]]);
   const hide = r.ai_flags.recommend === "hide";
@@ -80,6 +88,23 @@ function ReviewCard({ r }: { r: DeskReview }) {
         {r.status === "pending_review" ? <Badge tone={hide ? "danger" : "success"}>{hide ? "AI đề xuất ẩn" : "AI đề xuất hiện"}</Badge> : null}
       </div>
       {r.body ? <p className="text-[15px]">{r.body}</p> : <p className="text-[14px] text-ink-3">(Không viết chữ)</p>}
+      {r.choice_reason ? (
+        <div className="flex flex-col gap-1.5 rounded-md bg-soft px-3 py-2">
+          <p className="text-[13px] text-ink-2">
+            Vì sao khách chọn
+            {r.reason_public ? null : <span className="text-ink-3"> · đang ẩn trên website</span>}
+          </p>
+          <p className={r.reason_public ? "text-[15px]" : "text-[15px] text-ink-3 line-through"}>{r.choice_reason}</p>
+          {isOwner ? (
+            <Button size="sm" variant="ghost" className="self-start" icon={r.reason_public ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              loading={reasonVis.isPending}
+              onClick={() => reasonVis.mutate({ id: r.id, visible: !r.reason_public },
+                { onSuccess: () => notifySuccess(r.reason_public ? "Đã ẩn lý do chọn, đánh giá vẫn giữ" : "Đã hiện lại lý do chọn") })}>
+              {r.reason_public ? "Ẩn lý do này" : "Hiện lý do này"}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
       {r.photo_urls.length ? (
         <div className="grid grid-cols-4 gap-2">
           {r.photo_urls.map((u, i) => (

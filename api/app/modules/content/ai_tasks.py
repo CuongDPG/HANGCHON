@@ -41,7 +41,10 @@ ai.task(
     "đoạn hoặc mở đầu câu, vd «Vì sao mình chọn món này: …»), theo sau là lý do chọn (reason_selected) — Facebook, "
     "Instagram, Threads, Zalo đều phải có trong thân bài (`body`), kể cả bài ngắn; TikTok phải có một cảnh mà LỜI THOẠI "
     "(`voiceover`) nói «Vì sao mình chọn món này…» rồi nói lý do. Kèm «điều mình chưa ưng» (not_satisfied) nếu hồ sơ "
-    "có; đó là xương sống của bài. Nếu có `insights` thì áp dụng. "
+    "có; đó là xương sống của bài. Nếu hồ sơ có `customer_reasons` (lý do chọn của khách đã mua, chị đã duyệt) thì "
+    "bài CÓ THỂ trích 1–2 câu, ghi rõ là lời khách kèm tên (vd «Bạn Lan đã mua kể: “…”»), trích đúng nguyên văn, "
+    "không sửa ý, không gộp lời nhiều khách; không bắt buộc, và không thay cho phần «Vì sao mình chọn món này». "
+    "Không có `customer_reasons` thì tuyệt đối không viết lời khách. Nếu có `insights` thì áp dụng. "
     "Nếu có `instruction` (ý của chị) thì làm theo trong giới hạn luật trên. Instagram: điền `slides` theo chỉ số ảnh "
     "có thật (0..image_count-1). TikTok: điền `scenes`, tổng 20–30 giây.",
     tier="smart",
@@ -73,6 +76,8 @@ ai.task(
     "KHÔNG phải lỗi: kể lại trải nghiệm có trong hồ sơ hoặc `trial_notes` (vd «bé 6 tuổi tự buộc mà không kêu đau», "
     "«chun mềm», «giặt phơi nắng không xổ») — đó là trải nghiệm thật của chị. Chỉ là lỗi khi bài biến trải nghiệm đó "
     "thành cam kết chung cho mọi người («bé nào cũng», «đảm bảo», «không bao giờ đứt») hoặc nêu điều hồ sơ không có.\n"
+    "Trích lời khách đúng như trong `customer_reasons` KHÔNG phải bịa lời khách; chỉ là lỗi khi lời khách được trích "
+    "không có trong `customer_reasons`.\n"
     "Mỗi mục có `severity`: «fail» = lỗi thật phải sửa trước khi đăng; «note» = chỉ là góp ý cách nói, nội dung khớp hồ "
     "sơ. Tự hỏi trước khi ghi: nếu phần giải thích của mình nói «khớp hồ sơ / không phải lỗi» thì KHÔNG ghi mục đó, "
     "hoặc ghi severity=note. Mỗi mục một ý (không gộp nhiều ý vào một mục). Không chắc thì không báo. Gợi ý cách sửa "

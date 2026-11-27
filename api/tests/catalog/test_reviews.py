@@ -118,3 +118,68 @@ async def test_bad_token_and_validation(db, client):
     files = [("photos", (f"{i}.jpg", jpeg(), "image/jpeg")) for i in range(5)]
     res = await client.post(f"/api/store/catalog/reviews/{r.token}", data={"rating": "5"}, files=files)
     assert res.status_code == 400
+
+
+async def test_choice_reason_flows_to_public_page_only_when_published_and_public(db, client, owner_client):
+    p, _, (r,) = await _delivered(db)
+    res = await client.post(
+        f"/api/store/catalog/reviews/{r.token}",
+        data={"rating": "5", "body": "Dùng ổn.", "display_name": "Lan", "choice_reason": "  Cần bình nhỏ  bỏ túi. "},
+    )
+    assert res.status_code == 200, res.text
+    assert res.json()["choice_reason"] == "Cần bình nhỏ bỏ túi."
+    pending = (await owner_client.get("/api/desk/catalog/reviews", params={"status": "pending_review"})).json()
+    row = pending["items"][0]
+    assert row["choice_reason"] == "Cần bình nhỏ bỏ túi." and row["reason_public"] is True
+    item = (await db.execute(select(ApprovalItem).where(ApprovalItem.ref_id == r.id))).scalar_one()
+    assert item.preview["choice_reason"] == "Cần bình nhỏ bỏ túi."
+
+    # chưa duyệt → website chưa có
+    pub = (await client.get(f"/api/store/catalog/products/{p.slug}")).json()
+    assert pub["customer_reasons"] == []
+
+    await owner_client.post(f"/api/desk/catalog/reviews/{r.id}/approve")
+    pub = (await client.get(f"/api/store/catalog/products/{p.slug}")).json()
+    assert pub["customer_reasons"] == [{"display_name": "Lan", "text": "Cần bình nhỏ bỏ túi."}]
+
+    # chị ẩn riêng lý do: đánh giá vẫn hiện, câu trả lời của chị không bị xoá
+    await owner_client.patch(f"/api/desk/catalog/reviews/{r.id}", json={"owner_reply": "Cảm ơn bạn!"})
+    res = await owner_client.patch(f"/api/desk/catalog/reviews/{r.id}", json={"reason_public": False})
+    assert res.status_code == 200
+    assert res.json()["reason_public"] is False and res.json()["owner_reply"] == "Cảm ơn bạn!"
+    pub = (await client.get(f"/api/store/catalog/products/{p.slug}")).json()
+    assert pub["customer_reasons"] == [] and pub["review_count"] == 1
+
+    # hiện lại lý do, rồi ẩn cả đánh giá → lý do cũng mất
+    await owner_client.patch(f"/api/desk/catalog/reviews/{r.id}", json={"reason_public": True})
+    assert (await client.get(f"/api/store/catalog/products/{p.slug}")).json()["customer_reasons"]
+    await owner_client.post(f"/api/desk/catalog/reviews/{r.id}/reject", json={})
+    assert (await client.get(f"/api/store/catalog/products/{p.slug}")).json()["customer_reasons"] == []
+
+
+async def test_choice_reason_is_moderated_and_length_limited(db, client):
+    _, _, (r,) = await _delivered(db)
+    res = await client.post(f"/api/store/catalog/reviews/{r.token}", data={"rating": "5", "choice_reason": "x" * 301})
+    assert res.status_code == 422
+    res = await client.post(
+        f"/api/store/catalog/reviews/{r.token}",
+        data={"rating": "5", "body": "Dùng ổn.", "choice_reason": "Vì rẻ, inbox mình 0000 000 000 nhé"},
+    )
+    assert res.status_code == 200
+    await db.refresh(r)
+    assert r.ai_flags["personal_info"] and r.ai_flags["recommend"] == "hide"
+
+
+async def test_content_facts_quote_only_approved_public_reasons(db, client, owner_client):
+    from app.modules.content import facts
+
+    p, _, (r,) = await _delivered(db)
+    await client.post(f"/api/store/catalog/reviews/{r.token}",
+                      data={"rating": "5", "display_name": "Lan", "choice_reason": "Cần bình nhỏ bỏ túi."})  # fmt: skip
+    await db.refresh(p, ["images"])
+    assert (await facts.product_facts_full(db, p)).customer_reasons == []
+    await owner_client.post(f"/api/desk/catalog/reviews/{r.id}/approve")
+    pf = await facts.product_facts_full(db, p)
+    assert [(q.name, q.text) for q in pf.customer_reasons] == [("Lan", "Cần bình nhỏ bỏ túi.")]
+    await owner_client.patch(f"/api/desk/catalog/reviews/{r.id}", json={"reason_public": False})
+    assert (await facts.product_facts_full(db, p)).customer_reasons == []

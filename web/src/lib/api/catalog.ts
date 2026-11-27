@@ -79,6 +79,9 @@ export type PublicReview = {
   owner_reply: string | null;
 };
 
+/** «Vì sao khách chọn»: lý do của người đã mua, chỉ từ đánh giá chị đã duyệt. */
+export type CustomerReason = { display_name: string; text: string };
+
 export type ProductDetail = ProductCard & {
   short_description: string | null;
   description: string | null;
@@ -98,6 +101,7 @@ export type ProductDetail = ProductCard & {
   updated_at: string;
   ai_generated: boolean;
   reviews: PublicReview[];
+  customer_reasons?: CustomerReason[];
   url: string;
   /** Tên người chọn (Cài đặt `store.picker_name`); chưa đặt thì là tên trung tính mặc định. */
   picker_name?: string | null;
@@ -207,6 +211,7 @@ export type ReviewInvite = {
   display_name: string | null;
   rating: number | null;
   body: string | null;
+  choice_reason?: string | null;
 };
 
 export type SitemapEntry = { path: string; lastmod: string | null; priority: number };
@@ -381,6 +386,8 @@ export type DeskReview = {
   display_name: string | null;
   rating: number | null;
   body: string | null;
+  choice_reason: string | null;
+  reason_public: boolean;
   photo_urls: (string | null)[];
   submitted_at: string | null;
   published_at: string | null;
@@ -550,6 +557,15 @@ export function useReplyReview() {
   const done = useInvalidate();
   return useMutation({
     mutationFn: ({ id, reply }: { id: string; reply: string }) => api.patch<DeskReview>(`${D}/reviews/${id}`, { owner_reply: reply }),
+    onSuccess: done,
+  });
+}
+
+/** Chị ẩn/hiện riêng lý do chọn của khách, đánh giá vẫn giữ nguyên. */
+export function useReviewReasonVisibility() {
+  const done = useInvalidate();
+  return useMutation({
+    mutationFn: ({ id, visible }: { id: string; visible: boolean }) => api.patch<DeskReview>(`${D}/reviews/${id}`, { reason_public: visible }),
     onSuccess: done,
   });
 }

@@ -182,6 +182,7 @@ def dossier_text(product: ProductFacts | None, drop: DropFacts | None) -> str:
     if product:
         parts += [product.name, product.subtitle or "", product.short_description or "", product.reason_selected or ""]
         parts += [product.not_satisfied or "", *product.trial_notes, *product.safety_warnings]
+        parts += [q.text for q in product.customer_reasons]
         parts += [" ".join(str(v) for v in s.values()) for s in product.specs]
     if drop:
         parts += [drop.title, drop.description or ""]

@@ -166,3 +166,20 @@ def test_livestream_faq_medical_answers_flagged_for_review() -> None:
     assert needs_review("Bé dùng xong da đầu đỏ, shop giải thích sao?", "Bạn hỏi bác sĩ giúp mình nhé.")
     assert not needs_review("Màu có giống ảnh không?", "Màu hơi tối hơn ảnh một chút.")
     assert Intent.COMPLAINT in SKIP_INTENTS and Intent.ASK_PRODUCT not in SKIP_INTENTS
+
+
+def test_fake_compose_may_quote_an_approved_customer_reason_and_still_passes():
+    from app.modules.content.ai_io import ComposeIn, CustomerQuote
+    from app.modules.content.fakes import fake_compose
+
+    quote = CustomerQuote(name="Lan", text="Bé nhà mình tóc mỏng, cần loại chun mềm.")
+    out = fake_compose(
+        ComposeIn(kind="product", product=_product(customer_reasons=[quote]), channels=["facebook", "zalo_oa"])
+    )
+    fb, zalo = out.drafts
+    assert "Bạn Lan đã mua kể: “Bé nhà mình tóc mỏng, cần loại chun mềm.”" in fb.body
+    assert "Lan" not in zalo.body  # không bắt buộc: kênh khác không phải trích
+    findings = _chips(Channel.FACEBOOK, fb.body, product=_product(customer_reasons=[quote]))
+    assert can_approve(status_of(list(findings.values()))), findings
+    plain = fake_compose(ComposeIn(kind="product", product=_product(), channels=["facebook"])).drafts[0]
+    assert "đã mua kể" not in plain.body

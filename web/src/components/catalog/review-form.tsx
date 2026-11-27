@@ -10,12 +10,14 @@ import { catalogApi, type ReviewInvite } from "@/lib/api/catalog";
 import { cn } from "@/lib/cn";
 
 const MAX_PHOTOS = 4;
+const MAX_REASON = 300;
 const LABELS = ["", "Không ưng", "Chưa ổn", "Tạm được", "Ưng", "Rất ưng"];
 
 /** Khách gửi sao + chữ + ảnh (e8). Ảnh được bỏ thông tin vị trí trước khi lưu. */
 export function ReviewForm({ token, invite }: { token: string; invite: ReviewInvite }) {
   const [rating, setRating] = useState(0);
   const [body, setBody] = useState("");
+  const [reason, setReason] = useState("");
   const [name, setName] = useState(invite.display_name ?? "");
   const [files, setFiles] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
@@ -28,6 +30,7 @@ export function ReviewForm({ token, invite }: { token: string; invite: ReviewInv
     const form = new FormData();
     form.append("rating", String(rating));
     if (body.trim()) form.append("body", body.trim());
+    if (reason.trim()) form.append("choice_reason", reason.trim());
     if (name.trim()) form.append("display_name", name.trim());
     files.forEach((f) => form.append("photos", f));
     try {
@@ -76,6 +79,8 @@ export function ReviewForm({ token, invite }: { token: string; invite: ReviewInv
       </fieldset>
       <Textarea label="Bạn dùng thấy thế nào?" value={body} onChange={(e) => setBody(e.target.value)} maxLength={2000} rows={4}
         hint="Cả điều chưa ưng cũng rất có ích cho người mua sau." />
+      <Textarea label="Vì sao bạn chọn món này?" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={MAX_REASON} rows={2}
+        hint="Không bắt buộc. Một hai câu, ví dụ bạn cần nó cho việc gì." />
       <div className="flex flex-col gap-2">
         <span className="text-[15px] font-semibold">Ảnh bạn chụp (tối đa {MAX_PHOTOS})</span>
         <div className="flex flex-wrap gap-2">
