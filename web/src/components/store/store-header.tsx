@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { Brand } from "@/components/layout/brand";
-import { CartButton } from "@/components/orders/cart-button";
 import { StoreHeaderNav, StoreHeaderNavActive } from "./store-nav-links";
 
-/** Đầu trang website: tên + giỏ; trên máy tính có thêm hàng menu. */
+/** Đầu trang website: tên; trên máy tính có thêm hàng menu (giỏ nằm ở mục «Của tôi», kèm số món). */
 export function StoreHeader() {
   return (
     <header className="sticky top-0 z-20 border-b border-line bg-paper/92 pt-safe backdrop-blur-md">
@@ -15,7 +14,6 @@ export function StoreHeader() {
         <Suspense fallback={<StoreHeaderNav pathname={null} />}>
           <StoreHeaderNavActive />
         </Suspense>
-        <CartButton className="-mr-2 ml-auto md:ml-2" />
       </div>
     </header>
   );

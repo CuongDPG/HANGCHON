@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import { Hourglass } from "lucide-react";
 import { Suspense } from "react";
 import { ArrivedDropRow, OpenDropCard, UpcomingDropRow } from "@/components/catalog/drop-card";
+import { StoreIntro } from "@/components/store/store-intro";
 import { ButtonLink } from "@/components/ui/button";
 import { SectionLabel } from "@/components/ui/card";
 import { EmptyState, Skeleton } from "@/components/ui/feedback";
-import { PageHeader } from "@/components/ui/page-header";
 import { catalogApi } from "@/lib/api/catalog";
 import { errorMessage } from "@/lib/api/client";
 
@@ -19,7 +19,9 @@ export const metadata: Metadata = {
 export default function DropsPage() {
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Mua chung" description="Gom đơn mua chung để có giá tốt nhất" />
+      <StoreIntro eyebrow="Mua chung" title="Mua chung để có giá tốt nhất...">
+        Mình gom đơn theo đợt: hạn chót, số suất và ngày hàng về dự kiến nói rõ từ đầu.
+      </StoreIntro>
       <Suspense fallback={<Skeleton className="h-96 w-full" />}>
         <DropsBody />
       </Suspense>

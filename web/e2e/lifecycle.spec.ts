@@ -175,8 +175,8 @@ test("một món hàng từ đề tìm tới đánh giá của khách", async ({
   await expect(main.getByText("Giữ ấm tới chiều.").first()).toBeVisible();
   await expect(main.getByRole("link", { name: "Xem hồ sơ chọn" })).toHaveCount(0);
   await page.getByRole("region", { name: "Đặt mua" }).filter({ visible: true }).first().getByRole("button", { name: /Đặt ngay|Đặt mua chung/ }).click();
-  await expect(page).toHaveURL(/\/(gio-hang|dat-hang)/);
-  if (page.url().includes("/gio-hang")) await main.getByRole("link", { name: "Đặt hàng" }).click();
+  await expect(page).toHaveURL(/\/(cua-toi|dat-hang)/);
+  if (page.url().includes("/cua-toi")) await main.getByRole("link", { name: "Đặt hàng" }).click();
   await main.getByLabel("Số điện thoại").fill("0900000777");
   await main.getByLabel("Họ tên").fill("Khách Vòng Đời");
   await main.getByLabel("Địa chỉ nhận hàng").fill("12 Ngõ Ví Dụ");

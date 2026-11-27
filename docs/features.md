@@ -69,8 +69,8 @@ Nơi khách đọc kỹ, đặt hàng và theo dõi đơn.
 | e1 | Tự dựng trang sản phẩm | AI làm, chị duyệt | 1 | Từ hồ sơ đã chọn, AI viết tên, mô tả, thông số, phần hỏi đáp. Chị sửa và đăng ở tab Website của xưởng nội dung (website là kênh đầu tiên). |
 | e2 | Con dấu và hồ sơ chọn | AI tự làm | 1 | Website hiện con dấu «ĐÃ CHỌN» (không kèm số), thời gian thử, lý do chọn, điều chưa ưng. Quá trình chọn (tỉ lệ chọn n/m, dải số sàng lọc, các món đã loại kèm lý do) là dữ liệu nội bộ, chỉ xem ở desk: trang món đó ở Bàn chọn và tab «Hồ sơ chọn» của trang Sản phẩm (kèm dấu vết từng bước: đề, thẩm định, mẫu và thử, quyết định, giá vốn). Tab «Hồ sơ bán» theo dõi xuôi: nội dung từng kênh → lên kênh → khách và đơn. |
 | e3 | Mở bán theo đợt | AI làm, chị duyệt | 1 | Đợt gom đơn có hạn chót, số suất, ngày hàng về dự kiến. |
-| e4 | Đặt hàng một trang | AI tự làm | 1 | Không cần tạo tài khoản. Chuyển khoản bằng mã QR tự xác nhận, hoặc trả tiền khi nhận. |
-| e5 | Theo dõi đơn | AI tự làm | 1 | Khách xem hành trình đơn bằng số điện thoại và mã đơn. |
+| e4 | Đặt hàng một trang | AI tự làm | 1 | Không cần tạo tài khoản. Chuyển khoản bằng mã QR tự xác nhận, hoặc trả tiền khi nhận. Giỏ nằm trong mục «Của tôi». |
+| e5 | Theo dõi đơn | AI tự làm | 1 | Khách xem hành trình đơn bằng số điện thoại và mã đơn; ở «Của tôi» → «Đơn của tôi» khách đăng nhập bằng mã một lần (gửi tới số điện thoại hoặc email) để thấy mọi đơn, hoặc mở lại đơn đã đặt trên máy này. |
 | e6 | Xử lý ảnh sản phẩm | AI tự làm | 1 | Ảnh thật chị chụp là chính. AI cắt, cân sáng, làm sạch nền; không tạo ảnh giả. Chị có thể tự chọn dùng lại ảnh nhà cung cấp (không gì tự chép). |
 | a2, b1, c1, e2 | Ảnh nhà cung cấp ở phía chọn (26/11) | AI tự làm | 1 | Mọi ứng viên có ảnh của nhà cung cấp (lưu bản sao về kho riêng, chỉ desk) để chị hình dung món; link gốc vẫn mở được. Thiếu ảnh thì «Lấy ảnh và chi tiết». |
 | e7 | Trợ lý hỏi đáp trên web | AI tự làm | 2 | Trả lời từ hồ sơ thẩm định, có dẫn nguồn. Không biết thì nói không biết và chuyển chị. |

@@ -19,7 +19,12 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     // Hồ sơ chọn không còn là trang công khai (chỉ ở desk, «Sản phẩm» → «Hồ sơ chọn»): link cũ về trang sản phẩm.
-    return [{ source: "/san-pham/:slug/ho-so-chon", destination: "/san-pham/:slug", permanent: true }];
+    // Giỏ hàng và tra cứu đơn gộp vào «Của tôi» (27/11); link theo dõi đơn `/don/[code]` giữ nguyên.
+    return [
+      { source: "/san-pham/:slug/ho-so-chon", destination: "/san-pham/:slug", permanent: true },
+      { source: "/gio-hang", destination: "/cua-toi", permanent: true },
+      { source: "/don", destination: "/cua-toi?tab=don", permanent: true },
+    ];
   },
   async rewrites() {
     return [{ source: "/api/:path*", destination: `${API_ORIGIN}/api/:path*` }];

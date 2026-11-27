@@ -52,7 +52,7 @@ export function TrackingScreen() {
   if (!isClient || (t && q.isPending)) {
     return (
       <div className="flex flex-col gap-4">
-        <PageHeader title={`Đơn ${code}`} backHref="/don" />
+        <PageHeader title={`Đơn ${code}`} backHref="/cua-toi?tab=don" />
         <Skeleton className="h-40 w-full" />
         <Skeleton className="h-64 w-full" />
       </div>
@@ -61,13 +61,13 @@ export function TrackingScreen() {
   if (!t || q.isError) {
     return (
       <div className="flex flex-col gap-6">
-        <PageHeader title={`Đơn ${code}`} backHref="/don" />
+        <PageHeader title={`Đơn ${code}`} backHref="/cua-toi?tab=don" />
         <EmptyState
           icon={<Search />}
           tone={q.isError ? "error" : "default"}
           title="Chưa xem được đơn này"
           description={q.error?.message ?? "Bạn tra đơn bằng số điện thoại và mã đơn nhé."}
-          action={<ButtonLink href="/don">Tra cứu đơn</ButtonLink>}
+          action={<ButtonLink href="/cua-toi?tab=don">Tra cứu đơn</ButtonLink>}
         />
       </div>
     );
@@ -82,7 +82,7 @@ function OrderView({ order, token }: { order: PublicOrder; token: string }) {
   return (
     <div className="flex flex-col gap-5 md:grid md:grid-cols-[1fr_20rem] md:items-start md:gap-8">
       <div className="flex flex-col gap-5">
-        <PageHeader eyebrow={order.status_label} title={`Đơn ${order.code}`} backHref="/don" description={order.headline} />
+        <PageHeader eyebrow={order.status_label} title={`Đơn ${order.code}`} backHref="/cua-toi?tab=don" description={order.headline} />
         {waitingTransfer && order.payment ? <PaymentBox payment={order.payment} deposit={order.deposit_required_vnd > 0 && order.paid_vnd < order.deposit_required_vnd} /> : null}
         <Card>
           <Timeline

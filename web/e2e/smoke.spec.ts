@@ -30,7 +30,7 @@ async function shot(page: Page, name: string, project: string) {
 }
 
 const PAGES = [
-  { path: "/", name: "ke-hang", heading: /Món nào cũng đã dùng thử/ },
+  { path: "/", name: "ke-hang", heading: /Ít nhưng mà chất/ },
   { path: "/desk/dang-nhap", name: "dang-nhap", heading: "Đăng nhập" },
   { path: "/desk/kit", name: "kit", heading: "Bộ giao diện «Chàm»" },
 ];

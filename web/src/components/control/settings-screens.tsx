@@ -138,8 +138,8 @@ function StoreForm({ values }: { values: Record<string, unknown> }) {
       </fieldset>
       <fieldset disabled={!owner} className="flex flex-col gap-3">
         <SectionLabel>Người chọn</SectionLabel>
-        <Input label="Tên người chọn" placeholder="Vd: Mai" hint="Khách thấy tên này ở trang «Về người chọn» và trong khung hỏi đáp; chỉ ghi tên, không thêm «chị»." error={e.picker_name?.message} {...register("picker_name")} />
-        <Textarea label="Lời giới thiệu" rows={4} placeholder="Vd: Mình chọn hàng thế nào, thử bao lâu, vì sao bán…" hint="Khách đọc đoạn này ở trang «Về người chọn»: viết xưng «mình»." error={e.picker_intro?.message} {...register("picker_intro")} />
+        <Input label="Tên người chọn" placeholder="Vd: Mai" hint="Khách thấy tên này ở trang «Về Hàng Chọn» và trong khung hỏi đáp; chỉ ghi tên, không thêm «chị»." error={e.picker_name?.message} {...register("picker_name")} />
+        <Textarea label="Lời giới thiệu" rows={4} placeholder="Vd: Mình chọn hàng thế nào, thử bao lâu, vì sao bán…" hint="Khách đọc đoạn này ở trang «Về Hàng Chọn»: viết xưng «mình»." error={e.picker_intro?.message} {...register("picker_intro")} />
       </fieldset>
       <fieldset disabled={!owner} className="flex flex-col gap-3">
         <SectionLabel>Nhận chuyển khoản</SectionLabel>

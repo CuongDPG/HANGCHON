@@ -9,12 +9,12 @@ import { errorMessage } from "@/lib/api/client";
 import { pickerName } from "@/lib/picker";
 
 export const metadata: Metadata = {
-  title: "Về người chọn",
+  title: "Về Hàng Chọn",
   description: "Ai chọn từng món ở Hàng Chọn và chọn theo nguyên tắc nào.",
   alternates: { canonical: "/ve-nguoi-chon" },
 };
 
-/** Về người chọn: trang bảo lãnh — người chọn là ai, chọn theo nguyên tắc nào, AI làm gì. */
+/** Về Hàng Chọn (route giữ `/ve-nguoi-chon`): trang bảo lãnh — người chọn là ai, chọn theo nguyên tắc nào, AI làm gì. */
 export default function AboutPage() {
   return (
     <Suspense fallback={<Skeleton className="h-96 w-full" />}>

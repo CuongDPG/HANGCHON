@@ -14,7 +14,7 @@ test.describe("website: kệ hàng → sản phẩm → hỏi trợ lý", () => 
 
   test("tìm món, xem lý do chọn, hỏi trợ lý", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("heading", { level: 1 })).toContainText("Món nào cũng đã dùng thử");
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Ít nhưng mà chất...");
     // website không hiện số của quá trình chọn: con dấu chỉ còn chữ «ĐÃ CHỌN», không «n/m», không «món đã xem»
     await expect(page.getByRole("main").getByText(/món đã xem|1\/24/)).toHaveCount(0);
     await page.getByRole("searchbox", { name: "Tìm trên kệ" }).fill("binh giu nhiet");
@@ -58,8 +58,7 @@ test.describe("website: kệ hàng → sản phẩm → hỏi trợ lý", () => 
 
   test("mua chung và nhờ tìm", async ({ page }) => {
     await page.goto("/dot");
-    await expect(page.getByRole("main").getByRole("heading", { level: 1, name: "Mua chung" })).toBeVisible();
-    await expect(page.getByRole("main").getByText("Gom đơn mua chung để có giá tốt nhất")).toBeVisible();
+    await expect(page.getByRole("main").getByRole("heading", { level: 1, name: "Mua chung để có giá tốt nhất..." })).toBeVisible();
     await expect(page.getByRole("main").getByText(/Đang mở/).first()).toBeVisible();
     await expect(page.getByRole("main").getByText(/^Còn \d+ (ngày|giờ|phút)/).first()).toBeVisible();
 

@@ -70,9 +70,9 @@ const STORE = (i: Ids) => [
   i.slug && `/san-pham/${i.slug}`,
   "/dot",
   i.dropSlug && `/dot/${i.dropSlug}`,
-  "/gio-hang",
+  "/cua-toi",
+  "/cua-toi?tab=don",
   "/dat-hang",
-  "/don",
   i.trackPath,
   "/nho-tim",
   "/ve-nguoi-chon",
@@ -182,6 +182,41 @@ test("mọi trang website", async ({ page }, info) => {
   await page.context().clearCookies();
   const errors = watch(page);
   for (const url of STORE(ids).filter(Boolean) as string[]) await check(page, url, info.project.name, errors);
+});
+
+test("menu, chân trang, khẩu hiệu và «Của tôi» (link cũ /gio-hang, /don chuyển về)", async ({ page }, info) => {
+  const menu = ["Kệ hàng", "Mua chung", "Nhờ tìm", "Dùng thử", "Của tôi"];
+  await page.goto("/");
+  const nav = page.getByRole("navigation", { name: info.project.name === "mobile" ? "Điều hướng" : "Mục chính" });
+  await expect(nav.getByRole("link")).toHaveText(menu);
+  await expect(page.getByRole("navigation", { name: "Liên kết chân trang" }).getByRole("link")).toHaveText([
+    ...menu,
+    "Về Hàng Chọn",
+    "Hỏi trợ lý",
+  ]);
+  const taglines: [string, string][] = [
+    ["/", "Ít nhưng mà chất..."],
+    ["/dot", "Mua chung để có giá tốt nhất..."],
+    ["/nho-tim", "Mua cùng chuyên gia..."],
+    ["/dung-thu", "Thử cùng, cho mình và cho mọi người..."],
+  ];
+  for (const [url, line] of taglines) {
+    await page.goto(url);
+    await expect(page.getByRole("main").getByRole("heading", { level: 1 }), url).toHaveText(line);
+  }
+  await page.goto("/gio-hang");
+  await expect(page).toHaveURL(/\/cua-toi$/);
+  await expect(page.getByRole("main").getByRole("tab", { name: /Giỏ hàng/, selected: true })).toBeVisible();
+  await page.goto("/don");
+  await expect(page).toHaveURL(/\/cua-toi\?tab=don$/);
+  const main = page.getByRole("main");
+  await expect(main.getByRole("tab", { name: "Đơn của tôi", selected: true })).toBeVisible();
+  await expect(main.getByRole("heading", { name: "Đăng nhập để xem mọi đơn" })).toBeVisible();
+  await expect(main.getByRole("heading", { name: "Tra một đơn bằng mã đơn" })).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow, "/cua-toi?tab=don: tràn ngang").toBeLessThanOrEqual(0);
+  await main.getByRole("tab", { name: /Giỏ hàng/ }).click();
+  await expect(page).toHaveURL(/\/cua-toi$/);
 });
 
 /**

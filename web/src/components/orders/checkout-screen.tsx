@@ -89,7 +89,7 @@ export function CheckoutScreen() {
   if (items.length === 0) {
     return (
       <div className="flex flex-col gap-6">
-        <PageHeader title="Đặt hàng" backHref="/gio-hang" />
+        <PageHeader title="Đặt hàng" backHref="/cua-toi" />
         <EmptyState icon={<ShoppingBag />} title="Chưa có món nào để đặt" description="Bạn chọn món trên kệ hoặc trong đợt mua chung đang mở nhé." action={<ButtonLink href="/">Xem kệ hàng</ButtonLink>} />
       </div>
     );
@@ -99,7 +99,7 @@ export function CheckoutScreen() {
   return (
     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5 md:grid md:grid-cols-[1fr_22rem] md:items-start md:gap-8">
       <div className="flex flex-col gap-5">
-        <PageHeader title="Đặt hàng" backHref="/gio-hang" description="Không cần tạo tài khoản. Số điện thoại là khoá để bạn tra đơn về sau." />
+        <PageHeader title="Đặt hàng" backHref="/cua-toi" description="Không cần tạo tài khoản. Số điện thoại là khoá để bạn tra đơn về sau." />
         <section aria-label="Món đặt" className="flex flex-col gap-2">
           {items.map((i, idx) => (
             <div key={i.key} className="flex items-center gap-3 rounded-md border border-line bg-surface p-3">

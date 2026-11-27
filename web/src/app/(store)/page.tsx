@@ -1,29 +1,22 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { ShelfResults, ShelfSkeleton } from "@/components/catalog/shelf";
+import { StoreIntro } from "@/components/store/store-intro";
 import { Seal } from "@/components/ui/seal";
 
 export const metadata: Metadata = {
-  title: { absolute: "Hàng Chọn · Kệ hàng đã chọn, món nào cũng đã dùng thử" },
+  title: { absolute: "Hàng Chọn · Kệ hàng: ít nhưng mà chất" },
   description:
     "Đồ gia dụng nhỏ được chọn kỹ: mua về, dùng thật rồi mới đóng dấu. Nói rõ cả điều chưa ưng.",
   alternates: { canonical: "/" },
-  openGraph: { type: "website", locale: "vi_VN", siteName: "Hàng Chọn", title: "Hàng Chọn · Kệ hàng đã chọn" },
+  openGraph: { type: "website", locale: "vi_VN", siteName: "Hàng Chọn", title: "Hàng Chọn · Kệ hàng" },
 };
 
 /** Trang chủ — hướng B «Kệ hàng đã chọn»: vào là thấy hàng, mỗi món có con dấu và bằng chứng đã thử. */
 export default function ShelfPage({ searchParams }: PageProps<"/">) {
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex items-end justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-[12.5px] font-semibold tracking-[0.08em] text-accent uppercase">Kệ hàng đã chọn</p>
-          <h1 className="mt-1 text-[24px] leading-tight font-extrabold [text-wrap:balance] md:text-[34px]">
-            Ít món thôi. Món nào cũng đã dùng thử.
-          </h1>
-        </div>
-        <Seal size={64} className="hidden sm:inline-grid" />
-      </header>
+      <StoreIntro eyebrow="Kệ hàng" title="Ít nhưng mà chất..." aside={<Seal size={64} className="hidden sm:inline-grid" />} />
       <Suspense fallback={<ShelfSkeleton />}>
         <ShelfBody searchParams={searchParams} />
       </Suspense>

@@ -442,6 +442,67 @@ export function usePublicOrder(code: string, token: string | null) {
 }
 
 /* ================================================================================================================
+ * «Của tôi» — khách đăng nhập bằng mã một lần (khớp api/app/modules/orders/account.py)
+ * ============================================================================================================== */
+
+export type CustomerMe = { signed_in: boolean; kind: "phone" | "email" | null; contact: string | null };
+export type MyOrder = {
+  code: string;
+  token: string;
+  status: OrderStatus;
+  status_label: string;
+  placed_at: string;
+  total_vnd: number;
+  items_summary: string;
+  item_count: number;
+};
+
+const ACC = "/api/store/account";
+
+export const accountKeys = {
+  me: ["store", "account", "me"] as const,
+  orders: ["store", "account", "orders"] as const,
+};
+
+export function useCustomerMe() {
+  return useQuery({ queryKey: accountKeys.me, queryFn: () => api.get<CustomerMe>(`${ACC}/me`) });
+}
+
+export function useMyOrders(enabled: boolean) {
+  return useQuery({ queryKey: accountKeys.orders, queryFn: () => api.get<Paginated<MyOrder>>(`${ACC}/orders`, { query: { size: 50 } }), enabled });
+}
+
+export function useRequestLoginCode() {
+  return useMutation({
+    mutationFn: (contact: string) => api.post<{ message: string; expires_in: number; dev_code: string | null }>(`${ACC}/code`, { contact }),
+    meta: { silentError: true },
+  });
+}
+
+export function useVerifyLoginCode() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { contact: string; code: string }) => api.post<CustomerMe>(`${ACC}/verify`, body),
+    meta: { silentError: true },
+    onSuccess: (me) => {
+      qc.setQueryData(accountKeys.me, me);
+      void qc.invalidateQueries({ queryKey: accountKeys.orders });
+    },
+  });
+}
+
+export function useCustomerLogout() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<void>(`${ACC}/logout`),
+    onSuccess: () => {
+      qc.setQueryData<CustomerMe>(accountKeys.me, { signed_in: false, kind: null, contact: null });
+      qc.removeQueries({ queryKey: accountKeys.orders });
+    },
+  });
+}
+
+/* ================================================================================================================
  * Bàn làm việc (chị)
  * ============================================================================================================== */
 

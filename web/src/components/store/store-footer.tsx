@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { Brand } from "@/components/layout/brand";
 
+// Cùng tên với menu trên (`lib/store-nav.ts`), thêm «Về Hàng Chọn» và «Hỏi trợ lý» (không có trong menu)
 const LINKS = [
-  { href: "/ve-nguoi-chon", label: "Về người chọn" },
+  { href: "/", label: "Kệ hàng" },
   { href: "/dot", label: "Mua chung" },
   { href: "/nho-tim", label: "Nhờ tìm" },
-  { href: "/dung-thu", label: "Dùng thử cùng mình" },
-  { href: "/don", label: "Tra cứu đơn" },
+  { href: "/dung-thu", label: "Dùng thử" },
+  { href: "/cua-toi", label: "Của tôi" },
+  { href: "/ve-nguoi-chon", label: "Về Hàng Chọn" },
   { href: "/hoi", label: "Hỏi trợ lý" },
 ];
 

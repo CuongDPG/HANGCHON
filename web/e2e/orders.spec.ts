@@ -44,10 +44,12 @@ test("khách đặt hàng trong đợt, chuyển khoản QR, chị thấy đơn 
       ),
     [product!, drop] as const,
   );
-  await page.goto("/gio-hang");
-  await expect(page.getByRole("heading", { level: 1, name: "Giỏ hàng" })).toBeVisible();
+  await page.goto("/gio-hang"); // link cũ chuyển hẳn về «Của tôi», tab Giỏ hàng
+  await expect(page).toHaveURL(/\/cua-toi$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Của tôi" })).toBeVisible();
+  await expect(page.getByRole("main").getByRole("tab", { name: /Giỏ hàng/, selected: true })).toBeVisible();
   await expect(page.getByRole("main").getByText(product!.name)).toBeVisible();
-  await expect(page.getByRole("link", { name: /Giỏ hàng, 1 món/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /^Của tôi, giỏ hàng 1 món$/ }).filter({ visible: true }).first()).toBeVisible();
   await shot(page, "gio-hang", info.project.name);
   await noOverflow(page);
 
@@ -94,14 +96,45 @@ test("khách đặt hàng trong đợt, chuyển khoản QR, chị thấy đơn 
 });
 
 test("tra cứu đơn bằng số điện thoại + mã đơn", async ({ page }, info) => {
-  await page.goto("/don");
-  await expect(page.getByRole("heading", { level: 1, name: "Tra cứu đơn" })).toBeVisible();
-  await page.getByRole("main").getByLabel("Số điện thoại").fill("0900000999");
-  await page.getByRole("main").getByLabel("Mã đơn").fill("HC-11111");
+  await page.goto("/don"); // link cũ chuyển hẳn về «Của tôi», tab Đơn của tôi
+  await expect(page).toHaveURL(/\/cua-toi\?tab=don$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Của tôi" })).toBeVisible();
+  await page.getByRole("main").getByLabel("Số điện thoại", { exact: true }).fill("0900000999");
+  await page.getByRole("main").getByLabel("Mã đơn", { exact: true }).fill("HC-11111");
   await page.getByRole("main").getByRole("button", { name: "Xem đơn" }).click();
   await expect(page.getByRole("alert").filter({ hasText: /Không thấy đơn|Không kết nối/ })).toBeVisible();
   await shot(page, "don-tra-cuu", info.project.name);
   await noOverflow(page);
+});
+
+test("«Của tôi»: đăng nhập bằng mã một lần, thấy đơn của mình, đăng xuất", async ({ page }, info) => {
+  test.skip(info.project.name !== "mobile", "luồng ghi dữ liệu chỉ chạy một lần");
+  test.skip(!(await login(page)), "Cần API đang chạy với tài khoản chị");
+  const list = await (await page.request.get("/api/desk/orders?size=50&nhom=xong")).json();
+  const done = list.items?.[0] as { code: string; recipient_phone: string } | undefined;
+  test.skip(!done, "Cần một đơn đã giao trong dữ liệu mẫu");
+  await page.context().clearCookies();
+
+  await page.goto("/cua-toi?tab=don");
+  const main = page.getByRole("main");
+  await main.getByLabel("Số điện thoại hoặc email").fill(done!.recipient_phone);
+  await main.getByRole("button", { name: "Gửi mã" }).click();
+  await expect(main.getByRole("status")).toContainText("mình vừa gửi mã 6 chữ số");
+  // bản chạy thử (dev/test) hiện mã ngay dưới câu báo
+  const devCode = (await main.getByText(/mã là \d{6}/).textContent())!.match(/\d{6}/)![0];
+  await main.getByLabel("Mã 6 chữ số").fill(devCode);
+  await main.getByRole("button", { name: "Đăng nhập" }).click();
+  await expect(main.getByText("Đang đăng nhập:")).toBeVisible();
+  const row = main.getByRole("link", { name: new RegExp(done!.code) });
+  await expect(row).toBeVisible();
+  await shot(page, "cua-toi-don", info.project.name);
+  await noOverflow(page);
+  await row.click();
+  await expect(page).toHaveURL(new RegExp(`/don/${done!.code}\\?t=`));
+
+  await page.goto("/cua-toi?tab=don");
+  await main.getByRole("button", { name: "Đăng xuất" }).click();
+  await expect(main.getByRole("heading", { name: "Đăng nhập để xem mọi đơn" })).toBeVisible();
 });
 
 for (const p of [

@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { FindBoard } from "@/components/catalog/find-board";
+import { StoreIntro } from "@/components/store/store-intro";
 import { EmptyState, SkeletonList } from "@/components/ui/feedback";
-import { PageHeader } from "@/components/ui/page-header";
 import type { FindRequestsPage } from "@/lib/api/catalog";
 import { errorMessage } from "@/lib/api/client";
 import { serverFetch } from "@/lib/api/server";
 
 export const metadata: Metadata = {
   title: "Nhờ tìm",
-  description: "Bạn cần món gì mà chưa tìm được loại ưng? Gửi nhu cầu, người khác bấm «mình cũng cần». Đủ người, mình mở tìm.",
+  description: "Mua cùng chuyên gia: bạn cần món gì mà chưa tìm được loại ưng? Gửi nhu cầu, người khác bấm «mình cũng cần». Đủ người, mình mở tìm.",
   alternates: { canonical: "/nho-tim" },
 };
 
@@ -17,7 +17,10 @@ export const metadata: Metadata = {
 export default function FindPage({ searchParams }: PageProps<"/nho-tim">) {
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader title="Bạn cần món gì mà chưa tìm được loại ưng?" description="Người khác cũng cần thì bấm «mình cũng cần». Đây là cộng đồng." />
+      <StoreIntro eyebrow="Nhờ tìm" title="Mua cùng chuyên gia...">
+        Bạn cần món gì mà chưa tìm được loại ưng? Gửi nhu cầu cho mình. Người khác cũng cần thì bấm «mình cũng cần»: đây là
+        cộng đồng.
+      </StoreIntro>
       <Suspense fallback={<SkeletonList rows={4} />}>
         <FindBody searchParams={searchParams} />
       </Suspense>

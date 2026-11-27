@@ -3,12 +3,12 @@
 import { ShoppingBag, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
-import { Badge, ButtonLink, Card, DataList, EmptyState, IconButton, ImageBox, Money, PageHeader, SkeletonList } from "@/components/ui";
+import { Badge, ButtonLink, Card, DataList, EmptyState, IconButton, ImageBox, Money, SkeletonList } from "@/components/ui";
 import { useQuote } from "@/lib/api/orders";
 import { cartSubtotal, groupByDrop, removeFromCart, setCartQuantity, useCart, useIsClient, type CartItem } from "@/lib/cart";
 import { QuantityStepper } from "./quantity-stepper";
 
-/** Giỏ hàng (e4): món theo đợt, đổi số lượng, kiểm suất còn lại với máy chủ. */
+/** Giỏ hàng (e4), tab đầu của «Của tôi» (đầu trang do trang lo): món theo đợt, đổi số lượng, kiểm suất còn lại với máy chủ. */
 export function CartScreen() {
   const items = useCart();
   const hydrated = useIsClient();
@@ -28,7 +28,6 @@ export function CartScreen() {
   if (items.length === 0) {
     return (
       <div className="flex flex-col gap-6">
-        <PageHeader title="Giỏ hàng" />
         <EmptyState
           icon={<ShoppingBag />}
           title="Giỏ đang trống"
@@ -50,7 +49,7 @@ export function CartScreen() {
   return (
     <div className="flex flex-col gap-6 md:grid md:grid-cols-[1fr_20rem] md:items-start md:gap-8">
       <div className="flex flex-col gap-5">
-        <PageHeader title="Giỏ hàng" description="Giá và suất còn lại được kiểm lại lúc bạn đặt." />
+        <p className="text-[14px] text-ink-2">Giá và suất còn lại được kiểm lại lúc bạn đặt.</p>
         {groups.map((g) => (
           <section key={g.dropId ?? "stock"} className="flex flex-col gap-2" aria-label={g.label}>
             <div className="flex items-center gap-2">

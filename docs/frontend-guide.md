@@ -162,7 +162,7 @@ Nhập từ một chỗ: `import { Button, Card, Money } from "@/components/ui";
 | Component | Ví dụ |
 |---|---|
 | `Button`, `ButtonLink`, `buttonClasses()` | `<Button variant="primary\|secondary\|ghost\|danger" size="sm\|md\|lg" loading block icon={<Check className="size-4" />}>Duyệt</Button>` · `<ButtonLink href="/dot">Xem đợt</ButtonLink>` |
-| `IconButton`, `IconLink` | `<IconButton label="Lọc" icon={<SlidersHorizontal />} />` · `<IconLink href="/gio-hang" label="Giỏ hàng" icon={<ShoppingBag />} count={2} />` (bắt buộc `label`) |
+| `IconButton`, `IconLink` | `<IconButton label="Lọc" icon={<SlidersHorizontal />} />` · `<IconLink href="/cua-toi" label="Giỏ hàng" icon={<ShoppingBag />} count={2} />` (bắt buộc `label`) |
 | `Input`, `Textarea` | `<Input label="Số điện thoại" hint="…" error={errors.phone?.message} leading={<Search />} trailing="đ" {...register("phone")} />` |
 | `InlineSelect` | `<InlineSelect label="Hãng giao" value={v} onChange={setV} options={[{ value: "ghn", label: "GHN", hint: "22.000đ" }]} />` · `appearance="inline"` để chen trong câu |
 | `Checkbox`, `Radio`, `RadioGroup`, `Switch` | `<Checkbox label="Chỉ hàng Nhật" />` · `<RadioGroup name="pay" value={v} onChange={setV} options={[…]} />` · `<Switch label="Tự đăng" checked={on} onChange={setOn} />` |
@@ -202,13 +202,19 @@ Khung: `components/layout/brand.tsx` (`Brand`, `BrandMark`), `components/store/*
 | `/` | Kệ hàng đã chọn (trang chủ, hướng B) | e1, e2 |
 | `/san-pham/[slug]` | Trang sản phẩm | e1, e2, e7, e8 |
 | `/dot`, `/dot/[slug]` | Đợt gom đơn, chi tiết đợt | e3 |
-| `/gio-hang`, `/dat-hang` | Giỏ, đặt hàng một trang | e4 |
-| `/don`, `/don/[code]` | Tra cứu đơn, theo dõi đơn | e5, g5 |
+| `/cua-toi` | «Của tôi»: tab «Giỏ hàng» (mặc định) và «Đơn của tôi» (`?tab=don`: đăng nhập bằng mã một lần, đơn trên máy này, tra một đơn). `/gio-hang` → `/cua-toi`, `/don` → `/cua-toi?tab=don` (chuyển hẳn, `next.config.ts`) | e4, e5 |
+| `/dat-hang` | Đặt hàng một trang | e4 |
+| `/don/[code]` | Theo dõi đơn (link gửi khách, giữ nguyên) | e5, g5 |
 | `/nho-tim` | Nhờ tìm | e9 |
-| `/ve-nguoi-chon` | Về người chọn | — |
+| `/dung-thu` | Dùng thử (sổ người dùng thử) | h8 |
+| `/ve-nguoi-chon` | Về Hàng Chọn | — |
 | `/hoi` | Hỏi trợ lý | e7 |
 
-Điều hướng (thanh dưới điện thoại / menu trên máy tính): `src/lib/store-nav.ts` — Kệ hàng · Đợt gom · Nhờ tìm · Đơn · Người chọn.
+Điều hướng (thanh dưới điện thoại / menu trên máy tính): `src/lib/store-nav.ts` — Kệ hàng · Mua chung · Nhờ tìm · Dùng thử · Của tôi
+(xe đẩy, kèm số món trong giỏ; đầu trang không còn nút giỏ riêng). Chân trang dùng cùng tên, thêm «Về Hàng Chọn» và «Hỏi trợ lý».
+Bốn mục đầu mở bằng `StoreIntro` (`components/store/store-intro.tsx`): dòng nhỏ là tên mục, `<h1>` là khẩu hiệu
+(«Ít nhưng mà chất...», «Mua chung để có giá tốt nhất...», «Mua cùng chuyên gia...», «Thử cùng, cho mình và cho mọi người...»).
+Phiên khách («Của tôi»): `useCustomerMe()` / `useMyOrders()` trong `lib/api/orders.ts`, cookie `hc_customer` tách khỏi phiên bàn làm việc.
 
 ### Bàn làm việc — `src/app/desk/`
 
