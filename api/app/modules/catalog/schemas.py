@@ -1122,6 +1122,7 @@ class StopPlanOut(BaseModel):
     posts: list[StopPostRow] = Field(default_factory=list)
     listings: list[StopListingRow] = Field(default_factory=list)
     drops: list[StopDropRow] = Field(default_factory=list)
+    overdue_posts: list[StopPostRow] = Field(default_factory=list)  # món đã ngừng: bài giữ lại đã quá giờ hẹn
     last_stop: LastStop | None = None
 
 
@@ -1135,6 +1136,18 @@ class StopIn(BaseModel):
     remove_posts: list[StopPostChoice] = Field(default_factory=list)
     listing_ids: list[uuid.UUID] = Field(default_factory=list)
     delete_posts: bool = False  # «Xoá hẳn»: xoá bài đã đăng (không khôi phục được) thay vì ẩn
+
+
+class OverdueChoice(BaseModel):
+    """Mở bán lại: chị chọn cho từng bài quá giờ hẹn — đăng ngay, hẹn lại giờ (`scheduled_at`) hay bỏ."""
+
+    id: uuid.UUID
+    action: Literal["now", "reschedule", "drop"]
+    scheduled_at: datetime | None = None
+
+
+class ResumeIn(BaseModel):
+    overdue: list[OverdueChoice] = Field(default_factory=list)
 
 
 class StopRunOut(BaseModel):

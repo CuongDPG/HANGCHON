@@ -66,6 +66,16 @@ PRESETS = {
 OPEN_POST = (PostStatus.PLANNED, PostStatus.APPROVED, PostStatus.FAILED)
 
 
+STOPPED_MSG = "Món này đang ngừng bán. Chị mở bán lại rồi mới duyệt đăng bài."
+
+
+async def product_stopped(db: AsyncSession, product_id: uuid.UUID | None) -> bool:
+    """Món đã ngừng bán: bài của món không được duyệt / xếp lịch."""
+    return bool(product_id) and await db.scalar(select(Product.status).where(Product.id == product_id)) == (
+        ProductStatus.STOPPED
+    )
+
+
 def publish_key(draft_id: uuid.UUID) -> str:
     return f"publish:{draft_id}"
 
@@ -462,7 +472,11 @@ def draft_preview(draft: ContentDraft, post: ScheduledPost, name: str) -> dict[s
 async def submit(
     db: AsyncSession, draft: ContentDraft, *, slot_at: datetime | None = None
 ) -> control.ProposeOutcome | None:
-    """Xếp bản vào lịch (bài `planned`) và — nếu soát đạt — đưa vào hàng chờ duyệt đăng. Soát chưa đạt thì rút khỏi hàng chờ."""
+    """Xếp bản vào lịch (bài `planned`) và — nếu soát đạt — đưa vào hàng chờ duyệt đăng. Soát chưa đạt thì rút khỏi hàng chờ.
+    Món đã ngừng bán: bản nháp giữ nguyên, không lên lịch, không vào hàng chờ."""
+    if await product_stopped(db, draft.product_id):
+        await control.cancel_pending(db, action=ACTION_PUBLISH, dedupe_key=publish_key(draft.id))
+        return None
     post = await ensure_post(db, draft, slot_at=slot_at)
     if not can_approve(draft.check_status):
         await control.cancel_pending(db, action=ACTION_PUBLISH, dedupe_key=publish_key(draft.id))
@@ -497,6 +511,8 @@ async def apply_publish_approval(
     post = await db.get(ScheduledPost, _uuid(payload["scheduled_post_id"]))
     if draft is None or post is None or draft.status == DraftStatus.ARCHIVED or post.status == PostStatus.CANCELLED:
         raise Conflict("Bản này đã được thay bằng bản mới hoặc lịch đã huỷ.", code="draft_stale")
+    if await product_stopped(db, post.product_id or draft.product_id):
+        raise Conflict(STOPPED_MSG, code="product_stopped")
     edited = {k: payload[k] for k in ("title", "body", "hashtags") if k in payload}
     if edited:  # chị «sửa rồi duyệt» ngay trong hàng chờ: soát lại bằng luật
         for k, v in edited.items():
@@ -569,6 +585,8 @@ async def approve_draft(
         raise Conflict("Bản này đã đăng hoặc đã được thay.", code="draft_stale")
     if draft.status == DraftStatus.DRAFTING:
         raise Conflict("AI đang soạn bản này, chị đợi chút nhé.", code="drafting")
+    if await product_stopped(db, draft.product_id):
+        raise Conflict(STOPPED_MSG, code="product_stopped")
     if not can_approve(draft.check_status):
         raise Conflict(
             "Còn mục soát lời chưa đạt — chị sửa hoặc xác nhận bỏ qua có lý do trước khi duyệt.", code="check_failed"

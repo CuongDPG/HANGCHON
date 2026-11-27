@@ -281,3 +281,119 @@ async def test_stop_follows_autonomy_off(owner_client: httpx.AsyncClient, setup)
     async with SessionLocal() as db:
         assert (await db.get(Product, p.id)).status == ProductStatus.PUBLISHED
         assert await db.scalar(select(func.count(AIActivity.id))) == 0
+
+
+async def test_stop_cancels_drafts_awaiting_approval_and_blocks_approve(owner_client: httpx.AsyncClient) -> None:
+    """Bài chờ duyệt luôn bị huỷ khi ngừng bán (kể cả chị không tích); duyệt / xếp lịch bị chặn khi món đang ngừng."""
+    from app.core.errors import Conflict
+    from app.modules.content.service import apply_publish_approval
+
+    p = await make_product()
+    detail = (await owner_client.post(f"/api/desk/content/studio/product/{p.id}/compose", json={})).json()
+    drafts = detail["drafts"]
+    assert drafts and all(d["approval_item_id_pending"] for d in drafts)
+    async with SessionLocal() as db:
+        waiting = list((await db.execute(select(ScheduledPost).where(ScheduledPost.product_id == p.id))).scalars())
+    assert waiting and all(x.status == PostStatus.PLANNED for x in waiting)
+
+    r = await owner_client.post(f"{BASE}/{p.id}/stop", json={})
+    assert r.status_code == 200, r.text
+    steps = _by_id(r.json()["steps"])
+    for x in waiting:
+        s = steps[str(x.id)]
+        assert s["status"] == "done" and s["label"].startswith("Bài chờ duyệt"), s
+    async with SessionLocal() as db:
+        for x in waiting:
+            post = await db.get(ScheduledPost, x.id)
+            assert post.status == PostStatus.CANCELLED and post.removal["outcome"] == "cancelled"
+        items = list(
+            (await db.execute(select(ApprovalItem).where(ApprovalItem.action == "content.publish_post"))).scalars()
+        )
+        assert items and all(i.status == ApprovalStatus.CANCELLED for i in items)
+
+    fb = next(d for d in drafts if d["channel"] == "facebook")
+    a = await owner_client.post(f"/api/desk/content/drafts/{fb['id']}/approve", json={})
+    assert a.status_code == 409 and "ngừng bán" in a.json()["detail"] and "Chị" in a.json()["detail"]
+    async with SessionLocal() as db:
+        assert (
+            await db.scalar(
+                select(func.count(ScheduledPost.id)).where(
+                    ScheduledPost.product_id == p.id, ScheduledPost.status != PostStatus.CANCELLED
+                )
+            )
+            == 0
+        )  # không xếp lịch bài mới
+        # việc duyệt còn sót trong hàng chờ (bài vẫn chờ) cũng không xếp lịch được
+        stray = ScheduledPost(draft_id=uuid.UUID(fb["id"]), channel=Channel.FACEBOOK, product_id=p.id,
+                              status=PostStatus.PLANNED, scheduled_at=now_utc() + timedelta(hours=3))  # fmt: skip
+        db.add(stray)
+        await db.flush()
+        with pytest.raises(Conflict, match="ngừng bán"):
+            await apply_publish_approval(db, {"draft_id": fb["id"], "scheduled_post_id": str(stray.id)}, None)
+        assert stray.status == PostStatus.PLANNED
+
+
+async def test_resume_asks_before_posting_overdue(owner_client: httpx.AsyncClient) -> None:
+    """Mở bán lại: bài giữ lại đã quá giờ không tự đăng — theo chị chọn (đăng ngay / hẹn lại / bỏ); bài còn hạn giữ lịch."""
+    p = await make_product()
+    ids = {k: await _post(p, Channel.FACEBOOK, PostStatus.APPROVED) for k in ("now", "later", "drop", "none", "future")}
+    async with SessionLocal() as db:
+        for k in ("now", "later", "drop", "none"):
+            (await db.get(ScheduledPost, ids[k])).scheduled_at = now_utc() - timedelta(hours=1)
+        future_at = (await db.get(ScheduledPost, ids["future"])).scheduled_at
+        await db.commit()
+    assert (await owner_client.post(f"{BASE}/{p.id}/stop", json={})).status_code == 200  # chị giữ lại các lịch
+
+    plan = (await owner_client.get(f"{BASE}/{p.id}/stop-plan")).json()
+    assert {x["id"] for x in plan["overdue_posts"]} == {str(ids[k]) for k in ("now", "later", "drop", "none")}
+
+    late = (now_utc() + timedelta(days=1)).replace(microsecond=0)
+    choices = [
+        {"id": str(ids["now"]), "action": "now"},
+        {"id": str(ids["later"]), "action": "reschedule", "scheduled_at": late.isoformat()},
+        {"id": str(ids["drop"]), "action": "drop"},
+    ]
+    past = [
+        {"id": str(ids["later"]), "action": "reschedule", "scheduled_at": (now_utc() - timedelta(hours=1)).isoformat()}
+    ]
+    bad = await owner_client.post(f"{BASE}/{p.id}/resume", json={"overdue": past})
+    assert bad.status_code == 400 and "sau bây giờ" in bad.json()["detail"]
+    async with SessionLocal() as db:
+        assert (await db.get(Product, p.id)).status == ProductStatus.STOPPED
+
+    r = await owner_client.post(f"{BASE}/{p.id}/resume", json={"overdue": choices})
+    assert r.status_code == 200, r.text
+    assert r.json()["product"]["status"] == "published"
+    steps = _by_id(r.json()["steps"])
+    assert steps[str(ids["now"])]["status"] == "done" and "Đăng ngay" in steps[str(ids["now"])]["detail"]
+    assert steps[str(ids["later"])]["status"] == "done" and "hẹn lại" in steps[str(ids["later"])]["detail"]
+    assert steps[str(ids["drop"])]["status"] == "done"
+    assert steps[str(ids["none"])]["status"] == "info"  # chị chưa chọn: không tự đăng
+    assert str(ids["future"]) not in steps
+    async with SessionLocal() as db:
+        rows = {k: await db.get(ScheduledPost, v) for k, v in ids.items()}
+    assert rows["now"].status == PostStatus.APPROVED and rows["now"].scheduled_at <= now_utc()
+    assert rows["later"].status == PostStatus.APPROVED and rows["later"].scheduled_at == late
+    assert rows["drop"].status == PostStatus.CANCELLED and rows["none"].status == PostStatus.CANCELLED
+    assert rows["future"].status == PostStatus.APPROVED and rows["future"].scheduled_at == future_at
+
+    social = get_driver("social", "mock")
+    before = len(social.published)
+    assert await JOBS["content.publish_due"](job_context()) == 1  # chỉ bài chị chọn «Đăng ngay»
+    assert len(social.published) == before + 1
+    assert await _post_status(ids["now"]) == PostStatus.PUBLISHED
+
+
+async def test_resume_from_log_without_choices_does_not_post_overdue(owner_client: httpx.AsyncClient) -> None:
+    """Hoàn tác từ Nhật ký AI (không có lựa chọn): bài quá giờ huỷ lịch, không đăng."""
+    p = await make_product()
+    pid = await _post(p, Channel.FACEBOOK, PostStatus.APPROVED)
+    async with SessionLocal() as db:
+        (await db.get(ScheduledPost, pid)).scheduled_at = now_utc() - timedelta(hours=1)
+        await db.commit()
+    r = await owner_client.post(f"{BASE}/{p.id}/stop", json={})
+    assert r.status_code == 200, r.text
+    undo = await owner_client.post(f"/api/desk/control/activity/{r.json()['activity_id']}/undo")
+    assert undo.status_code in (200, 201), undo.text
+    assert await _post_status(pid) == PostStatus.CANCELLED
+    assert await JOBS["content.publish_due"](job_context()) == 0

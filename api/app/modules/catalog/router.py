@@ -71,6 +71,7 @@ from app.modules.catalog.schemas import (
     PublicStatus,
     ReminderIn,
     ReminderOut,
+    ResumeIn,
     ReviewInvite,
     ReviewReplyIn,
     RewriteIn,
@@ -444,9 +445,9 @@ async def stop_product(product_id: uuid.UUID, body: StopIn, user: OwnerUser, db:
 
 
 @desk.post("/products/{product_id}/resume", response_model=StopRunOut)
-async def resume_product(product_id: uuid.UUID, user: OwnerUser, db: DbSession) -> Any:
+async def resume_product(product_id: uuid.UUID, user: OwnerUser, db: DbSession, body: ResumeIn | None = None) -> Any:
     p = await product_svc.get_product(db, product_id)
-    steps = await stop_selling.resume(db, p, user)
+    steps = await stop_selling.resume(db, p, user, (body or ResumeIn()).model_dump()["overdue"])
     await db.refresh(p)
     return {"product": await _desk_product(db, p), "steps": steps}
 

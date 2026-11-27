@@ -8,12 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Card, SectionLabel } from "@/components/ui/card";
 import { Checkbox, Switch } from "@/components/ui/choice";
 import { useConfirm } from "@/components/ui/confirm";
-import { DateTime } from "@/components/ui/date-time";
+import { DateTime, useNow } from "@/components/ui/date-time";
 import { SkeletonList } from "@/components/ui/feedback";
+import { Input } from "@/components/ui/field";
 import { Sheet } from "@/components/ui/overlay";
+import { Segmented } from "@/components/ui/segmented";
 import { notifySuccess } from "@/components/ui/toast";
 import {
   useResumeSelling,
+  type OverdueAction,
   useStopPlan,
   useStopSelling,
   type DeskProduct,
@@ -120,15 +123,19 @@ function StopForm({ plan, onDone }: { plan: StopPlan; onDone: (steps: StopStep[]
       {plan.scheduled_posts.length ? (
         <section className="flex flex-col gap-1">
           <SectionLabel>Lịch đăng chưa đăng</SectionLabel>
-          {plan.scheduled_posts.map((p) => (
-            <Checkbox
-              key={p.id}
-              checked={on(p.id)}
-              onChange={() => toggle(off, setOff, p.id)}
-              label={`Huỷ lịch ${p.label}`}
-              description={p.scheduled_at ? <>hẹn <DateTime value={p.scheduled_at} format="dateTime" /></> : undefined}
-            />
-          ))}
+          {plan.scheduled_posts.map((p) =>
+            p.status === "planned" ? (
+              <Checkbox key={p.id} checked disabled readOnly label={`Huỷ bài chờ duyệt ${p.label}`} description="Chưa duyệt" />
+            ) : (
+              <Checkbox
+                key={p.id}
+                checked={on(p.id)}
+                onChange={() => toggle(off, setOff, p.id)}
+                label={`Huỷ lịch ${p.label}`}
+                description={p.scheduled_at ? <>hẹn <DateTime value={p.scheduled_at} format="dateTime" /></> : undefined}
+              />
+            ),
+          )}
         </section>
       ) : null}
 
@@ -228,12 +235,101 @@ function StopForm({ plan, onDone }: { plan: StopPlan; onDone: (steps: StopStep[]
   );
 }
 
+function resumeMessage(plan: StopPlan | undefined): string {
+  const last = plan?.last_stop;
+  const parts = [
+    "Website lên lại như trước khi ngừng bán",
+    last?.hidden_posts ? `hiện lại ${last.hidden_posts} bài đã ẩn` : null,
+    last?.listings ? `mở bán lại trên ${last.listings} sàn` : null,
+  ].filter(Boolean);
+  const gone = (last?.gone_posts ?? 0) + (last?.cancelled_posts ?? 0);
+  return `${parts.join(", ")}.${gone ? ` ${gone} bài/lịch đăng đã gỡ hoặc huỷ không tự quay lại.` : ""}`;
+}
+
+const OVERDUE_OPTIONS: { value: OverdueAction; label: string }[] = [
+  { value: "now", label: "Đăng ngay" },
+  { value: "reschedule", label: "Hẹn lại giờ" },
+  { value: "drop", label: "Bỏ" },
+];
+type OverduePick = { action: OverdueAction | ""; at: string };
+
+/** Mở bán lại khi có bài chị giữ lại đã quá giờ hẹn: chị chọn từng bài (hoặc cả loạt) trước, không tự đăng. */
+function ResumeForm({ plan, onDone }: { plan: StopPlan; onDone: (steps: StopStep[]) => void }) {
+  const resume = useResumeSelling(plan.product_id);
+  const [picks, setPicks] = useState<Record<string, OverduePick>>({});
+  const pick = (id: string) => picks[id] ?? { action: "", at: "" };
+  const set = (id: string, v: Partial<OverduePick>) => setPicks((s) => ({ ...s, [id]: { ...pick(id), ...v } }));
+  const actions = plan.overdue_posts.map((p) => pick(p.id).action);
+  const all = actions.every((a) => a === actions[0]) ? actions[0] : "";
+  const setAll = (action: OverdueAction) =>
+    setPicks((s) => Object.fromEntries(plan.overdue_posts.map((p) => [p.id, { ...(s[p.id] ?? { at: "" }), action }])));
+  const now = useNow();
+  const ready = plan.overdue_posts.every((p) => {
+    const c = pick(p.id);
+    return c.action === "reschedule" ? Boolean(c.at) && new Date(c.at).getTime() > (now ?? 0) : c.action !== "";
+  });
+
+  const submit = () =>
+    resume.mutate(
+      {
+        overdue: plan.overdue_posts.map((p) => {
+          const c = pick(p.id);
+          return { id: p.id, action: c.action as OverdueAction, scheduled_at: c.action === "reschedule" ? new Date(c.at).toISOString() : null };
+        }),
+      },
+      { onSuccess: (run) => { notifySuccess("Đã mở bán lại"); onDone(run.steps); } },
+    );
+
+  return (
+    <div className="flex flex-col gap-5">
+      <p className="text-[14px] text-ink-2">{resumeMessage(plan)}</p>
+      <section className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <SectionLabel>Bài đã quá giờ hẹn</SectionLabel>
+          {plan.overdue_posts.length > 1 ? (
+            <Segmented<OverdueAction | ""> size="sm" aria-label="Chọn cho tất cả" value={all} onChange={(v) => v && setAll(v)} options={OVERDUE_OPTIONS} />
+          ) : null}
+        </div>
+        <ul className="flex flex-col divide-y divide-line">
+          {plan.overdue_posts.map((p) => {
+            const c = pick(p.id);
+            return (
+              <li key={p.id} className="flex flex-col gap-2 py-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-[15px] font-semibold">{p.label}</p>
+                    {p.scheduled_at ? (
+                      <p className="text-[14px] text-ink-2">
+                        hẹn <DateTime value={p.scheduled_at} format="dateTime" />
+                      </p>
+                    ) : null}
+                  </div>
+                  <Segmented<OverdueAction | ""> size="sm" aria-label={`Bài ${p.label}`} value={c.action} onChange={(v) => v && set(p.id, { action: v })} options={OVERDUE_OPTIONS} />
+                </div>
+                {c.action === "reschedule" ? (
+                  <Input label="Giờ đăng mới" type="datetime-local" value={c.at} onChange={(e) => set(p.id, { at: e.target.value })} />
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+      <div className="sticky bottom-0 -mb-1 flex flex-wrap gap-2 bg-surface py-2">
+        <Button icon={<RotateCcw className="size-4" />} loading={resume.isPending} disabled={!ready} onClick={submit}>
+          Mở bán lại
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 /**
  * «Ngừng bán» (món đang bán / tạm ẩn) hoặc «Mở bán lại» (món đã ngừng bán) — một chỗ vào duy nhất, dùng ở đầu trang
  * sản phẩm và tab Website của xưởng nội dung. Chỉ chị (owner) thấy nút.
  */
 export function StopSellingButton({ product, size = "md" }: { product: DeskProduct; size?: "sm" | "md" }) {
   const [open, setOpen] = useState(false);
+  const [resuming, setResuming] = useState(false);
   const [steps, setSteps] = useState<StopStep[] | null>(null);
   const stopped = product.status === "stopped";
   const selling = product.status === "published" || product.status === "paused";
@@ -242,20 +338,14 @@ export function StopSellingButton({ product, size = "md" }: { product: DeskProdu
   const confirm = useConfirm();
   if (!stopped && !selling) return null;
 
-  const close = () => { setOpen(false); setSteps(null); };
+  const close = () => { setOpen(false); setResuming(false); setSteps(null); };
   const doResume = async () => {
-    const last = plan.data?.last_stop;
-    const parts = [
-      "Website lên lại như trước khi ngừng bán",
-      last?.hidden_posts ? `hiện lại ${last.hidden_posts} bài đã ẩn` : null,
-      last?.listings ? `mở bán lại trên ${last.listings} sàn` : null,
-    ].filter(Boolean);
-    const gone = (last?.gone_posts ?? 0) + (last?.cancelled_posts ?? 0);
-    const ok = await confirm({
-      title: "Mở bán lại món này?",
-      message: `${parts.join(", ")}.${gone ? ` ${gone} bài/lịch đăng đã gỡ hoặc huỷ không tự quay lại.` : ""}`,
-      confirmLabel: "Mở bán lại",
-    });
+    if (plan.data?.overdue_posts.length) {
+      setResuming(true);
+      setOpen(true);
+      return;
+    }
+    const ok = await confirm({ title: "Mở bán lại món này?", message: resumeMessage(plan.data), confirmLabel: "Mở bán lại" });
     if (!ok) return;
     resume.mutate(undefined, {
       onSuccess: (run) => { notifySuccess("Đã mở bán lại"); setSteps(run.steps); setOpen(true); },
@@ -278,11 +368,13 @@ export function StopSellingButton({ product, size = "md" }: { product: DeskProdu
         onClose={close}
         dismissOnBackdrop={false}
         size="lg"
-        title={steps ? `Kết quả: ${product.name}` : `Ngừng bán «${product.name}» trên mọi kênh`}
+        title={steps ? `Kết quả: ${product.name}` : resuming ? `Mở bán lại «${product.name}»` : `Ngừng bán «${product.name}» trên mọi kênh`}
         footer={steps ? <Button variant="secondary" onClick={close}>Đóng</Button> : undefined}
       >
         {steps ? (
           <StopSteps steps={steps} />
+        ) : resuming && plan.data ? (
+          <ResumeForm plan={plan.data} onDone={setSteps} />
         ) : plan.isPending ? (
           <SkeletonList rows={4} />
         ) : plan.data && plan.data.can_stop ? (

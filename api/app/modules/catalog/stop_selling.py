@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import control
 from app.core import events
 from app.core.errors import BadRequest, Conflict
+from app.core.timeutil import VN_TZ, now_utc, to_local
 from app.integrations.marketplaces import driver_for as marketplace_driver
 from app.integrations.social import driver_for as social_driver
 from app.modules.catalog.models import Drop, DropItem, DropStatus, Product, ProductStatus
@@ -43,6 +44,12 @@ LISTED = (ListingStatus.ACTIVE, ListingStatus.INACTIVE, ListingStatus.ERROR, Lis
 
 def _label(ch: Any) -> str:
     return CHANNEL_LABELS.get(ch, getattr(ch, "value", str(ch)))
+
+
+def _overdue(posts: list[ScheduledPost]) -> list[ScheduledPost]:
+    """Bài chị giữ lại khi ngừng bán, đã quá giờ hẹn: mở bán lại không tự đăng, hỏi chị trước."""
+    now = now_utc()
+    return [x for x in posts if x.status == PostStatus.APPROVED and x.scheduled_at <= now]
 
 
 def _post_row(x: ScheduledPost) -> dict[str, Any]:
@@ -139,6 +146,7 @@ async def plan(db: AsyncSession, p: Product) -> dict[str, Any]:
         "posts": [_post_row(x) for x in r["live"]],
         "listings": [_listing_row(li) for li in r["listings"]],
         "drops": [_drop_row(d, it) for d, it in r["drops"]],
+        "overdue_posts": [_post_row(x) for x in _overdue(r["scheduled"])] if p.status == ProductStatus.STOPPED else [],
         "last_stop": last,
     }
 
@@ -200,6 +208,9 @@ async def apply_stop(ctx: control.ActionContext) -> control.HandlerResult:
     if p.status not in STOPPABLE:
         raise Conflict("Món này không còn ở trạng thái đang bán.", code="not_stoppable")
     r = await _rows(db, p)  # chụp trước khi gỡ: thứ chị bỏ tích là «giữ lại»
+    # bài còn chờ duyệt luôn huỷ (kể cả bài vừa vào hàng chờ sau khi chị mở màn ngừng bán)
+    waiting = [str(x.id) for x in r["scheduled"] if x.status == PostStatus.PLANNED]
+    pl = {**pl, "cancel_post_ids": list(dict.fromkeys([*pl["cancel_post_ids"], *waiting]))}
     prev = p.status
     p.status = ProductStatus.STOPPED
     await db.flush()
@@ -244,17 +255,22 @@ async def _stop_steps(
     } if ids else {}  # fmt: skip
     for x in r["scheduled"]:
         sid = str(x.id)
-        base = {"id": sid, "channel": x.channel.value, "label": f"Lịch đăng {_label(x.channel)}"}
+        rm = (posts[sid].removal or {}) if sid in posts else {}
+        waiting = (
+            rm.get("prev_status") if rm.get("stop_id") == stop_id else x.status.value
+        ) == PostStatus.PLANNED.value
+        base = {"id": sid, "channel": x.channel.value,
+                "label": f"{'Bài chờ duyệt' if waiting else 'Lịch đăng'} {_label(x.channel)}"}  # fmt: skip
         if sid not in cancel:
             steps.append(_step("scheduled_post", status="skipped", detail="Chị giữ lại (bài không đăng khi món đang "
                                "ngừng bán).", **base))  # fmt: skip
             continue
-        rm = (posts[sid].removal or {}) if sid in posts else {}
         if rm.get("stop_id") != stop_id:
             steps.append(_step("scheduled_post", status="failed", detail=MISSING, **base))
         elif rm.get("outcome") == "cancelled":
             undo["cancelled_post_ids"].append(sid)
-            steps.append(_step("scheduled_post", status="done", detail="Đã huỷ lịch đăng.", **base))
+            steps.append(_step("scheduled_post", status="done", detail="Đã huỷ bài chờ duyệt." if waiting
+                               else "Đã huỷ lịch đăng.", **base))  # fmt: skip
         else:
             steps.append(_step("scheduled_post", status="failed", detail=rm.get("error") or MISSING, **base))
     for x in r["live"]:
@@ -331,7 +347,8 @@ async def undo_stop(ctx: control.UndoContext) -> None:
     await events.emit(
         "product.sale_resume_requested",
         {"stop_id": u["stop_id"], "product_id": u["product_id"], "user_id": str(ctx.user.id) if ctx.user else None,
-         "post_ids": u.get("hidden_post_ids") or [], "listing_ids": u.get("listing_ids") or []},
+         "post_ids": u.get("hidden_post_ids") or [], "listing_ids": u.get("listing_ids") or [],
+         "overdue": u.get("overdue") or []},
         db=db,
     )  # fmt: skip
     await control.audit(
@@ -373,6 +390,28 @@ async def resume_steps(db: AsyncSession, u: dict[str, Any]) -> list[dict[str, An
             "Bài đã gỡ khi ngừng bán, không hiện lại được — chị lên lịch bài mới ở xưởng nội dung.",
             id=str(x.id), channel=x.channel.value, url=f"/desk/noi-dung/san-pham/{u['product_id']}?kenh={x.channel.value}",
         ))  # fmt: skip
+    prod_id = uuid.UUID(u["product_id"])
+    for x in (await db.execute(select(ScheduledPost).where(ScheduledPost.product_id == prod_id))).scalars():
+        rec = (x.removal or {}).get("resume") or {}
+        if rec.get("stop_id") != u["stop_id"]:
+            continue
+        base = {"id": str(x.id), "channel": x.channel.value, "label": f"Bài quá giờ {_label(x.channel)}"}
+        choice = rec.get("choice")
+        if choice == "now" and x.status == PostStatus.APPROVED:
+            steps.append(_step("scheduled_post", status="done", detail="Đăng ngay theo chị chọn (trong vài phút).",
+                               **base))  # fmt: skip
+        elif choice == "reschedule" and x.status == PostStatus.APPROVED:
+            when = to_local(x.scheduled_at).strftime("%H:%M %d/%m")
+            steps.append(_step("scheduled_post", status="done", detail=f"Đã hẹn lại lúc {when}.", **base))
+        elif choice == "drop" and x.status == PostStatus.CANCELLED:
+            steps.append(_step("scheduled_post", status="done", detail="Đã bỏ bài theo chị chọn.", **base))
+        elif choice is None and x.status == PostStatus.CANCELLED:
+            steps.append(_step("scheduled_post", status="info", detail="Bài đã quá giờ hẹn, chị chưa chọn cách xử lý "
+                               "nên không đăng — chị đặt lịch lại ở xưởng nội dung.",
+                               url=f"/desk/noi-dung/san-pham/{u['product_id']}", **base))  # fmt: skip
+        else:
+            steps.append(_step("scheduled_post", status="failed", detail="Bài đã đổi trạng thái, chưa xử lý được.",
+                               **base))  # fmt: skip
     n = len(u.get("cancelled_post_ids") or [])
     if n:
         steps.append(_step("scheduled_post", "Lịch đăng", "info",
@@ -392,10 +431,31 @@ async def resume_steps(db: AsyncSession, u: dict[str, Any]) -> list[dict[str, An
     return steps
 
 
-async def resume(db: AsyncSession, p: Product, user: User) -> list[dict[str, Any]]:
-    """Chị bấm «Mở bán lại» = hoàn tác lần ngừng bán gần nhất (cùng đường với nút Hoàn tác ở Nhật ký AI)."""
+def _overdue_choices(raw: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    out = []
+    for c in raw:
+        at = c.get("scheduled_at")
+        if c["action"] == "reschedule":
+            if at is None:
+                raise BadRequest("Chị chọn giờ hẹn lại cho bài quá giờ nhé.", code="reschedule_time")
+            at = at if at.tzinfo else at.replace(tzinfo=VN_TZ)
+            if at <= now_utc():
+                raise BadRequest("Giờ hẹn lại phải sau bây giờ.", code="reschedule_time")
+        out.append({"id": str(c["id"]), "action": c["action"],
+                    "scheduled_at": at.isoformat() if c["action"] == "reschedule" else None})  # fmt: skip
+    return out
+
+
+async def resume(
+    db: AsyncSession, p: Product, user: User, overdue: list[dict[str, Any]] | None = None
+) -> list[dict[str, Any]]:
+    """Chị bấm «Mở bán lại» = hoàn tác lần ngừng bán gần nhất (cùng đường với nút Hoàn tác ở Nhật ký AI).
+
+    `overdue`: lựa chọn của chị cho bài đã quá giờ hẹn (`now` / `reschedule` + `scheduled_at` / `drop`); ghi vào
+    dữ liệu hoàn tác để content đọc. Bài quá giờ chị chưa chọn (vd hoàn tác từ Nhật ký AI) không tự đăng."""
     if p.status != ProductStatus.STOPPED:
         raise BadRequest("Món này không ở trạng thái ngừng bán.", code="not_stopped")
+    choices = _overdue_choices(overdue or [])
     act = await latest(db, p.id)
     if act is None or act.undone_at is not None or not act.undoable:
         # không còn dòng nhật ký để hoàn tác (hiếm): đưa về «tạm ẩn» để chị đăng lại trang ở xưởng nội dung
@@ -405,5 +465,7 @@ async def resume(db: AsyncSession, p: Product, user: User) -> list[dict[str, Any
         await db.flush()
         return [_step("website", "Website", "needs_manual", "Không thấy lần ngừng bán để hoàn tác: trang về «tạm ẩn», "
                       "chị đăng lại ở xưởng nội dung; bài và sàn chị kiểm tay.")]  # fmt: skip
+    act.undo_data = {**(act.undo_data or {}), "overdue": choices}
+    await db.flush()
     await control.undo(db, act.id, user)
     return await resume_steps(db, act.undo_data or {})

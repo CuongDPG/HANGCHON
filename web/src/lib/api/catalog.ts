@@ -816,6 +816,8 @@ export type StopPlan = {
   posts: StopPostRow[];
   listings: StopListingRow[];
   drops: StopDropRow[];
+  /** Món đã ngừng bán: bài chị giữ lại mà đã quá giờ hẹn — mở bán lại hỏi chị trước, không tự đăng. */
+  overdue_posts: StopPostRow[];
   last_stop: {
     activity_id: string;
     at: string;
@@ -834,6 +836,8 @@ export type StopChoice = {
   listing_ids: string[];
   delete_posts: boolean;
 };
+export type OverdueAction = "now" | "reschedule" | "drop";
+export type ResumeChoice = { overdue: { id: string; action: OverdueAction; scheduled_at?: string | null }[] };
 export type StopRun = { product: DeskProduct; steps: StopStep[]; activity_id?: string | null };
 
 export function useStopPlan(id: string, enabled: boolean) {
@@ -857,5 +861,5 @@ export function useStopSelling(id: string) {
 }
 
 export function useResumeSelling(id: string) {
-  return useStopMutation(id, () => api.post<StopRun>(`${D}/products/${id}/resume`));
+  return useStopMutation(id, (body?: ResumeChoice) => api.post<StopRun>(`${D}/products/${id}/resume`, body ?? { overdue: [] }));
 }
