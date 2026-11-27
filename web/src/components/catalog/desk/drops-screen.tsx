@@ -12,7 +12,7 @@ import { Sheet } from "@/components/ui/overlay";
 import { PageHeader } from "@/components/ui/page-header";
 import { DROP_STATUS_LABELS, useCreateDrop, useDeskDrops, type DropStatus } from "@/lib/api/catalog";
 import { formatDateTime, formatDayMonth } from "@/lib/format";
-import { DeskSubnav } from "./desk-subnav";
+import { PRODUCT_SECTIONS } from "@/lib/desk-sections";
 
 export const DROP_TONE: Record<DropStatus, BadgeTone> = {
   draft: "outline",
@@ -61,14 +61,14 @@ export function DropsScreen() {
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
-        title="Đợt bán"
+        sections={PRODUCT_SECTIONS}
+        active="drops"
         actions={
           <Button size="sm" icon={<CalendarPlus className="size-4" />} onClick={() => setOpen(true)}>
             Tạo đợt
           </Button>
         }
       />
-      <DeskSubnav active="drops" />
       {isPending ? (
         <SkeletonList rows={3} />
       ) : error ? (

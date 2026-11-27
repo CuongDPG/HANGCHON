@@ -17,7 +17,7 @@ import {
   SectionLabel,
   SkeletonList,
   StatTile,
-  Tabs,
+  Toolbar,
   buttonClasses,
   notifySuccess,
   useConfirm,
@@ -40,6 +40,8 @@ import {
   type LedgerEntry,
 } from "@/lib/api/finance";
 import { formatDate, formatVndCompact } from "@/lib/format";
+import { BOOKS_SECTIONS } from "@/lib/desk-sections";
+import { useUrlParam } from "@/lib/use-url-param";
 import { ExpenseSheet } from "./expense-sheet";
 import { InvoiceSheet } from "./invoice-sheet";
 import { periodOptions } from "./period";
@@ -51,38 +53,29 @@ const noopSubscribe = () => () => {};
 
 export function BooksScreen() {
   const params = useSearchParams();
-  const initial = params.get("tab");
-  const [tab, setTab] = useState<Tab>(initial === "chi-phi" || initial === "hoa-don" ? initial : "so");
+  const raw = params.get("tab");
+  const tab: Tab = raw === "chi-phi" || raw === "hoa-don" ? raw : "so";
   const periods = periodOptions();
-  const [period, setPeriod] = useState(periods[0].value);
+  const [period, setPeriod] = useUrlParam<string>("ky", periods[0].value, periods.map((p) => p.value));
   const { user } = useSession();
   // lúc hydrate dùng đúng như máy chủ (chưa biết phiên), tránh lệch HTML khi phiên về trước khi khối này hydrate
   const hydrated = useSyncExternalStore(noopSubscribe, () => true, () => false);
   const owner = hydrated && isOwner(user);
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Sổ sách" />
-      <Tabs
-        aria-label="Phần sổ sách"
-        value={tab}
-        onChange={setTab}
-        items={[
-          { value: "so", label: "Sổ thu chi" },
-          { value: "chi-phi", label: "Chi phí" },
-          { value: "hoa-don", label: "Hoá đơn" },
-        ]}
-      />
-      {tab !== "hoa-don" ? (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <InlineSelect aria-label="Kỳ" appearance="inline" value={period} onChange={setPeriod} options={periods} />
-          {tab === "so" && owner ? (
+      <PageHeader
+        sections={BOOKS_SECTIONS}
+        active={tab}
+        actions={
+          tab === "so" && owner ? (
             <a href={ledgerExportUrl(period)} download className={buttonClasses({ variant: "secondary", size: "sm" })}>
               <Download className="size-4" aria-hidden />
-              Tải bảng kê CSV
+              Tải CSV
             </a>
-          ) : null}
-        </div>
-      ) : null}
+          ) : null
+        }
+      />
+      {tab !== "hoa-don" ? <Toolbar end={<InlineSelect aria-label="Kỳ" appearance="inline" value={period} onChange={setPeriod} options={periods} />} /> : null}
       {tab === "so" ? <LedgerTab key={period} period={period} /> : tab === "chi-phi" ? <ExpensesTab key={period} period={period} /> : <InvoicesTab />}
     </div>
   );

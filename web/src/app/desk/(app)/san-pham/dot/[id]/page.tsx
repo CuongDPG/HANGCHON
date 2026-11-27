@@ -1,12 +1,12 @@
 import { Suspense } from "react";
 import { DropEditor } from "@/components/catalog/desk/drop-editor";
-import { SkeletonList } from "@/components/ui/feedback";
+import { DeskPageFallback } from "@/components/desk/desk-page-fallback";
 
 export const metadata = { title: "Sửa đợt bán" };
 
 export default function DeskDropPage({ params }: PageProps<"/desk/san-pham/dot/[id]">) {
   return (
-    <Suspense fallback={<SkeletonList rows={5} />}>
+    <Suspense fallback={<DeskPageFallback backHref="/desk/san-pham/dot" rows={5} />}>
       <Editor params={params} />
     </Suspense>
   );

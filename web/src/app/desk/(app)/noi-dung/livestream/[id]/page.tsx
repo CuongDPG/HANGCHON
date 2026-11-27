@@ -1,12 +1,12 @@
 import { Suspense } from "react";
 import { LivestreamDetail } from "@/components/content/livestream-screen";
-import { SkeletonList } from "@/components/ui";
+import { DeskPageFallback } from "@/components/desk/desk-page-fallback";
 
 export const metadata = { title: "Kịch bản livestream" };
 
 export default function Page({ params }: PageProps<"/desk/noi-dung/livestream/[id]">) {
   return (
-    <Suspense fallback={<SkeletonList rows={5} />}>
+    <Suspense fallback={<DeskPageFallback backHref="/desk/noi-dung/livestream" rows={5} />}>
       <Detail params={params} />
     </Suspense>
   );

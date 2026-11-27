@@ -57,7 +57,7 @@ export function CustomerProfileScreen({ id }: { id: string }) {
   if (isPending) {
     return (
       <div className="flex flex-col gap-4" role="status" aria-label="Đang tải">
-        <PageHeader title="Khách" backHref="/desk/khach/so-khach" />
+        <PageHeader loading backHref="/desk/khach/so-khach" />
         <Skeleton className="h-24 w-full" />
         <SkeletonList rows={3} />
       </div>
@@ -81,11 +81,11 @@ export function CustomerProfileScreen({ id }: { id: string }) {
     );
   }
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       <PageHeader
         backHref="/desk/khach/so-khach"
         title={c.name || c.phone || "Khách"}
-        description={[c.phone, c.email, ...c.identities.map((i) => CHANNEL_LABEL[i.channel] ?? i.channel)].filter(Boolean).join(" · ")}
+        eyebrow={[c.phone, c.email, ...c.identities.map((i) => CHANNEL_LABEL[i.channel] ?? i.channel)].filter(Boolean).join(" · ")}
       />
       <Summary c={c} />
       <div className="grid grid-cols-3 gap-2">

@@ -15,19 +15,19 @@ import { notifySuccess } from "@/components/ui/toast";
 import { useSession } from "@/lib/api/auth";
 import { useDeskFinds, useDeskProducts, useFindAction, type DeskFindRequest, type FindStatus } from "@/lib/api/catalog";
 import { api } from "@/lib/api/client";
-import { DeskSubnav } from "./desk-subnav";
+import { PRODUCT_SECTIONS } from "@/lib/desk-sections";
+import { useUrlParam } from "@/lib/use-url-param";
 
 const SETTING = "catalog.find_request_threshold";
 
 /** Nhờ tìm (e9): duyệt lời nhờ trước khi hiện, theo dõi số người cùng cần, chuyển trạng thái. */
 export function FindsScreen() {
-  const [tab, setTab] = useState<FindStatus>("pending_review");
+  const [tab, setTab] = useUrlParam<FindStatus>("tab", "pending_review", ["pending_review", "open", "threshold_reached", "searching", "found", "closed", "rejected"]);
   const { data, isPending, error } = useDeskFinds(tab);
   const rows = data?.items ?? [];
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Nhờ tìm" />
-      <DeskSubnav active="finds" />
+      <PageHeader sections={PRODUCT_SECTIONS} active="finds" />
       <ThresholdSetting />
       <Tabs
         aria-label="Trạng thái"

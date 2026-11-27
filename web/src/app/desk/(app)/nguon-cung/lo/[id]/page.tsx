@@ -1,19 +1,12 @@
 import { Suspense } from "react";
 import { InboundScreen } from "@/components/supply/inbound-screen";
-import { PageHeader, SkeletonList } from "@/components/ui";
+import { DeskPageFallback } from "@/components/desk/desk-page-fallback";
 
 export const metadata = { title: "Lô hàng về" };
 
 export default function Page({ params }: PageProps<"/desk/nguon-cung/lo/[id]">) {
   return (
-    <Suspense
-      fallback={
-        <div className="flex flex-col gap-4">
-          <PageHeader title="Đang tải…" backHref="/desk/nguon-cung?tab=lo-hang" />
-          <SkeletonList rows={3} />
-        </div>
-      }
-    >
+    <Suspense fallback={<DeskPageFallback backHref="/desk/nguon-cung?tab=lo-hang" />}>
       <Inner params={params} />
     </Suspense>
   );

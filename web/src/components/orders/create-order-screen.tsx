@@ -56,7 +56,7 @@ export function CreateOrderScreen() {
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       <PageHeader title="Tạo đơn" backHref="/desk/don-hang" />
       <Card className="flex flex-col gap-3">
         <CardHeader title="Món" />

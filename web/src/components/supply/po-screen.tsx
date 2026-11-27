@@ -41,14 +41,14 @@ export function POScreen({ id }: { id: string }) {
   if (isPending)
     return (
       <div className="flex flex-col gap-4">
-        <PageHeader title="Đang tải…" backHref="/desk/nguon-cung" />
+        <PageHeader loading backHref="/desk/nguon-cung?tab=don" />
         <SkeletonList rows={3} />
       </div>
     );
   if (error)
     return (
       <div className="flex flex-col gap-4">
-        <PageHeader title="Không mở được đơn" backHref="/desk/nguon-cung" />
+        <PageHeader title="Không mở được đơn" backHref="/desk/nguon-cung?tab=don" />
         <EmptyState tone="error" title="Chưa tải được" description={error.message} />
       </div>
     );
@@ -76,14 +76,16 @@ function PODetail({ po }: { po: PurchaseOrder }) {
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       <PageHeader
         title={po.candidate_title ?? po.lines[0]?.description ?? po.code}
-        eyebrow={`${PO_KIND_LABELS[po.kind].toUpperCase()} · ${po.code}`}
+        badge={<POStatusBadge status={po.status} />}
         backHref="/desk/nguon-cung?tab=don"
       />
       <div className="flex flex-wrap items-center gap-2">
-        <POStatusBadge status={po.status} />
+        <span className="text-[14px] text-ink-2">
+          {PO_KIND_LABELS[po.kind]} · {po.code}
+        </span>
         {po.ai_generated ? <LevelTag level="review" size="sm">AI soạn, chị duyệt</LevelTag> : null}
         {po.status === "pending_approval" ? <span className="text-[13px] text-ink-2">Đặt hàng luôn chờ chị duyệt.</span> : null}
       </div>

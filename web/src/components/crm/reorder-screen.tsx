@@ -16,7 +16,9 @@ import {
   SectionLabel,
   SkeletonList,
   Switch,
-  Tabs,
+  Chip,
+  TabLinks,
+  Toolbar,
   Textarea,
   notifySuccess,
 } from "@/components/ui";
@@ -31,22 +33,24 @@ import {
   type Reminder,
   type ReorderRule,
 } from "@/lib/api/crm";
-import { KhachNav } from "./khach-nav";
+import { KHACH_CARE_TABS, KHACH_SECTIONS } from "@/lib/desk-sections";
+import { useUrlParam } from "@/lib/use-url-param";
 
 type Tab = "pending_review" | "scheduled" | "sent" | "skipped";
 
 /** Nhắc mua lại đúng lúc (h6): món tiêu hao sắp hết thì AI soạn tin riêng từng khách, chị duyệt rồi gửi. */
 export function ReorderScreen() {
-  const [tab, setTab] = useState<Tab>("pending_review");
+  const [tab, setTab] = useUrlParam<Tab>("tab", "pending_review", ["pending_review", "scheduled", "sent", "skipped"]);
   const all = useReminders();
   const runDue = useRunDue();
   const counts = (s: Reminder["status"]) => all.data?.filter((r) => r.status === s).length;
   const rows = all.data?.filter((r) => (tab === "sent" ? r.status === "sent" || r.status === "converted" : r.status === tab)) ?? [];
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       <PageHeader
-        title="Nhắc mua lại"
+        sections={KHACH_SECTIONS}
+        active="care"
         actions={
           <Button
             size="sm"
@@ -62,18 +66,21 @@ export function ReorderScreen() {
           </Button>
         }
       />
-      <KhachNav active="reorder" />
-      <Tabs
-        aria-label="Trạng thái nhắc"
-        value={tab}
-        onChange={setTab}
-        items={[
-          { value: "pending_review", label: "Chờ chị", count: counts("pending_review") },
-          { value: "scheduled", label: "Sắp tới", count: counts("scheduled") },
-          { value: "sent", label: "Đã nhắc", count: (counts("sent") ?? 0) + (counts("converted") ?? 0) },
-          { value: "skipped", label: "Bỏ qua", count: counts("skipped") },
-        ]}
-      />
+      <TabLinks aria-label="Chăm khách" items={KHACH_CARE_TABS} active="reorder" />
+      <Toolbar>
+        {(
+          [
+            { value: "pending_review", label: "Chờ chị", count: counts("pending_review") },
+            { value: "scheduled", label: "Sắp tới", count: counts("scheduled") },
+            { value: "sent", label: "Đã nhắc", count: (counts("sent") ?? 0) + (counts("converted") ?? 0) },
+            { value: "skipped", label: "Bỏ qua", count: counts("skipped") },
+          ] as const
+        ).map((c) => (
+          <Chip key={c.value} selected={tab === c.value} count={c.count} onClick={() => setTab(c.value)}>
+            {c.label}
+          </Chip>
+        ))}
+      </Toolbar>
       {all.isPending ? (
         <SkeletonList rows={3} />
       ) : all.error ? (

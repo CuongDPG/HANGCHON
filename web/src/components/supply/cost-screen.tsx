@@ -1,5 +1,7 @@
 "use client";
 
+import { DeskMoreMenu } from "@/components/desk/desk-more-menu";
+import { relatedItems } from "@/components/desk/related-links";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Check, Sparkles, X } from "lucide-react";
 import { useDeferredValue, useState } from "react";
@@ -46,7 +48,7 @@ export function CostScreen({ candidateId }: { candidateId: string }) {
   if (cand.isPending || sheet.isPending)
     return (
       <div className="flex flex-col gap-4">
-        <PageHeader title="Giá vốn về tay" backHref={`/desk/ban-chon/${candidateId}`} />
+        <PageHeader loading backHref="/desk/nguon-cung?tab=gia-von" />
         <SkeletonList rows={3} />
       </div>
     );
@@ -58,8 +60,13 @@ export function CostScreen({ candidateId }: { candidateId: string }) {
       </div>
     );
   return (
-    <div className="flex flex-col gap-5">
-      <PageHeader title="Giá vốn về tay" eyebrow={cand.data.card.title.toUpperCase()} backHref={`/desk/ban-chon/${candidateId}`} />
+    <div className="flex flex-col gap-4">
+      <PageHeader
+        title="Giá vốn về tay"
+        eyebrow={cand.data.card.title}
+        backHref="/desk/nguon-cung?tab=gia-von"
+        actions={<DeskMoreMenu items={relatedItems([{ href: `/desk/ban-chon/${candidateId}`, label: "Trên bàn chọn" }])} />}
+      />
       <CostForm key={sheet.data?.id ?? "new"} cand={cand.data} sheet={sheet.data ?? null} />
       <PriceSection candidateId={candidateId} hasSheet={!!sheet.data} />
     </div>

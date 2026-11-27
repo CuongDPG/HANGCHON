@@ -121,7 +121,7 @@ export function BriefScreen({ id }: { id: string }) {
   if (isPending)
     return (
       <div className="flex flex-col gap-4" role="status" aria-label="Đang tải">
-        <Skeleton className="h-8 w-56" />
+        <PageHeader loading backHref="/desk/san-hang" />
         <Skeleton className="h-28 w-full" />
         <SkeletonList rows={4} />
       </div>
@@ -159,13 +159,13 @@ export function BriefScreen({ id }: { id: string }) {
     setPicked((cur) => (cur.includes(cid) ? cur.filter((x) => x !== cid) : cur.length >= 5 ? cur : [...cur, cid]));
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       <PageHeader
         backHref="/desk/san-hang"
-        eyebrow={<Badge tone={st.tone}>{st.label}</Badge>}
+        badge={<Badge tone={st.tone}>{st.label}</Badge>}
         title={brief.title}
         actions={
-          brief.candidate_count ? <Seal chosen={brief.selected_count} total={brief.candidate_count} size={48} /> : undefined
+          brief.candidate_count ? <Seal chosen={brief.selected_count} total={brief.candidate_count} size={36} /> : undefined
         }
       />
 

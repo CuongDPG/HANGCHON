@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Badge, Button, Card, EmptyState, PageHeader, Skeleton, SkeletonList } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, PageHeader, SkeletonList } from "@/components/ui";
 import { CandidateThumb } from "@/components/sourcing/supplier-gallery";
 import { useComparison } from "@/lib/api/assessment";
 import { cn } from "@/lib/cn";
@@ -12,7 +12,7 @@ export function ComparisonScreen({ id }: { id: string }) {
   if (isPending)
     return (
       <div className="flex flex-col gap-4" role="status" aria-label="Đang tải">
-        <Skeleton className="h-8 w-56" />
+        <PageHeader loading backHref="/desk/san-hang" />
         <SkeletonList rows={5} />
       </div>
     );
@@ -35,7 +35,7 @@ export function ComparisonScreen({ id }: { id: string }) {
   const cands = new Map(data.candidates.map((c) => [c.id, c]));
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader backHref={data.brief_id ? `/desk/san-hang/de/${data.brief_id}` : "/desk/san-hang"} title="So sánh cạnh nhau" description={data.title} />
+      <PageHeader backHref={data.brief_id ? `/desk/san-hang/de/${data.brief_id}` : "/desk/san-hang"} title="So sánh cạnh nhau" eyebrow={data.title} />
       {data.conclusion ? (
         <Card tone="soft">
           <p className="text-[15px] [text-wrap:pretty]">{data.conclusion}</p>

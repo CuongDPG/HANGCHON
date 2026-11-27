@@ -15,18 +15,19 @@ import {
   Textarea,
   notifyError,
   notifySuccess,
+  TabLinks,
 } from "@/components/ui";
 import { INVITE_STATUS_LABEL, useInviteStatus, useInviteTesters, useTrialCandidates, type TesterInvite, type TrialCandidate } from "@/lib/api/crm";
 import { CustomerPicker } from "./customer-picker";
-import { KhachNav } from "./khach-nav";
+import { KHACH_SECTIONS, KHACH_TRIAL_TABS } from "@/lib/desk-sections";
 
 /** Khách thử hàng cùng chị (h8): mời khách quen dùng thử món đang ở cột «Đang thử»; nhận xét hiện cạnh ghi chú thử. */
 export function TestersScreen() {
   const { data, isPending, error, refetch } = useTrialCandidates();
   return (
-    <div className="flex flex-col gap-5">
-      <PageHeader title="Khách thử hàng" />
-      <KhachNav active="testers" />
+    <div className="flex flex-col gap-4">
+      <PageHeader sections={KHACH_SECTIONS} active="trial" />
+      <TabLinks aria-label="Dùng thử" items={KHACH_TRIAL_TABS} active="testers" />
       {isPending ? (
         <SkeletonList rows={2} />
       ) : error ? (

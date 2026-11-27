@@ -15,7 +15,7 @@ import {
   StatTile,
 } from "@/components/ui";
 import { useToday, type ApprovalItem, type Stat } from "@/lib/api/control";
-import { formatNumber, formatVndCompact, formatWeekday } from "@/lib/format";
+import { formatNumber, formatVndCompact } from "@/lib/format";
 import { ApprovalRow } from "./approval-row";
 import { ApprovalSheet } from "./approval-sheet";
 
@@ -70,8 +70,8 @@ export function TodayScreen() {
   const costWarn = cost.budget_vnd > 0 && cost.used_pct >= 80;
 
   return (
-    <div className="flex flex-col gap-5">
-      <PageHeader eyebrow={formatWeekday(data.date)} title="Hôm nay" />
+    <div className="flex flex-col gap-4">
+      <PageHeader title="Hôm nay" />
 
       {costWarn ? (
         <Card tone={cost.used_pct >= 100 ? "danger" : "accent"} className="flex items-start gap-3">

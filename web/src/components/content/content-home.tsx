@@ -1,19 +1,21 @@
 "use client";
 
-import { CalendarDays, ChevronRight, Megaphone, PenLine } from "lucide-react";
+import { ChevronRight, Megaphone, PenLine } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { Badge, ButtonLink, Chip, ChipRow, EmptyState, ImageBox, PageHeader, SectionLabel, SkeletonList } from "@/components/ui";
+import { useMemo } from "react";
+import { Badge, EmptyState, ImageBox, PageHeader, SectionLabel, SkeletonList, Tabs } from "@/components/ui";
 import { PRODUCT_STATUS_LABELS, type ProductStatus } from "@/lib/api/catalog";
 import { useCalendar, useStudio, type StudioItem } from "@/lib/api/content";
 import { formatTime } from "@/lib/format";
-import { ContentNav, localFile, StatusBadge } from "./shared";
+import { CONTENT_SECTIONS } from "@/lib/desk-sections";
+import { useUrlParam } from "@/lib/use-url-param";
+import { CONTENT_SETTINGS, localFile, StatusBadge } from "./shared";
 
 type Filter = "all" | "todo" | "done";
 
 export function ContentHome() {
   const { data, isPending, error } = useStudio();
-  const [filter, setFilter] = useState<Filter>("todo");
+  const [filter, setFilter] = useUrlParam<Filter>("tab", "todo", ["todo", "done", "all"]);
   const items = useMemo(() => data?.items ?? [], [data]);
   // còn việc: bài chờ duyệt / đang soạn, hoặc chưa có bài, hoặc trang website chưa đăng
   const todo = items.filter((i) => i.pending > 0 || i.drafting > 0 || i.total === 0 || (i.kind === "product" && i.status !== "published"));
@@ -22,25 +24,19 @@ export function ContentHome() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        title="Nội dung"
-        actions={<ButtonLink href="/desk/noi-dung/lich" variant="secondary" size="sm" icon={<CalendarDays className="size-4" aria-hidden />}>Lịch</ButtonLink>}
-      />
-      <ContentNav />
+      <PageHeader sections={CONTENT_SECTIONS} active="studio" settings={CONTENT_SETTINGS} />
       <TodayStrip />
       <div className="flex flex-col gap-3">
-        <SectionLabel>XƯỞNG NỘI DUNG</SectionLabel>
-        <ChipRow>
-          <Chip selected={filter === "todo"} count={todo.length} onClick={() => setFilter("todo")}>
-            Chờ chị
-          </Chip>
-          <Chip selected={filter === "done"} count={done.length} onClick={() => setFilter("done")}>
-            Đã duyệt hết
-          </Chip>
-          <Chip selected={filter === "all"} count={items.length} onClick={() => setFilter("all")}>
-            Tất cả
-          </Chip>
-        </ChipRow>
+        <Tabs
+          aria-label="Xưởng nội dung"
+          value={filter}
+          onChange={setFilter}
+          items={[
+            { value: "todo", label: "Chờ chị", count: todo.length },
+            { value: "done", label: "Đã duyệt hết", count: done.length },
+            { value: "all", label: "Tất cả", count: items.length },
+          ]}
+        />
         {isPending ? (
           <SkeletonList rows={4} />
         ) : error ? (

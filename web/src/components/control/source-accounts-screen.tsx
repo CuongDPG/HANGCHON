@@ -2,7 +2,7 @@
 
 import { CircleAlert, CircleCheck, Plug } from "lucide-react";
 import { useState } from "react";
-import { Badge, Button, Card, EmptyState, Input, PageHeader, Segmented, SkeletonList, notifySuccess, useConfirm } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, Input, Segmented, SkeletonList, notifySuccess, useConfirm } from "@/components/ui";
 import { isOwner, useSession } from "@/lib/api/auth";
 import {
   useCheckSourceAccount,
@@ -13,7 +13,7 @@ import {
   type SourcePlatformCard,
   type SourceProfile,
 } from "@/lib/api/control";
-import { SettingsNav } from "./settings-nav";
+import { SettingsHeader } from "./settings-nav";
 import { SourceProfileSection } from "./source-profile-section";
 import { OwnerOnly } from "./settings-screens";
 import { GuideBox } from "./social-accounts-screen";
@@ -28,14 +28,10 @@ export function SourceAccountsScreen() {
   const { user } = useSession();
   const owner = isOwner(user);
   const { data, isPending, error, refetch } = useSources(owner);
-  if (user && !owner) return <OwnerOnly title="Nguồn hàng" />;
+  if (user && !owner) return <OwnerOnly />;
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        title="Nguồn hàng"
-        description="Sàn còn «Giả lập» thì trả món mẫu, chưa lấy hàng thật."
-      />
-      <SettingsNav />
+      <SettingsHeader />
       {isPending ? (
         <SkeletonList rows={4} />
       ) : error ? (

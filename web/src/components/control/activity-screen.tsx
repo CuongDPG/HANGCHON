@@ -8,20 +8,21 @@ import {
   Badge,
   Button,
   Chip,
-  ChipRow,
   DateTime,
   EmptyState,
   InlineSelect,
   LevelTag,
   PageHeader,
   SkeletonList,
-  Tabs,
+  Toolbar,
   notifySuccess,
   useConfirm,
 } from "@/components/ui";
 import { isOwner, useSession } from "@/lib/api/auth";
 import { moduleLabel, useActivity, useAudit, useAutonomy, useUndo, type Activity, type AuditEntry } from "@/lib/api/control";
 import { formatDate, formatWeekday } from "@/lib/format";
+import { AI_LOG_SECTIONS } from "@/lib/desk-sections";
+import { useUrlParam } from "@/lib/use-url-param";
 import { Rationale } from "./preview-view";
 
 type Range = "hom-nay" | "7-ngay" | "30-ngay" | "tat-ca";
@@ -41,23 +42,13 @@ function vnDate(offsetDays = 0): string {
 
 /** Nhật ký AI (i4) + lưu vết duyệt (k3). */
 export function ActivityScreen() {
-  const params = useSearchParams();
-  const [tab, setTab] = useState<"ai" | "audit">(params.get("tab") === "luu-vet" ? "audit" : "ai");
+  const tab = useSearchParams().get("tab") === "luu-vet" ? "audit" : "ai";
   const { user } = useSession();
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Nhật ký AI" />
-      <Tabs
-        aria-label="Loại nhật ký"
-        value={tab}
-        onChange={setTab}
-        items={[
-          { value: "ai", label: "AI đã làm" },
-          { value: "audit", label: "Lưu vết duyệt" },
-        ]}
-      />
+      <PageHeader sections={AI_LOG_SECTIONS} active={tab} />
       {tab === "ai" ? (
-        <AILog initialRange={(params.get("ngay") as Range) ?? "7-ngay"} initialAction={params.get("action") ?? undefined} />
+        <AILog />
       ) : isOwner(user) ? (
         <AuditLog />
       ) : (
@@ -67,10 +58,12 @@ export function ActivityScreen() {
   );
 }
 
-function AILog({ initialRange, initialAction }: { initialRange: Range; initialAction?: string }) {
-  const [range, setRange] = useState<Range>(RANGES.some((r) => r.value === initialRange) ? initialRange : "7-ngay");
-  const [module, setModule] = useState<string>("all");
-  const [action, setAction] = useState<string | undefined>(initialAction);
+function AILog() {
+  const [range, setRange] = useUrlParam<Range>("ngay", "7-ngay", RANGES.map((r) => r.value));
+  const [module, setModule] = useUrlParam<string>("khu", "all");
+  const [actionParam, setActionParam] = useUrlParam<string>("action", "");
+  const action = actionParam || undefined;
+  const setAction = (a?: string) => setActionParam(a ?? "");
   const [page, setPage] = useState(1);
   const days = RANGES.find((r) => r.value === range)?.days;
   const autonomy = useAutonomy();
@@ -93,7 +86,27 @@ function AILog({ initialRange, initialAction }: { initialRange: Range; initialAc
 
   return (
     <>
-      <ChipRow>
+      <Toolbar
+        end={
+          <>
+            {action ? (
+              <Chip selected onClick={() => setAction(undefined)} aria-label={`Bỏ lọc ${actionLabel}`}>
+                {actionLabel} ✕
+              </Chip>
+            ) : null}
+            <InlineSelect
+              aria-label="Khu"
+              appearance="inline"
+              value={module}
+              onChange={(v) => {
+                setModule(v);
+                setPage(1);
+              }}
+              options={[{ value: "all", label: "Mọi khu" }, ...modules.map((m) => ({ value: m, label: moduleLabel(m) }))]}
+            />
+          </>
+        }
+      >
         {RANGES.map((r) => (
           <Chip
             key={r.value}
@@ -106,24 +119,7 @@ function AILog({ initialRange, initialAction }: { initialRange: Range; initialAc
             {r.label}
           </Chip>
         ))}
-      </ChipRow>
-      <div className="flex flex-wrap items-center gap-3">
-        <InlineSelect
-          aria-label="Khu"
-          appearance="inline"
-          value={module}
-          onChange={(v) => {
-            setModule(v);
-            setPage(1);
-          }}
-          options={[{ value: "all", label: "Mọi khu" }, ...modules.map((m) => ({ value: m, label: moduleLabel(m) }))]}
-        />
-        {action ? (
-          <Chip selected onClick={() => setAction(undefined)} aria-label={`Bỏ lọc ${actionLabel}`}>
-            {actionLabel} ✕
-          </Chip>
-        ) : null}
-      </div>
+      </Toolbar>
 
       {isPending ? (
         <SkeletonList rows={4} />
@@ -250,7 +246,7 @@ const DECISIONS = ["control.approved", "control.returned", "control.approve_fail
 const ACTOR_LABELS: Record<string, string> = { owner: "Chị", helper: "Người phụ", ai: "AI", system: "Hệ thống", customer: "Khách" };
 
 function AuditLog() {
-  const [scope, setScope] = useState<"decisions" | "all">("decisions");
+  const [scope, setScope] = useUrlParam<"decisions" | "all">("pham-vi", "decisions", ["decisions", "all"]);
   const [page, setPage] = useState(1);
   const { data, isPending, error, refetch } = useAudit({ actions: scope === "decisions" ? DECISIONS : undefined, page });
   const pick = (s: "decisions" | "all") => {
@@ -259,14 +255,14 @@ function AuditLog() {
   };
   return (
     <>
-      <ChipRow>
+      <Toolbar>
         <Chip selected={scope === "decisions"} onClick={() => pick("decisions")}>
           Duyệt, trả lại, hoàn tác
         </Chip>
         <Chip selected={scope === "all"} onClick={() => pick("all")}>
           Mọi thay đổi
         </Chip>
-      </ChipRow>
+      </Toolbar>
       {isPending ? (
         <SkeletonList rows={4} />
       ) : error ? (

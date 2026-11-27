@@ -6,7 +6,6 @@ import { Button, Card, EmptyState, IconButton, Input, PageHeader, SectionLabel, 
 import { useSession } from "@/lib/api/auth";
 import { useEditVoice, useLearnVoice, useVoice, type Voice, type VoicePatch } from "@/lib/api/content";
 import { formatDateTime } from "@/lib/format";
-import { ContentNav } from "./shared";
 import { useSpeech } from "./use-speech";
 
 /** Giọng của chị (f2): dán bài cũ, nói vài câu (giọng nói → chữ), ghi chú → AI rút hồ sơ giọng; chị xem và sửa. */
@@ -16,8 +15,7 @@ export function VoiceScreen() {
   const owner = session?.role === "owner";
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Giọng của chị" />
-      <ContentNav />
+      <PageHeader title="Giọng của chị" backHref="/desk/noi-dung" />
       {isPending ? (
         <SkeletonList rows={4} />
       ) : error ? (

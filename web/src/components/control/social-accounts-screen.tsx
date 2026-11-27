@@ -10,7 +10,6 @@ import {
   DateTime,
   EmptyState,
   Input,
-  PageHeader,
   Segmented,
   SkeletonList,
   notifyError,
@@ -25,7 +24,7 @@ import {
   useSaveChannelAccount,
   type ChannelAccount,
 } from "@/lib/api/control";
-import { SettingsNav } from "./settings-nav";
+import { SettingsHeader } from "./settings-nav";
 import { OwnerOnly } from "./settings-screens";
 
 /**
@@ -38,14 +37,10 @@ export function SocialAccountsScreen() {
   const owner = isOwner(user);
   const { data, isPending, error, refetch } = useChannelAccounts(owner);
   useOAuthResult(data);
-  if (user && !owner) return <OwnerOnly title="Mạng xã hội" />;
+  if (user && !owner) return <OwnerOnly />;
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        title="Mạng xã hội"
-        description="Kênh còn «Giả lập» thì không gửi gì ra ngoài."
-      />
-      <SettingsNav />
+      <SettingsHeader />
       {isPending ? (
         <SkeletonList rows={4} />
       ) : error ? (

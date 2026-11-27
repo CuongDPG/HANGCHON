@@ -367,14 +367,15 @@ export const RETURN_STATUS_LABELS: Record<ReturnStatus, string> = {
   closed: "Đã đóng",
 };
 
+/** Nhóm đơn theo thứ tự công việc (tab của trang Đơn): nháp từ tin nhắn → chờ tiền → … → xong/huỷ. */
 export const GROUPS: { value: StatusGroup; label: string }[] = [
+  { value: "nhap", label: "Nháp" },
   { value: "cho_thanh_toan", label: "Chờ thanh toán" },
   { value: "cho_hang", label: "Chờ hàng về" },
   { value: "cho_giao", label: "Chờ giao" },
   { value: "dang_giao", label: "Đang giao" },
   { value: "xong", label: "Xong" },
   { value: "huy", label: "Huỷ" },
-  { value: "nhap", label: "Nháp" },
   { value: "tat_ca", label: "Tất cả" },
 ];
 

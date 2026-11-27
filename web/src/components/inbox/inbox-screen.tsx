@@ -3,16 +3,17 @@
 import { Inbox, MessageSquarePlus, Search } from "lucide-react";
 import Link from "next/link";
 import { useDeferredValue, useState } from "react";
-import { KhachNav } from "@/components/crm/khach-nav";
-import { Badge, Button, Card, DateTime, EmptyState, IconButton, Input, LevelTag, PageHeader, SkeletonList, Tabs } from "@/components/ui";
+import { Badge, Button, Card, DateTime, EmptyState, IconButton, LevelTag, PageHeader, SkeletonList, Tabs, Toolbar, ToolbarSearch } from "@/components/ui";
 import { useInboxMeta, useThreadCounts, useThreads, type InboxTab, type ThreadItem } from "@/lib/api/inbox";
 import { cn } from "@/lib/cn";
+import { KHACH_SECTIONS } from "@/lib/desk-sections";
+import { useUrlParam } from "@/lib/use-url-param";
 import { DraftBox } from "./draft-box";
 import { SimulateSheet } from "./simulate-sheet";
 
 /** Hộp thư gộp (h1): bình luận và tin nhắn mọi kênh ở một chỗ, AI soạn sẵn (h2), việc khó chuyển chị (h3). */
 export function InboxScreen() {
-  const [tab, setTab] = useState<InboxTab>("waiting");
+  const [tab, setTab] = useUrlParam<InboxTab>("tab", "waiting", ["waiting", "ai", "all"]);
   const [q, setQ] = useState("");
   const query = useDeferredValue(q.trim());
   const [simOpen, setSimOpen] = useState(false);
@@ -24,15 +25,14 @@ export function InboxScreen() {
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
-        title="Hộp thư"
-        description={c ? (c.waiting ? `${c.waiting} tin chờ chị` : "Không có tin nào chờ chị") : " "}
+        sections={KHACH_SECTIONS}
+        active="inbox"
         actions={
           meta.data?.simulate_enabled ? (
-            <IconButton label="Giả lập tin khách gửi" variant="secondary" icon={<MessageSquarePlus />} onClick={() => setSimOpen(true)} />
+            <IconButton label="Giả lập tin khách gửi" variant="secondary" size="sm" icon={<MessageSquarePlus />} onClick={() => setSimOpen(true)} />
           ) : null
         }
       />
-      <KhachNav active="inbox" />
       <Tabs
         aria-label="Lọc hội thoại"
         value={tab}
@@ -43,14 +43,7 @@ export function InboxScreen() {
           { value: "all", label: "Tất cả", count: c?.all },
         ]}
       />
-      <Input
-        aria-label="Tìm trong hộp thư"
-        placeholder="Tìm tên khách, nội dung tin…"
-        leading={<Search aria-hidden />}
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        type="search"
-      />
+      <Toolbar end={<ToolbarSearch aria-label="Tìm trong hộp thư" placeholder="Tìm tên khách, nội dung tin…" value={q} onChange={(e) => setQ(e.target.value)} />} />
       {threads.isPending ? (
         <SkeletonList rows={4} />
       ) : threads.error ? (

@@ -1,19 +1,12 @@
 import { Suspense } from "react";
 import { POScreen } from "@/components/supply/po-screen";
-import { PageHeader, SkeletonList } from "@/components/ui";
+import { DeskPageFallback } from "@/components/desk/desk-page-fallback";
 
 export const metadata = { title: "Đơn đặt hàng" };
 
 export default function Page({ params }: PageProps<"/desk/nguon-cung/don/[id]">) {
   return (
-    <Suspense
-      fallback={
-        <div className="flex flex-col gap-4">
-          <PageHeader title="Đang tải…" backHref="/desk/nguon-cung?tab=don" />
-          <SkeletonList rows={3} />
-        </div>
-      }
-    >
+    <Suspense fallback={<DeskPageFallback backHref="/desk/nguon-cung?tab=don" />}>
       <Inner params={params} />
     </Suspense>
   );

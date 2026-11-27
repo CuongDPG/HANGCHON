@@ -4,7 +4,8 @@ import { BarChart3, ExternalLink, RefreshCw, Sparkles } from "lucide-react";
 import { Badge, Button, Card, EmptyState, Money, PageHeader, SectionLabel, SkeletonList, StatTile, notifySuccess } from "@/components/ui";
 import { usePerformance, useRefreshMetrics, useRunInsights } from "@/lib/api/content";
 import { formatDayMonth, formatNumber, formatVndCompact } from "@/lib/format";
-import { ChannelMark, ContentNav } from "./shared";
+import { CONTENT_SECTIONS } from "@/lib/desk-sections";
+import { CONTENT_SETTINGS, ChannelMark } from "./shared";
 
 /** Đo và học (f7): bài nào ra đơn (gắn đơn qua mã bài trong link ?src=), AI rút 2–3 nhận xét cho tuần sau. */
 export function PerformanceScreen() {
@@ -14,15 +15,15 @@ export function PerformanceScreen() {
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
-        title="Bài nào ra đơn"
-        description="Số liệu cập nhật mỗi giờ."
+        sections={CONTENT_SECTIONS}
+        active="performance"
+        settings={CONTENT_SETTINGS}
         actions={
           <Button size="sm" variant="ghost" icon={<RefreshCw className="size-4" aria-hidden />} loading={refresh.isPending} onClick={() => refresh.mutate(undefined, { onSuccess: () => notifySuccess("Đã cập nhật số liệu") })}>
             Cập nhật
           </Button>
         }
       />
-      <ContentNav />
       {isPending ? (
         <SkeletonList rows={5} />
       ) : error ? (

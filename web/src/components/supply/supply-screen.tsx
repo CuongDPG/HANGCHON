@@ -1,8 +1,8 @@
 "use client";
 
-import { AlertTriangle, Calculator, Factory, Package, Plus, Settings2, Truck } from "lucide-react";
+import { AlertTriangle, Calculator, Factory, Package, Plus, Truck } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import {
   Badge,
@@ -10,7 +10,6 @@ import {
   CardLink,
   DateTime,
   EmptyState,
-  IconLink,
   InlineSelect,
   Input,
   Money,
@@ -18,7 +17,6 @@ import {
   ProgressBar,
   Sheet,
   SkeletonList,
-  Tabs,
   Textarea,
   notifySuccess,
 } from "@/components/ui";
@@ -36,38 +34,25 @@ import {
   useSuppliers,
   type SupplierKind,
 } from "@/lib/api/supply";
+import { SUPPLY_SECTIONS } from "@/lib/desk-sections";
 import { POStatusBadge, UploadSheet } from "./shared";
 
-type Tab = "don" | "lo-hang" | "ncc" | "gia-von" | "chung-tu";
-const TABS: { value: Tab; label: string }[] = [
-  { value: "don", label: "Đơn đặt" },
-  { value: "lo-hang", label: "Hàng về" },
-  { value: "ncc", label: "Nhà cung cấp" },
-  { value: "gia-von", label: "Giá vốn" },
-  { value: "chung-tu", label: "Chứng từ" },
-];
+type Tab = (typeof SUPPLY_SECTIONS)[number]["key"];
 
 /** Nguồn cung (d1–d7): đơn đặt mẫu/lô, lô hàng về, sổ nhà cung cấp, giá vốn, chứng từ nguồn gốc. */
 export function SupplyScreen() {
   const params = useSearchParams();
-  const router = useRouter();
-  const pathname = usePathname();
-  const t = params.get("tab") as Tab | null;
-  const tab: Tab = t && TABS.some((x) => x.value === t) ? t : "don";
+  const t = params.get("tab");
+  const tab: Tab = SUPPLY_SECTIONS.find((x) => x.key === t)?.key ?? "don";
   const candidate = params.get("candidate");
   const warnings = useDocWarnings();
 
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
-        title="Nguồn cung"
-        actions={<IconLink href="/desk/nguon-cung/cai-dat" label="Tham số giá vốn" icon={<Settings2 />} />}
-      />
-      <Tabs
-        aria-label="Mục nguồn cung"
-        value={tab}
-        onChange={(v) => router.replace(`${pathname}?tab=${v}`, { scroll: false })}
-        items={TABS.map((x) => ({ ...x, count: x.value === "chung-tu" && warnings.data?.length ? warnings.data.length : undefined }))}
+        sections={SUPPLY_SECTIONS.map((x) => (x.key === "chung-tu" ? { ...x, count: warnings.data?.length || undefined } : x))}
+        active={tab}
+        settings={{ href: "/desk/nguon-cung/cai-dat", label: "Tham số giá vốn" }}
       />
       {tab === "don" ? <OrdersTab candidateId={candidate} /> : null}
       {tab === "lo-hang" ? <InboundTab /> : null}

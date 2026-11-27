@@ -2,7 +2,6 @@
 
 import { CalendarClock, Clapperboard, ExternalLink, Globe, PenLine, RefreshCw, Send, Sparkles } from "lucide-react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import {
   Badge,
@@ -45,7 +44,9 @@ import {
 import { formatDateTime, formatDayMonth, formatTime, formatWeekday } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { CheckChips, ChannelMark, CHANNEL_LABEL, draftDisplay, isDone, localFile, MicButton, StatusBadge, toLocalInput, useSpeech } from "./shared";
-import { RelatedLinks } from "@/components/desk/related-links";
+import { DeskMoreMenu } from "@/components/desk/desk-more-menu";
+import { relatedItems } from "@/components/desk/related-links";
+import { useUrlParam } from "@/lib/use-url-param";
 
 const ORDER: ContentChannel[] = ["facebook", "instagram", "threads", "tiktok", "zalo_oa"];
 const WEBSITE = "website";
@@ -53,8 +54,7 @@ const WEBSITE = "website";
 export function StudioScreen({ kind, id }: { kind: "product" | "drop"; id: string }) {
   const { data, isPending, error } = useStudioDetail(kind, id);
   // `?kenh=facebook` (từ Hồ sơ bán của sản phẩm) mở thẳng tab kênh đó
-  const initial = useSearchParams().get("kenh");
-  const [tab, setTab] = useState<string>(initial ?? "");
+  const [tab, setTab] = useUrlParam<string>("kenh", "");
   const drafts = useMemo(() => [...(data?.drafts ?? [])].sort((a, b) => ORDER.indexOf(a.channel) - ORDER.indexOf(b.channel)), [data]);
   const done = drafts.filter(isDone).length;
   const isProduct = kind === "product";
@@ -68,18 +68,21 @@ export function StudioScreen({ kind, id }: { kind: "product" | "drop"; id: strin
     <div className="flex flex-col gap-4">
       <PageHeader
         backHref="/desk/noi-dung"
-        eyebrow={kind === "drop" ? "ĐỢT MỞ BÁN" : "XƯỞNG NỘI DUNG"}
+        eyebrow={kind === "drop" ? "Đợt mở bán" : undefined}
         title={data?.name ?? "Xưởng nội dung"}
-        actions={data && drafts.length ? <Badge tone={done === drafts.length ? "success" : "neutral"}>{done}/{drafts.length} bài đã duyệt</Badge> : null}
-      />
-      <RelatedLinks
-        links={
-          kind === "drop"
-            ? [{ href: `/desk/san-pham/dot/${id}`, label: "Đợt mở bán" }]
-            : [
-                data?.candidate_id && { href: `/desk/ban-chon/${data.candidate_id}`, label: "Hồ sơ chọn (Bàn chọn)" },
-                { href: `/desk/san-pham/${id}`, label: "Giá và cách bán (Sản phẩm)" },
-              ]
+        loading={isPending}
+        badge={data && drafts.length ? <Badge tone={done === drafts.length ? "success" : "neutral"}>{done}/{drafts.length} bài đã duyệt</Badge> : undefined}
+        actions={
+          <DeskMoreMenu
+            items={relatedItems(
+              kind === "drop"
+                ? [{ href: `/desk/san-pham/dot/${id}`, label: "Đợt mở bán" }]
+                : [
+                    data?.candidate_id && { href: `/desk/ban-chon/${data.candidate_id}`, label: "Hồ sơ chọn (Bàn chọn)" },
+                    { href: `/desk/san-pham/${id}`, label: "Giá và cách bán (Sản phẩm)" },
+                  ],
+            )}
+          />
         }
       />
       {isPending ? (

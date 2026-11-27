@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, Plus, Printer, Search, Settings2, Truck } from "lucide-react";
+import { Bot, Plus, Printer, Search, Truck } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -10,16 +10,16 @@ import {
   ButtonLink,
   Card,
   Checkbox,
-  Chip,
-  ChipRow,
   DateTime,
   EmptyState,
-  Input,
   Money,
   notifyError,
   notifySuccess,
   PageHeader,
   SkeletonList,
+  Tabs,
+  Toolbar,
+  ToolbarSearch,
 } from "@/components/ui";
 import {
   CHANNEL_LABELS,
@@ -33,6 +33,7 @@ import {
   type OrderListItem,
   type StatusGroup,
 } from "@/lib/api/orders";
+import { ORDER_SETTINGS, orderSections } from "@/lib/desk-sections";
 import { DropCard, InboundList } from "./drop-card";
 
 /** Đơn hàng và đợt gom (g1, g3, g4): đợt đang mở, đơn theo trạng thái, tìm, tạo đơn, tạo vận đơn hàng loạt. */
@@ -70,18 +71,26 @@ export function OrdersScreen() {
   const c = counts.data;
   const openDrops = (drops.data ?? []).filter((d) => d.status === "open");
   const canShip = group === "cho_giao" && !q.trim();
+  // «In nhãn»: đơn đang chọn, hoặc mọi đơn đang giao (đã có vận đơn) khi ở nhóm Đang giao
+  const labelIds = selected.length ? selected : group === "dang_giao" && !q.trim() ? (orders.data?.items ?? []).map((o) => o.id) : [];
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       <PageHeader
-        title="Đơn hàng"
-        description={c ? `${c.new_today} đơn mới hôm nay` : undefined}
+        sections={orderSections(c)}
+        active="orders"
+        settings={ORDER_SETTINGS}
         actions={
           <>
-            <ButtonLink href="/desk/don-hang/van-hanh" variant="ghost" size="sm" icon={<Settings2 className="size-4" />} aria-label="Vận hành">
-              <span className="hidden md:inline">Vận hành</span>
-            </ButtonLink>
             <ButtonLink href="/desk/don-hang/tao" size="sm" icon={<Plus className="size-4" />}>
               Tạo đơn
+            </ButtonLink>
+            <ButtonLink
+              href={labelIds.length ? `/desk/don-hang/in-nhan?${labelIds.map((id) => `ids=${id}`).join("&")}` : "/desk/don-hang/in-nhan"}
+              variant="secondary"
+              size="sm"
+              icon={<Printer className="size-4" />}
+            >
+              In nhãn
             </ButtonLink>
           </>
         }
@@ -109,23 +118,16 @@ export function OrdersScreen() {
 
       {drops.isPending ? <SkeletonList rows={1} /> : openDrops.length ? <div className="grid grid-cols-1 gap-3 md:grid-cols-2">{openDrops.map((d) => <DropCard key={d.id} drop={d} />)}</div> : null}
 
-      <Input
-        aria-label="Tìm đơn"
-        placeholder="Tìm mã đơn, tên, số điện thoại"
-        leading={<Search />}
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        type="search"
+      <Tabs
+        aria-label="Nhóm đơn"
+        value={q.trim() ? "tat_ca" : group}
+        onChange={(g) => {
+          setQ("");
+          setGroup(g);
+        }}
+        items={GROUPS.map((g) => ({ value: g.value, label: g.label, count: c ? c[g.value] : undefined }))}
       />
-      {!q.trim() ? (
-        <ChipRow>
-          {GROUPS.map((g) => (
-            <Chip key={g.value} selected={g.value === group} count={c ? c[g.value] : undefined} onClick={() => setGroup(g.value)}>
-              {g.label}
-            </Chip>
-          ))}
-        </ChipRow>
-      ) : null}
+      <Toolbar end={<ToolbarSearch aria-label="Tìm đơn" placeholder="Tìm mã đơn, tên, số điện thoại" value={q} onChange={(e) => setQ(e.target.value)} />} />
 
       {canShip && orders.data?.items.length ? (
         <div className="flex flex-wrap items-center gap-2">
@@ -139,13 +141,6 @@ export function OrdersScreen() {
               Tạo vận đơn{selected.length ? ` (${selected.length})` : ""}
             </Button>
           </div>
-        </div>
-      ) : null}
-      {group === "dang_giao" && orders.data?.items.length ? (
-        <div className="flex justify-end">
-          <ButtonLink href={`/desk/don-hang/in-nhan?${orders.data.items.map((o) => `ids=${o.id}`).join("&")}`} variant="secondary" size="sm" icon={<Printer className="size-4" />}>
-            In nhãn
-          </ButtonLink>
         </div>
       ) : null}
 

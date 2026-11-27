@@ -6,7 +6,7 @@ import { useState } from "react";
 import {
   Button,
   Chip,
-  ChipRow,
+  Toolbar,
   EmptyState,
   PageHeader,
   SkeletonList,
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui";
 import { isOwner, useSession } from "@/lib/api/auth";
 import { useApprovalGroups, useApprovals, useApproveBatch, type ApprovalItem } from "@/lib/api/control";
+import { useUrlParam } from "@/lib/use-url-param";
 import { ApprovalRow } from "./approval-row";
 import { ApprovalSheet } from "./approval-sheet";
 
@@ -25,8 +26,10 @@ type Tab = "pending" | "done";
 /** Hàng chờ duyệt (i2): lọc theo loại việc, duyệt hàng loạt các việc cùng loại, xem lại việc đã xử lý. */
 export function ApprovalsScreen() {
   const params = useSearchParams();
-  const [tab, setTab] = useState<Tab>("pending");
-  const [action, setAction] = useState<string | undefined>(params.get("action") ?? undefined);
+  const [tab, setTab] = useUrlParam<Tab>("tab", "pending", ["pending", "done"]);
+  const [actionParam, setActionParam] = useUrlParam<string>("action", "");
+  const action = actionParam || undefined;
+  const setAction = (a?: string) => setActionParam(a ?? "");
   const [open, setOpen] = useState<ApprovalItem | null>(null);
   const [openId, setOpenId] = useState<string | null>(params.get("id"));
   const { user } = useSession();
@@ -56,7 +59,16 @@ export function ApprovalsScreen() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Chờ duyệt" />
+      <PageHeader
+        title="Chờ duyệt"
+        actions={
+          canBatch ? (
+            <Button size="sm" icon={<CheckCheck className="size-4" />} loading={batch.isPending} onClick={approveAll}>
+              Duyệt tất cả
+            </Button>
+          ) : null
+        }
+      />
       <Tabs
         aria-label="Trạng thái"
         value={tab}
@@ -67,7 +79,7 @@ export function ApprovalsScreen() {
         ]}
       />
       {groups.data && groups.data.length > 1 && tab === "pending" ? (
-        <ChipRow>
+        <Toolbar>
           <Chip selected={!action} count={totalPending} onClick={() => setAction(undefined)}>
             Tất cả
           </Chip>
@@ -76,13 +88,7 @@ export function ApprovalsScreen() {
               {g.label}
             </Chip>
           ))}
-        </ChipRow>
-      ) : null}
-
-      {canBatch ? (
-        <Button variant="secondary" icon={<CheckCheck className="size-4" />} loading={batch.isPending} onClick={approveAll} className="self-start">
-          Duyệt cả {items.length} việc «{group.label}»
-        </Button>
+        </Toolbar>
       ) : null}
 
       {list.isPending ? (

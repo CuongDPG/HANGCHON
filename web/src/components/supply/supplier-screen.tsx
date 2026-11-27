@@ -48,7 +48,7 @@ export function SupplierScreen({ id }: { id: string }) {
   if (isPending)
     return (
       <div className="flex flex-col gap-4">
-        <PageHeader title="Đang tải…" backHref="/desk/nguon-cung?tab=ncc" />
+        <PageHeader loading backHref="/desk/nguon-cung?tab=ncc" />
         <SkeletonList rows={3} />
       </div>
     );
@@ -70,12 +70,12 @@ function SupplierDetail({ s }: { s: Supplier }) {
   const [editing, setEditing] = useState(false);
   const pos = usePurchaseOrders({ supplier_id: s.id });
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       <PageHeader
         title={s.name}
-        eyebrow={`${SUPPLIER_KIND_LABELS[s.kind].toUpperCase()}${s.country ? ` · ${s.country}` : ""}`}
+        eyebrow={`${SUPPLIER_KIND_LABELS[s.kind]}${s.country ? ` · ${s.country}` : ""}`}
         backHref="/desk/nguon-cung?tab=ncc"
-        actions={<IconButton label="Sửa hồ sơ" icon={<PenLine />} onClick={() => setEditing(true)} />}
+        actions={<IconButton label="Sửa hồ sơ" size="sm" icon={<PenLine />} onClick={() => setEditing(true)} />}
       />
       <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
         <div className="flex min-w-0 flex-col gap-4">

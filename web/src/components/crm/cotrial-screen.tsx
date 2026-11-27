@@ -2,29 +2,20 @@
 
 import { ArrowRight, BookUser, Users } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Badge, Card, DateTime, EmptyState, Money, PageHeader, SkeletonList, Switch, Tabs } from "@/components/ui";
+import { useSearchParams } from "next/navigation";
+import { Badge, Card, DateTime, EmptyState, Money, PageHeader, SkeletonList, Switch, TabLinks } from "@/components/ui";
 import { useCotrialOffers, useSetExcluded, useTesterRegistry, type CotrialOffer, type RegistryTester, type TesterHistory } from "@/lib/api/crm";
-import { KhachNav } from "./khach-nav";
+import { KHACH_SECTIONS, KHACH_TRIAL_TABS } from "@/lib/desk-sections";
 
-type Tab = "loi-moi" | "so";
-const TABS: { value: Tab; label: string }[] = [
-  { value: "loi-moi", label: "Lời mời" },
-  { value: "so", label: "Sổ người dùng thử" },
-];
 
 /** «Mời thử cùng» (27/11): lời mời theo món đang thử + sổ người dùng thử (đăng ký một lần ở /dung-thu). */
 export function CotrialScreen() {
-  const params = useSearchParams();
-  const router = useRouter();
-  const pathname = usePathname();
-  const tab: Tab = params.get("tab") === "so" ? "so" : "loi-moi";
+  const registry = useSearchParams().get("tab") === "so";
   return (
-    <div className="flex flex-col gap-5">
-      <PageHeader title="Người dùng thử" />
-      <KhachNav active="cotrial" />
-      <Tabs aria-label="Người dùng thử" value={tab} onChange={(v) => router.replace(`${pathname}?tab=${v}`, { scroll: false })} items={TABS} />
-      {tab === "loi-moi" ? <Offers /> : <Registry />}
+    <div className="flex flex-col gap-4">
+      <PageHeader sections={KHACH_SECTIONS} active="trial" />
+      <TabLinks aria-label="Dùng thử" items={KHACH_TRIAL_TABS} active={registry ? "testers-book" : "offers"} />
+      {registry ? <Registry /> : <Offers />}
     </div>
   );
 }

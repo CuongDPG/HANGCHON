@@ -14,7 +14,6 @@ import {
   EmptyState,
   InlineSelect,
   Input,
-  PageHeader,
   SectionLabel,
   Segmented,
   SkeletonList,
@@ -35,7 +34,7 @@ import {
   type AITestResult,
 } from "@/lib/api/control";
 import { formatNumber, formatVnd } from "@/lib/format";
-import { SettingsNav } from "./settings-nav";
+import { SettingsHeader } from "./settings-nav";
 import { OwnerOnly } from "./settings-screens";
 
 const EFFORT_LABELS: Record<AIEffort, string> = { low: "Thấp", medium: "Vừa", high: "Cao", max: "Tối đa" };
@@ -49,11 +48,10 @@ export function AIConfigScreen() {
   const { user } = useSession();
   const owner = isOwner(user);
   const { data, isPending, error, refetch } = useAIConfig(owner);
-  if (user && !owner) return <OwnerOnly title="AI và khoá API" />;
+  if (user && !owner) return <OwnerOnly />;
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="AI và khoá API" description="Khoá được mã hoá khi lưu, chỉ hiện dạng che." />
-      <SettingsNav />
+      <SettingsHeader />
       {isPending ? (
         <SkeletonList rows={4} />
       ) : error ? (

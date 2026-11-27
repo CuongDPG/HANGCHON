@@ -15,11 +15,14 @@ import {
   ProgressBar,
   SectionLabel,
   SkeletonList,
+  Toolbar,
   notifySuccess,
 } from "@/components/ui";
 import { isOwner, useSession } from "@/lib/api/auth";
 import { useAICosts, useSetBudget, type AICosts } from "@/lib/api/control";
 import { formatNumber, formatVnd, formatVndCompact } from "@/lib/format";
+import { AUTONOMY_SECTIONS } from "@/lib/desk-sections";
+import { useUrlParam } from "@/lib/use-url-param";
 
 function monthOptions(n = 6) {
   const now = new Date();
@@ -33,16 +36,12 @@ function monthOptions(n = 6) {
 /** Chi phí AI theo tháng (k2): trần, cảnh báo, lịch sử theo ngày và theo tác vụ. */
 export function AICostsScreen() {
   const months = monthOptions();
-  const [month, setMonth] = useState(months[0].value);
+  const [month, setMonth] = useUrlParam<string>("thang", months[0].value, months.map((m) => m.value));
   const { data, isPending, error, refetch } = useAICosts(month);
   return (
-    <div className="flex flex-col gap-5">
-      <PageHeader
-        backHref="/desk/tu-chu"
-        title="Chi phí AI"
-        description="Chạm trần thì AI dừng và hỏi chị."
-        actions={<InlineSelect aria-label="Tháng" value={month} onChange={setMonth} options={months} appearance="inline" />}
-      />
+    <div className="flex flex-col gap-4">
+      <PageHeader sections={AUTONOMY_SECTIONS} active="costs" />
+      <Toolbar end={<InlineSelect aria-label="Tháng" value={month} onChange={setMonth} options={months} appearance="inline" />} />
       {isPending ? (
         <SkeletonList rows={3} />
       ) : error ? (

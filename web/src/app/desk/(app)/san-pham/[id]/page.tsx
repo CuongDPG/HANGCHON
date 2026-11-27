@@ -1,13 +1,13 @@
 import { Suspense } from "react";
 import { ProductScreen } from "@/components/catalog/desk/product-screen";
-import { SkeletonList } from "@/components/ui/feedback";
+import { DeskPageFallback } from "@/components/desk/desk-page-fallback";
 
 export const metadata = { title: "Sản phẩm" };
 
 /** Một sản phẩm, theo dõi hai chiều: Hồ sơ chọn (ngược về quá trình chọn) · Hồ sơ bán (xuôi theo đường bán) · Giá và cách bán. */
 export default function DeskProductPage({ params }: PageProps<"/desk/san-pham/[id]">) {
   return (
-    <Suspense fallback={<SkeletonList rows={6} />}>
+    <Suspense fallback={<DeskPageFallback backHref="/desk/san-pham" rows={6} />}>
       <Screen params={params} />
     </Suspense>
   );

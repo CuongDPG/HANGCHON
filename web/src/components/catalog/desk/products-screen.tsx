@@ -1,17 +1,17 @@
 "use client";
 
-import { ArrowRight, PackagePlus, Search, Sparkles } from "lucide-react";
+import { ArrowRight, PackagePlus, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardLink } from "@/components/ui/card";
 import { DateTime } from "@/components/ui/date-time";
 import { EmptyState, SkeletonList } from "@/components/ui/feedback";
-import { Input } from "@/components/ui/field";
 import { ImageBox } from "@/components/ui/image-box";
 import { Money } from "@/components/ui/money";
 import { PageHeader } from "@/components/ui/page-header";
 import { Tabs } from "@/components/ui/tabs";
+import { Toolbar, ToolbarSearch } from "@/components/ui/toolbar";
 import { notifySuccess } from "@/components/ui/toast";
 import {
   PRODUCT_STATUS_LABELS,
@@ -25,7 +25,8 @@ import {
 import { cn } from "@/lib/cn";
 import { formatVndCompact } from "@/lib/format";
 import { matchesVi } from "@/lib/text";
-import { DeskSubnav } from "./desk-subnav";
+import { PRODUCT_SECTIONS } from "@/lib/desk-sections";
+import { useUrlParam } from "@/lib/use-url-param";
 
 type Tab = "all" | ProductStatus;
 export const STATUS_TONE: Record<ProductStatus, BadgeTone> = {
@@ -39,7 +40,7 @@ export const STATUS_TONE: Record<ProductStatus, BadgeTone> = {
 
 /** Danh sách sản phẩm (e1): món AI đã dựng trang chờ chị duyệt nằm trên cùng. */
 export function ProductsScreen() {
-  const [tab, setTab] = useState<Tab>("all");
+  const [tab, setTab] = useUrlParam<Tab>("tab", "all", ["all", "draft", "pending_review", "published", "paused", "stopped"]);
   const [q, setQ] = useState("");
   const { data, isPending, error } = useDeskProducts();
   const pipeline = useProductPipeline();
@@ -55,8 +56,7 @@ export function ProductsScreen() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Sản phẩm" />
-      <DeskSubnav active="products" />
+      <PageHeader sections={PRODUCT_SECTIONS} active="products" />
       {selectable.data?.length ? (
         <Card tone="accent" className="flex flex-col gap-2">
           <p className="text-[15px] font-semibold">{selectable.data.length} món chị đã chọn chưa có trang sản phẩm</p>
@@ -78,19 +78,21 @@ export function ProductsScreen() {
           </ul>
         </Card>
       ) : null}
-      <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm sản phẩm" aria-label="Tìm sản phẩm" leading={<Search />} />
       <Tabs
         aria-label="Trạng thái sản phẩm"
         value={tab}
         onChange={setTab}
         items={[
-          { value: "all", label: "Tất cả", count: rows.length },
+          { value: "draft", label: "Nháp", count: count("draft") },
           { value: "pending_review", label: "Chờ duyệt", count: count("pending_review") },
           { value: "published", label: "Trên kệ", count: count("published") },
-          { value: "draft", label: "Nháp", count: count("draft") },
           { value: "paused", label: "Tạm ẩn", count: count("paused") },
           { value: "stopped", label: "Đã ngừng bán", count: count("stopped") },
+          { value: "all", label: "Tất cả", count: rows.length },
         ]}
+      />
+      <Toolbar
+        end={<ToolbarSearch value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm sản phẩm" aria-label="Tìm sản phẩm" />}
       />
       {isPending ? (
         <SkeletonList rows={4} />

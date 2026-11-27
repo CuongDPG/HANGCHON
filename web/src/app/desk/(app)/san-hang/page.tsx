@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { SkeletonList } from "@/components/ui";
+import { DeskPageFallback } from "@/components/desk/desk-page-fallback";
 import { SourcingScreen } from "@/components/sourcing/sourcing-screen";
 
 export const metadata = { title: "Săn hàng" };
@@ -8,7 +8,7 @@ export const metadata = { title: "Săn hàng" };
 export default function DeskSourcingPage() {
   // SourcingScreen đọc ?tab= (useSearchParams) → nằm trong <Suspense> (cacheComponents)
   return (
-    <Suspense fallback={<SkeletonList rows={4} />}>
+    <Suspense fallback={<DeskPageFallback title="Săn hàng" rows={4} />}>
       <SourcingScreen />
     </Suspense>
   );

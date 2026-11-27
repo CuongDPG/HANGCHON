@@ -1,8 +1,6 @@
 "use client";
 
 import { Check, CircleAlert, Mic, MicOff } from "lucide-react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Badge, type BadgeTone } from "@/components/ui";
 import type { CheckFinding, ContentChannel, DisplayStatus, Draft } from "@/lib/api/content";
@@ -103,39 +101,8 @@ export function CheckChips({ findings, onOverride }: { findings: CheckFinding[];
   );
 }
 
-const SECTIONS = [
-  { href: "/desk/noi-dung", label: "Xưởng" },
-  { href: "/desk/noi-dung/lich", label: "Lịch đăng" },
-  { href: "/desk/noi-dung/so-lieu", label: "Bài ra đơn" },
-  { href: "/desk/noi-dung/giong", label: "Giọng của chị" },
-  { href: "/desk/noi-dung/video", label: "Video ngắn" },
-  { href: "/desk/noi-dung/livestream", label: "Livestream" },
-];
-
-/** Điều hướng các mục con của khu Nội dung. */
-export function ContentNav() {
-  const path = usePathname();
-  return (
-    <nav aria-label="Mục nội dung" className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] md:mx-0 md:flex-wrap md:px-0">
-      {SECTIONS.map((s) => {
-        const on = s.href === "/desk/noi-dung" ? path === s.href : path.startsWith(s.href);
-        return (
-          <Link
-            key={s.href}
-            href={s.href}
-            aria-current={on ? "page" : undefined}
-            className={cn(
-              "inline-flex h-9 shrink-0 items-center rounded-md border px-3 text-sm whitespace-nowrap transition-colors",
-              on ? "border-ink bg-ink text-paper" : "border-line-strong bg-surface text-ink hover:border-ink-3",
-            )}
-          >
-            {s.label}
-          </Link>
-        );
-      })}
-    </nav>
-  );
-}
+/** Trang cấu hình của khu Nội dung (nút bánh răng trên hàng tiêu đề). */
+export const CONTENT_SETTINGS = { href: "/desk/noi-dung/giong", label: "Giọng của chị" };
 
 /** URL tệp từ API (tuyệt đối) → đường dẫn cùng origin để cookie đăng nhập đi kèm. */
 export function localFile(url: string | null | undefined): string | null {

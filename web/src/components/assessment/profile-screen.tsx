@@ -29,7 +29,8 @@ import { DecisionBar } from "./decision-bar";
 import { ReviewsCard } from "./reviews-card";
 import { ScoreCard } from "./score-card";
 import { WarningsCard } from "./warnings-card";
-import { RelatedLinks } from "@/components/desk/related-links";
+import { DeskMoreMenu } from "@/components/desk/desk-more-menu";
+import { relatedItems } from "@/components/desk/related-links";
 import { SupplierGallery } from "@/components/sourcing/supplier-gallery";
 
 const STEP_LABEL: Record<string, string> = {
@@ -63,7 +64,7 @@ export function ProfileScreen({ id }: { id: string }) {
   if (isPending)
     return (
       <div className="flex flex-col gap-4" role="status" aria-label="Đang tải">
-        <Skeleton className="h-8 w-60" />
+        <PageHeader loading backHref="/desk/san-hang" />
         <Skeleton className="h-24 w-full" />
         <SkeletonList rows={4} />
       </div>
@@ -97,12 +98,14 @@ export function ProfileScreen({ id }: { id: string }) {
         eyebrow={data.brief ? `${data.brief.title} · ${data.brief.considered_count} ứng viên` : "Ứng viên"}
         title={c.title_vi}
         actions={
-          a && !assessing ? (
-            <IconButton label="Thẩm định lại" icon={<RotateCw />} onClick={start} disabled={run.isPending} />
-          ) : undefined
+          <>
+            {a && !assessing ? <IconButton label="Thẩm định lại" size="sm" icon={<RotateCw />} onClick={start} disabled={run.isPending} /> : null}
+            <DeskMoreMenu
+              items={relatedItems([{ href: `/desk/ban-chon/${c.id}`, label: "Trên bàn chọn" }, { href: `/desk/nguon-cung/gia-von/${c.id}`, label: "Giá vốn" }])}
+            />
+          </>
         }
       />
-      <RelatedLinks links={[{ href: `/desk/ban-chon/${c.id}`, label: "Trên bàn chọn" }, { href: `/desk/nguon-cung/gia-von/${c.id}`, label: "Giá vốn" }]} />
 
       <div className="flex items-start gap-3">
         <ImageBox src={c.thumb_url} alt={c.title_vi} className="w-[84px] shrink-0" placeholder="" priority referrerPolicy="no-referrer" />

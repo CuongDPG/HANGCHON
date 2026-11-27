@@ -1,13 +1,13 @@
 import { Suspense } from "react";
-import { SkeletonList } from "@/components/ui";
 import { ComparisonScreen } from "@/components/assessment/comparison-screen";
+import { DeskPageFallback } from "@/components/desk/desk-page-fallback";
 
 export const metadata = { title: "So sánh cạnh nhau" };
 
 /** Bảng so sánh 2–5 ứng viên cùng đề (b3). */
 export default function ComparisonPage({ params }: PageProps<"/desk/san-hang/so-sanh/[id]">) {
   return (
-    <Suspense fallback={<SkeletonList rows={5} />}>
+    <Suspense fallback={<DeskPageFallback backHref="/desk/san-hang" rows={5} />}>
       <Comparison params={params} />
     </Suspense>
   );

@@ -21,7 +21,8 @@ import { useSession } from "@/lib/api/auth";
 import { useCreateLivestream, useLivestream, useLivestreamAction, useLivestreams, usePickDrops, usePickProducts, type Livestream } from "@/lib/api/content";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/cn";
-import { ContentNav } from "./shared";
+import { CONTENT_SECTIONS } from "@/lib/desk-sections";
+import { CONTENT_SETTINGS } from "./shared";
 
 const STATUS: Record<Livestream["status"], { label: string; tone: "neutral" | "warning" | "success" | "accent" }> = {
   drafting: { label: "AI đang soạn", tone: "accent" },
@@ -35,8 +36,7 @@ export function LivestreamScreen() {
   const { data, isPending, error } = useLivestreams();
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Livestream" />
-      <ContentNav />
+      <PageHeader sections={CONTENT_SECTIONS} active="livestream" settings={CONTENT_SETTINGS} />
       <CreateCard />
       <section className="flex flex-col gap-2">
         <SectionLabel>KỊCH BẢN</SectionLabel>
@@ -120,10 +120,11 @@ export function LivestreamDetail({ id }: { id: string }) {
     <div className={cn("flex flex-col gap-4", big && "text-[19px]")}>
       <PageHeader
         backHref="/desk/noi-dung/livestream"
-        title={data?.title ?? "Kịch bản livestream"}
-        eyebrow={data ? STATUS[data.status].label.toUpperCase() : undefined}
+        title={data?.title}
+        loading={isPending}
+        badge={data ? <Badge tone={STATUS[data.status].tone}>{STATUS[data.status].label}</Badge> : undefined}
         actions={
-          <div className="flex gap-1 print:hidden">
+          <div className="flex gap-1.5 print:hidden">
             <Button size="sm" variant={big ? "primary" : "ghost"} icon={<Type className="size-4" aria-hidden />} onClick={() => setBig((x) => !x)}>
               Chữ to
             </Button>

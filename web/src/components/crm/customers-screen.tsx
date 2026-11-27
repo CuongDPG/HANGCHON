@@ -2,10 +2,11 @@
 
 import { Search, UsersRound } from "lucide-react";
 import { useDeferredValue, useState } from "react";
-import { Badge, Button, CardLink, Chip, ChipRow, EmptyState, Input, Money, PageHeader, SkeletonList } from "@/components/ui";
+import { Badge, Button, CardLink, Chip, EmptyState, Money, PageHeader, SkeletonList, Toolbar, ToolbarSearch } from "@/components/ui";
 import { useCustomers, type CustomerItem, type CustomerSegment } from "@/lib/api/crm";
 import { CHANNEL_LABEL } from "@/lib/api/inbox";
-import { KhachNav } from "./khach-nav";
+import { KHACH_SECTIONS } from "@/lib/desk-sections";
+import { useUrlParam } from "@/lib/use-url-param";
 
 const SEGMENTS: { value: CustomerSegment; label: string }[] = [
   { value: "all", label: "Tất cả" },
@@ -16,30 +17,23 @@ const SEGMENTS: { value: CustomerSegment; label: string }[] = [
 
 /** Sổ khách (h4): mỗi khách đã mua gì, hỏi gì, quan tâm gì. Tìm không dấu theo tên, số điện thoại, ghi chú, nhãn. */
 export function CustomersScreen() {
-  const [segment, setSegment] = useState<CustomerSegment>("all");
+  const [segment, setSegment] = useUrlParam<CustomerSegment>("nhom", "all", ["all", "regular", "new", "optout"]);
   const [q, setQ] = useState("");
   const query = useDeferredValue(q.trim());
   const { data, isPending, error, refetch } = useCustomers({ q: query, segment });
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Sổ khách" description={data ? `${data.total} khách` : " "} />
-      <KhachNav active="book" />
-      <Input
-        aria-label="Tìm khách"
-        type="search"
-        placeholder="Tên, số điện thoại, ghi chú, nhãn…"
-        leading={<Search aria-hidden />}
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-      />
-      <ChipRow>
+      <PageHeader sections={KHACH_SECTIONS} active="book" />
+      <Toolbar
+        end={<ToolbarSearch aria-label="Tìm khách" placeholder="Tên, số điện thoại, ghi chú, nhãn…" value={q} onChange={(e) => setQ(e.target.value)} />}
+      >
         {SEGMENTS.map((s) => (
-          <Chip key={s.value} selected={segment === s.value} onClick={() => setSegment(s.value)}>
+          <Chip key={s.value} selected={segment === s.value} count={segment === s.value ? data?.total : undefined} onClick={() => setSegment(s.value)}>
             {s.label}
           </Chip>
         ))}
-      </ChipRow>
+      </Toolbar>
       {isPending ? (
         <SkeletonList rows={4} />
       ) : error ? (

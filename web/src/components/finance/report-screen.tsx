@@ -2,7 +2,6 @@
 
 import { BarChart3, RefreshCw, RotateCw } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
 import {
   Button,
   Card,
@@ -13,11 +12,13 @@ import {
   SectionLabel,
   SkeletonList,
   StatTile,
+  Toolbar,
   notifySuccess,
 } from "@/components/ui";
 import { isOwner, useSession } from "@/lib/api/auth";
 import { useGenerateReport, useReports, type WeeklyReport } from "@/lib/api/finance";
 import { formatNumber, formatVndCompact } from "@/lib/format";
+import { useUrlParam } from "@/lib/use-url-param";
 
 const CHANNELS: Record<string, string> = { facebook: "Facebook", instagram: "Instagram", threads: "Threads", tiktok: "TikTok", zalo: "Zalo", zalo_oa: "Zalo", web: "Website" };
 
@@ -38,7 +39,7 @@ function minutesText(m: number): string {
 /** Báo cáo tuần (i5): bốn con số, món và bài ra đơn, AI rút ra gì, thời gian chị dành cho việc duyệt. */
 export function ReportScreen() {
   const { data, isPending, error, refetch } = useReports();
-  const [id, setId] = useState<string | null>(null);
+  const [id, setId] = useUrlParam<string>("tuan", "");
   const { user } = useSession();
   const gen = useGenerateReport();
   const reports = data?.items ?? [];
@@ -52,17 +53,13 @@ export function ReportScreen() {
 
   const regen = isOwner(user) ? (
     <Button variant="secondary" size="sm" icon={<RefreshCw className="size-4" />} loading={gen.isPending} onClick={regenerate}>
-      Lập lại tuần này
+      Lập lại
     </Button>
   ) : null;
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        eyebrow={report && reports.length < 2 ? weekLabel(report) : undefined}
-        title="Báo cáo tuần"
-        description="Tự lập 6 giờ sáng thứ Hai cho tuần trước."
-      />
+      <PageHeader title="Báo cáo tuần" actions={report ? regen : null} />
       {isPending ? (
         <SkeletonList rows={3} />
       ) : error ? (
@@ -85,20 +82,21 @@ export function ReportScreen() {
         />
       ) : (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            {reports.length > 1 ? (
-              <InlineSelect
-                aria-label="Chọn tuần"
-                appearance="inline"
-                value={report.id}
-                onChange={setId}
-                options={reports.map((r) => ({ value: r.id, label: weekLabel(r) }))}
-              />
-            ) : (
-              <span />
-            )}
-            {regen}
-          </div>
+          <Toolbar
+            end={
+              reports.length > 1 ? (
+                <InlineSelect
+                  aria-label="Chọn tuần"
+                  appearance="inline"
+                  value={report.id}
+                  onChange={setId}
+                  options={reports.map((r) => ({ value: r.id, label: weekLabel(r) }))}
+                />
+              ) : (
+                <span className="text-[14px] text-ink-2">{weekLabel(report)}</span>
+              )
+            }
+          />
           <ReportBody r={report} />
         </>
       )}

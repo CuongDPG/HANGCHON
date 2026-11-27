@@ -21,6 +21,7 @@ import {
 import { isOwner, useSession } from "@/lib/api/auth";
 import { useAICosts, useAutonomy, useSetAutonomy, type AutonomyRow } from "@/lib/api/control";
 import { formatNumber, formatVndCompact } from "@/lib/format";
+import { AUTONOMY_SECTIONS } from "@/lib/desk-sections";
 
 type Settable = "auto" | "ask" | "off";
 
@@ -60,8 +61,8 @@ export function AutonomyScreen() {
   const suggestions = free.filter((r) => r.suggest_auto && !dismissed.includes(r.action));
 
   return (
-    <div className="flex flex-col gap-5">
-      <PageHeader title="Mức tự chủ của AI" />
+    <div className="flex flex-col gap-4">
+      <PageHeader sections={AUTONOMY_SECTIONS} active="autonomy" />
 
       {isPending ? (
         <SkeletonList rows={4} />

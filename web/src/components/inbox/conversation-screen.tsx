@@ -42,7 +42,7 @@ export function ConversationScreen({ id }: { id: string }) {
   if (isPending) {
     return (
       <div className="flex flex-col gap-4" role="status" aria-label="Đang tải">
-        <PageHeader title="Hội thoại" backHref="/desk/khach" />
+        <PageHeader loading backHref="/desk/khach" />
         <Skeleton className="h-16 w-full" />
         <SkeletonList rows={3} />
       </div>
@@ -72,7 +72,7 @@ export function ConversationScreen({ id }: { id: string }) {
       <PageHeader
         backHref="/desk/khach"
         eyebrow={
-          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="flex items-center gap-x-2">
             <ChannelBadge channel={t.channel} label={t.channel_label} />
             <span className="whitespace-nowrap">{t.kind === "comment" ? "Bình luận công khai" : "Tin nhắn riêng"}</span>
             {t.account_name ? <span className="hidden text-ink-3 md:inline">· {t.account_name}</span> : null}

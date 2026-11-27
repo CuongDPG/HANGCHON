@@ -2,7 +2,7 @@
 
 import { Download, RefreshCw, Upload } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import {
   Badge,
@@ -18,7 +18,6 @@ import {
   notifySuccess,
   PageHeader,
   SkeletonList,
-  Tabs,
   Textarea,
 } from "@/components/ui";
 import {
@@ -43,32 +42,27 @@ import {
   type NotifyChannel,
   type PaymentRow,
 } from "@/lib/api/orders";
+import { ORDER_SETTINGS, orderSections } from "@/lib/desk-sections";
 import { InventoryTab } from "./inventory-tab";
 
 type Tab = "tien" | "doi-tra" | "ton" | "san" | "mau-tin";
 
-/** Vận hành đơn hàng: khoản tiền cần xem (g2), đổi trả (g7), tồn kho nhỏ (g8), sàn (g9), mẫu tin (g5). */
+/**
+ * Vận hành đơn hàng — bốn mục tầng 1 của khu Đơn hàng (?tab=): khoản tiền cần xem (g2), đổi trả (g7), tồn kho nhỏ (g8), sàn (g9);
+ * mẫu tin (g5) là trang cấu hình (nút bánh răng).
+ */
 export function OperationsScreen() {
-  const router = useRouter();
-  const pathname = usePathname();
   const params = useSearchParams();
-  const tab = (params.get("tab") as Tab | null) ?? "tien";
   const c = useOrderCounts().data;
+  const raw = params.get("tab");
+  const tab: Tab = raw === "doi-tra" || raw === "ton" || raw === "san" || raw === "mau-tin" ? raw : "tien";
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Vận hành" backHref="/desk/don-hang" />
-      <Tabs
-        aria-label="Mục vận hành"
-        value={tab}
-        onChange={(v) => router.replace(`${pathname}?tab=${v}`, { scroll: false })}
-        items={[
-          { value: "tien", label: "Tiền về", count: c?.payments_to_review || undefined },
-          { value: "doi-tra", label: "Đổi trả", count: c?.returns_open || undefined },
-          { value: "ton", label: "Tồn kho" },
-          { value: "san", label: "Sàn" },
-          { value: "mau-tin", label: "Mẫu tin" },
-        ]}
-      />
+      {tab === "mau-tin" ? (
+        <PageHeader title="Mẫu tin" backHref="/desk/don-hang" />
+      ) : (
+        <PageHeader sections={orderSections(c)} active={tab} settings={ORDER_SETTINGS} />
+      )}
       {tab === "tien" ? <PaymentsTab /> : tab === "doi-tra" ? <ReturnsTab /> : tab === "ton" ? <InventoryTab /> : tab === "san" ? <MarketplaceTab /> : <TemplatesTab />}
     </div>
   );

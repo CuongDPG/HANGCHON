@@ -22,19 +22,19 @@ import {
   type ReviewStatus,
 } from "@/lib/api/catalog";
 import { formatDate } from "@/lib/format";
-import { DeskSubnav } from "./desk-subnav";
+import { PRODUCT_SECTIONS } from "@/lib/desk-sections";
+import { useUrlParam } from "@/lib/use-url-param";
 
 const FLAG_LABELS: Record<string, string> = { spam: "Quảng cáo / spam", offensive: "Thô tục", personal_info: "Lộ thông tin cá nhân", off_topic: "Lạc đề" };
 
 /** Đánh giá chờ duyệt (e8): AI lọc trước, chị quyết định hiện hay không. Chê thật lòng vẫn nên hiện. */
 export function ReviewsScreen() {
-  const [tab, setTab] = useState<ReviewStatus>("pending_review");
+  const [tab, setTab] = useUrlParam<ReviewStatus>("tab", "pending_review", ["pending_review", "published", "hidden", "rejected"]);
   const { data, isPending, error } = useDeskReviews(tab);
   const rows = data?.items ?? [];
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Đánh giá của khách" />
-      <DeskSubnav active="reviews" />
+      <PageHeader sections={PRODUCT_SECTIONS} active="reviews" />
       <Tabs
         aria-label="Trạng thái đánh giá"
         value={tab}

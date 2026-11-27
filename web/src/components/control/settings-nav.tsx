@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { ReactNode } from "react";
+import { PageHeader, TabLinks } from "@/components/ui";
 import { isOwner, useSession } from "@/lib/api/auth";
-import { cn } from "@/lib/cn";
 
 /** Các tab của Cài đặt (theo URL), xếp theo mức chị hay dùng. `owner`: người phụ giúp không thấy. */
 export const SETTINGS_TABS = [
@@ -20,29 +20,19 @@ export const SETTINGS_TABS = [
 /** Trang vào mặc định của Cài đặt (/desk/cai-dat chuyển tới đây). */
 export const SETTINGS_HOME = SETTINGS_TABS[0].href;
 
-/** Thanh tab dưới tiêu đề mỗi trang Cài đặt — cùng kiểu thanh phụ của khu Sản phẩm (`DeskSubnav`). */
-export function SettingsNav() {
+/**
+ * Đầu mỗi trang Cài đặt: tiêu đề «Cài đặt» + tab theo route (tầng 2; 8 mục > 5 nên không lên hàng tiêu đề).
+ * Thanh tab cuộn ngang trên điện thoại; người phụ giúp không thấy mục `owner`.
+ */
+export function SettingsHeader({ actions }: { actions?: ReactNode }) {
   const path = usePathname();
   const { user } = useSession();
   const tabs = SETTINGS_TABS.filter((t) => !("owner" in t) || !user || isOwner(user));
+  const active = tabs.find((t) => path === t.href || path.startsWith(`${t.href}/`))?.href ?? "";
   return (
-    <nav aria-label="Mục cài đặt" className="-mx-4 flex gap-1 overflow-x-auto border-b border-line px-4 [scrollbar-width:none] md:mx-0 md:px-0">
-      {tabs.map((t) => {
-        const on = path === t.href || path.startsWith(`${t.href}/`);
-        return (
-          <Link
-            key={t.href}
-            href={t.href}
-            aria-current={on ? "page" : undefined}
-            className={cn(
-              "-mb-px shrink-0 border-b-2 px-3 py-2.5 text-[15px] whitespace-nowrap",
-              on ? "border-accent font-semibold text-ink" : "border-transparent text-ink-2 hover:text-ink",
-            )}
-          >
-            {t.label}
-          </Link>
-        );
-      })}
-    </nav>
+    <>
+      <PageHeader title="Cài đặt" actions={actions} />
+      <TabLinks aria-label="Mục cài đặt" items={tabs.map((t) => ({ key: t.href, href: t.href, label: t.label }))} active={active} />
+    </>
   );
 }

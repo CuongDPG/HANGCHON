@@ -3,7 +3,7 @@
 import { ExternalLink, PackageCheck, Plus, Rocket, Square, Trash2, XCircle } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Card, SectionLabel } from "@/components/ui/card";
 import { useConfirm } from "@/components/ui/confirm";
 import { EmptyState, SkeletonList } from "@/components/ui/feedback";
@@ -24,7 +24,7 @@ import {
   type DropInput,
 } from "@/lib/api/catalog";
 import { formatVnd } from "@/lib/format";
-import { DeskSubnav } from "./desk-subnav";
+import { DeskMoreMenu } from "@/components/desk/desk-more-menu";
 import { DROP_TONE, fromLocalInput, toLocalInput } from "./drops-screen";
 
 type Row = { product_id: string; price_vnd: string; slots_total: string; max_per_order: string; reserved: number };
@@ -87,9 +87,20 @@ export function DropEditor({ id }: { id: string }) {
   const cancel = useDropMutation(id, () => deskDropApi.cancel(id));
   const arrived = useDropMutation(id, (day: string) => deskDropApi.arrived(id, day));
 
-  if (isPending) return <SkeletonList rows={5} />;
-  if (error || !d) return <EmptyState tone="error" title="Chưa tải được đợt" description={error?.message} />;
-  if (!draft) return <SkeletonList rows={5} />;
+  if (isPending || (d && !draft))
+    return (
+      <div className="flex flex-col gap-4">
+        <PageHeader loading backHref="/desk/san-pham/dot" />
+        <SkeletonList rows={5} />
+      </div>
+    );
+  if (error || !d || !draft)
+    return (
+      <div className="flex flex-col gap-4">
+        <PageHeader title="Không mở được đợt" backHref="/desk/san-pham/dot" />
+        <EmptyState tone="error" title="Chưa tải được đợt" description={error?.message} />
+      </div>
+    );
 
   const editable = ["draft", "pending_review", "scheduled", "open"].includes(d.status);
   const dirty = JSON.stringify(toInput(draft)) !== JSON.stringify(toInput(toDraft(d)));
@@ -100,13 +111,13 @@ export function DropEditor({ id }: { id: string }) {
   const addable = published.filter((p) => !draft.items.some((i) => i.product_id === p.id));
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       <PageHeader
         title={`${d.label} · ${d.title}`}
         backHref="/desk/san-pham/dot"
+        badge={<Badge tone={DROP_TONE[d.status]}>{DROP_STATUS_LABELS[d.status]}</Badge>}
         actions={
           <>
-            <Badge tone={DROP_TONE[d.status]}>{DROP_STATUS_LABELS[d.status]}</Badge>
             {["draft", "pending_review"].includes(d.status) ? (
               <Button
                 size="sm"
@@ -118,12 +129,12 @@ export function DropEditor({ id }: { id: string }) {
                   })
                 }
               >
-                {isOwner ? "Mở đợt" : "Gửi chị duyệt mở đợt"}
+                {isOwner ? "Mở đợt" : "Gửi duyệt"}
               </Button>
             ) : null}
             {dirty && editable ? (
               <Button size="sm" variant="secondary" loading={save.isPending} onClick={() => save.mutate(toInput(draft), { onSuccess: () => notifySuccess("Đã lưu") })}>
-                Lưu thay đổi
+                Lưu
               </Button>
             ) : null}
             {isOwner && ["open", "scheduled"].includes(d.status) ? (
@@ -144,28 +155,29 @@ export function DropEditor({ id }: { id: string }) {
                 Hàng đã về
               </Button>
             ) : null}
-            {d.status !== "draft" && d.status !== "pending_review" && d.status !== "cancelled" ? (
-              <ButtonLink size="sm" href={`/dot/${d.slug}`} variant="ghost" icon={<ExternalLink className="size-4" />} target="_blank">
-                Xem trên web
-              </ButtonLink>
-            ) : null}
-            {isOwner && ["draft", "pending_review", "scheduled"].includes(d.status) ? (
-              <Button
-                size="sm"
-                variant="ghost"
-                icon={<XCircle className="size-4" />}
-                onClick={async () => {
-                  if (await confirm({ title: "Huỷ đợt này?", message: "Đợt sẽ không hiện trên web nữa.", confirmLabel: "Huỷ đợt", tone: "danger" }))
-                    cancel.mutate(undefined);
-                }}
-              >
-                Huỷ đợt
-              </Button>
-            ) : null}
+            <DeskMoreMenu
+              items={[
+                d.status !== "draft" && d.status !== "pending_review" && d.status !== "cancelled" && {
+                  href: `/dot/${d.slug}`,
+                  target: "_blank",
+                  label: "Xem trên web",
+                  icon: <ExternalLink aria-hidden />,
+                },
+                isOwner &&
+                  ["draft", "pending_review", "scheduled"].includes(d.status) && {
+                    label: "Huỷ đợt",
+                    icon: <XCircle aria-hidden />,
+                    danger: true,
+                    onSelect: async () => {
+                      if (await confirm({ title: "Huỷ đợt này?", message: "Đợt sẽ không hiện trên web nữa.", confirmLabel: "Huỷ đợt", tone: "danger" }))
+                        cancel.mutate(undefined);
+                    },
+                  },
+              ]}
+            />
           </>
         }
       />
-      <DeskSubnav active="drops" />
       {d.reminder_count ? (
         <p className="text-[14px] text-ink-2">{d.reminder_count} khách đã bấm «Nhắc mình». Khi đợt mở, AI soạn tin nhắc để chị duyệt.</p>
       ) : null}

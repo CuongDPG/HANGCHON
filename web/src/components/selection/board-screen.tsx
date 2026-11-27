@@ -7,8 +7,6 @@ import {
   Button,
   Card,
   EmptyState,
-  IconButton,
-  IconLink,
   InlineSelect,
   Input,
   PageHeader,
@@ -18,6 +16,7 @@ import {
   notifyInfo,
   notifySuccess,
 } from "@/components/ui";
+import { DeskMoreMenu } from "@/components/desk/desk-more-menu";
 import { cn } from "@/lib/cn";
 import {
   STAGES,
@@ -174,26 +173,25 @@ export function BoardScreen() {
     if (over?.stage !== stage || over.index !== index) setOver({ stage, index });
   }
 
-  const selectedTotal = data?.counts.selected ?? 0;
-
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
         title="Bàn chọn"
-        eyebrow={data ? `${selectedTotal} món đã chọn` : undefined}
         actions={
           <>
             {data ? (
               <Button size="sm" variant="secondary" icon={<Mic className="size-4" aria-hidden />} onClick={() => setQuickNote(true)}>
-                <span>
-                  Ghi nhanh<span className="max-md:hidden">, AI xếp vào món</span>
-                </span>
+                Ghi nhanh
               </Button>
             ) : null}
             <InlineSelect appearance="inline" aria-label="Xếp thẻ trong cột" value={sort} onChange={setSort} options={BOARD_SORT_OPTIONS} />
-            <IconLink href="/desk/ban-chon/nguyen-tac" label="Bộ nguyên tắc của chị" icon={<ListChecks />} />
-            <IconLink href="/desk/ban-chon/gu" label="AI hiểu gu chị thế nào" icon={<Sparkles />} />
-            <IconButton label="Cài đặt bàn chọn" icon={<Settings2 />} onClick={() => setSettingsOpen(true)} />
+            <DeskMoreMenu
+              items={[
+                { href: "/desk/ban-chon/nguyen-tac", label: "Nguyên tắc chọn hàng", icon: <ListChecks aria-hidden /> },
+                { href: "/desk/ban-chon/gu", label: "Gu của chị", icon: <Sparkles aria-hidden /> },
+                { label: "Cài đặt bàn chọn", icon: <Settings2 aria-hidden />, onSelect: () => setSettingsOpen(true) },
+              ]}
+            />
           </>
         }
       />

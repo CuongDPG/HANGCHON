@@ -1,12 +1,12 @@
 import { Suspense } from "react";
 import { ApprovalsScreen } from "@/components/control/approvals-screen";
-import { SkeletonList } from "@/components/ui";
+import { DeskPageFallback } from "@/components/desk/desk-page-fallback";
 
 export const metadata = { title: "Chờ duyệt" };
 
 export default function DeskApprovalsPage() {
   return (
-    <Suspense fallback={<SkeletonList rows={4} />}>
+    <Suspense fallback={<DeskPageFallback title="Chờ duyệt" rows={4} />}>
       <ApprovalsScreen />
     </Suspense>
   );

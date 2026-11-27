@@ -60,7 +60,7 @@ export function OrderDetailScreen() {
   if (q.isPending) {
     return (
       <div className="flex flex-col gap-4">
-        <Skeleton className="h-10 w-48" />
+        <PageHeader loading backHref="/desk/don-hang" />
         <Skeleton className="h-48 w-full" />
         <Skeleton className="h-32 w-full" />
       </div>
@@ -69,7 +69,7 @@ export function OrderDetailScreen() {
   if (q.isError) {
     return (
       <div className="flex flex-col gap-4">
-        <PageHeader title="Đơn hàng" backHref="/desk/don-hang" />
+        <PageHeader title="Không mở được đơn" backHref="/desk/don-hang" />
         <EmptyState tone="error" title="Chưa tải được đơn" description={q.error.message} action={<Button onClick={() => q.refetch()}>Thử lại</Button>} />
       </div>
     );
@@ -83,16 +83,12 @@ function Detail({ order: o }: { order: OrderDetail }) {
   const [sheet, setSheet] = useState<null | "pay" | "edit" | "cancel" | "return">(null);
   const address = [o.address_line, o.ward, o.district, o.province].filter(Boolean).join(", ");
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       <PageHeader
         eyebrow={`${CHANNEL_LABELS[o.channel] ?? o.channel} · ${PAYMENT_LABELS[o.payment_method]}`}
         title={o.code}
         backHref="/desk/don-hang"
-        actions={
-          <Badge tone={statusTone(o.status)} className="h-7 text-[13px]">
-            {o.status_label}
-          </Badge>
-        }
+        badge={<Badge tone={statusTone(o.status)}>{o.status_label}</Badge>}
       />
       {o.status === "draft" ? <DraftCard order={o} /> : null}
 

@@ -14,7 +14,6 @@ import {
   DataList,
   EmptyState,
   Input,
-  PageHeader,
   SectionLabel,
   Segmented,
   Sheet,
@@ -37,15 +36,14 @@ import { formatNumber } from "@/lib/format";
 import type { ThemePreference } from "@/lib/theme";
 import { useThemePreference } from "@/lib/use-theme";
 import { useMutation } from "@tanstack/react-query";
-import { SettingsNav } from "./settings-nav";
+import { SettingsHeader } from "./settings-nav";
 
 /* ---------- khung chung ---------- */
 
-export function OwnerOnly({ title }: { title: string }) {
+export function OwnerOnly() {
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title={title} />
-      <SettingsNav />
+      <SettingsHeader />
       <EmptyState title="Chỉ chị (chủ cửa hàng) xem được phần này" />
     </div>
   );
@@ -82,8 +80,7 @@ export function StoreSettingsScreen() {
   const { data, isPending, error, refetch } = useSettings();
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Cửa hàng" description="Hiện trên website và trong tin nhắn gửi khách." />
-      <SettingsNav />
+      <SettingsHeader />
       {isPending ? (
         <SkeletonList rows={4} />
       ) : error ? (
@@ -198,8 +195,7 @@ export function AccountScreen() {
   });
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Tài khoản của chị" />
-      <SettingsNav />
+      <SettingsHeader />
       {user ? (
         <Card flush className="px-4 py-2">
           <DataList
@@ -257,7 +253,7 @@ export function HelpersScreen() {
   const confirm = useConfirm();
   const [creating, setCreating] = useState(false);
   const [resetFor, setResetFor] = useState<SessionUser | null>(null);
-  if (user && !owner) return <OwnerOnly title="Người phụ giúp" />;
+  if (user && !owner) return <OwnerOnly />;
   const helpers = (users.data ?? []).filter((u) => u.role === "helper");
 
   async function toggle(u: SessionUser) {
@@ -271,16 +267,13 @@ export function HelpersScreen() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        title="Người phụ giúp"
-        description="Người phụ xem được mọi thứ, ghi chi phí; không duyệt, không đổi cài đặt."
+      <SettingsHeader
         actions={
           <Button size="sm" icon={<UserPlus className="size-4" />} onClick={() => setCreating(true)}>
-            Thêm người phụ giúp
+            Thêm người
           </Button>
         }
       />
-      <SettingsNav />
       {users.isPending ? (
         <SkeletonList rows={2} />
       ) : users.error ? (
@@ -468,8 +461,7 @@ export function IntegrationsScreen() {
   const { user } = useSession();
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Tích hợp" description="«Giả lập» nghĩa là chưa nối tài khoản thật, không gửi gì ra ngoài." />
-      <SettingsNav />
+      <SettingsHeader />
       {isPending ? (
         <SkeletonList rows={4} />
       ) : error ? (

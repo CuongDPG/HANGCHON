@@ -30,7 +30,9 @@ import {
 } from "@/lib/api/content";
 import { formatDateTime, formatDayMonth, formatTime } from "@/lib/format";
 import { cn } from "@/lib/cn";
-import { ChannelMark, ContentNav, DISPLAY_STATUS, StatusBadge, toLocalInput } from "./shared";
+import { CONTENT_SECTIONS } from "@/lib/desk-sections";
+import { useUrlParam } from "@/lib/use-url-param";
+import { CONTENT_SETTINGS, ChannelMark, DISPLAY_STATUS, StatusBadge, toLocalInput } from "./shared";
 
 const MOVABLE = new Set(["planned", "approved", "failed"]);
 
@@ -60,7 +62,9 @@ const tone: Record<string, string> = {
 };
 
 export function CalendarScreen() {
-  const [week, setWeek] = useState<string | undefined>(undefined);
+  const [weekParam, setWeekParam] = useUrlParam<string>("tuan", "");
+  const week = weekParam || undefined;
+  const setWeek = (w: string) => setWeekParam(w);
   const { data, isPending, error } = useCalendar(week);
   const plan = usePlanWeek();
   const reschedule = useReschedule();
@@ -86,16 +90,17 @@ export function CalendarScreen() {
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
-        title="Lịch đăng"
-        eyebrow={data?.label ?? "Tuần này"}
+        sections={CONTENT_SECTIONS}
+        active="calendar"
+        settings={CONTENT_SETTINGS}
         actions={
           <>
-            <IconButton label="Tuần trước" icon={<ChevronLeft />} onClick={() => data && setWeek(addDays(data.week_start, -7))} />
-            <IconButton label="Tuần sau" icon={<ChevronRight />} onClick={() => data && setWeek(addDays(data.week_start, 7))} />
+            <IconButton label="Tuần trước" size="sm" icon={<ChevronLeft />} onClick={() => data && setWeek(addDays(data.week_start, -7))} />
+            <span className="text-[13px] font-medium whitespace-nowrap text-ink-2 max-md:hidden">{data?.label ?? "Tuần này"}</span>
+            <IconButton label="Tuần sau" size="sm" icon={<ChevronRight />} onClick={() => data && setWeek(addDays(data.week_start, 7))} />
           </>
         }
       />
-      <ContentNav />
       <div className="flex flex-wrap items-center gap-2">
         {(["published", "approved", "pending", "draft_pushed", "needs_fix", "failed"] as const).map((k) =>
           counts[k] || k === "published" || k === "approved" || k === "pending" ? (

@@ -21,7 +21,8 @@ import {
 import { useSession } from "@/lib/api/auth";
 import { useApproveVideo, useDeleteMedia, useMedia, usePickProducts, usePlanVideo, useUploadClip, type MediaAsset } from "@/lib/api/content";
 import { formatDateTime } from "@/lib/format";
-import { ContentNav, localFile } from "./shared";
+import { CONTENT_SECTIONS } from "@/lib/desk-sections";
+import { CONTENT_SETTINGS, localFile } from "./shared";
 
 /** Dựng video ngắn (f6): clip chị quay khi thử hàng → AI lập kế hoạch dựng → dựng file 9:16 (nếu máy có ffmpeg) → chị duyệt. */
 export function VideoScreen() {
@@ -39,8 +40,7 @@ export function VideoScreen() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Video ngắn" />
-      <ContentNav />
+      <PageHeader sections={CONTENT_SECTIONS} active="video" settings={CONTENT_SETTINGS} />
       <InlineSelect label="Món" value={productId} onChange={(v) => { setProductId(v); setPicked([]); }} options={options} placeholder="Chọn món để lọc clip" />
       <UploadCard productId={productId} />
 

@@ -23,7 +23,7 @@ export function LabelsPrint() {
       <PageHeader
         title="In nhãn"
         backHref="/desk/don-hang?nhom=cho_giao"
-        description="Khổ A6, mỗi đơn một nhãn."
+        eyebrow="Khổ A6"
         actions={
           <Button size="sm" icon={<Printer className="size-4" />} onClick={() => window.print()} disabled={!q.data?.length}>
             In

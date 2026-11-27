@@ -31,7 +31,8 @@ import { NoteComposer } from "./note-composer";
 import { NoteItem } from "./note-item";
 import { ReasonsCard } from "./reasons-card";
 import { RejectSheet } from "./reject-sheet";
-import { RelatedLinks } from "@/components/desk/related-links";
+import { DeskMoreMenu } from "@/components/desk/desk-more-menu";
+import { relatedItems } from "@/components/desk/related-links";
 import { SupplierGallery } from "@/components/sourcing/supplier-gallery";
 import { CotrialCard } from "@/components/crm/cotrial-card";
 
@@ -45,7 +46,7 @@ export function CandidateScreen({ id }: { id: string }) {
   if (isPending) {
     return (
       <div className="flex flex-col gap-4">
-        <PageHeader title="Đang tải…" backHref="/desk/ban-chon" />
+        <PageHeader loading backHref="/desk/ban-chon" />
         <SkeletonList rows={3} />
       </div>
     );
@@ -99,18 +100,21 @@ export function CandidateScreen({ id }: { id: string }) {
   ];
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       <PageHeader
         title={card.title}
-        eyebrow={`${STAGE_LABELS[card.stage].toUpperCase()} · ${PLATFORM_LABELS[card.source_platform] ?? card.source_platform}`}
-        backHref={`/desk/ban-chon?tab=${card.stage}`}
-      />
-      <RelatedLinks
-        links={[
-          { href: `/desk/san-hang/ung-vien/${card.id}`, label: "Hồ sơ thẩm định" },
-          { href: `/desk/nguon-cung/gia-von/${card.id}`, label: "Giá vốn" },
-          card.stage === "selected" && productId && { href: `/desk/san-pham/${productId}`, label: "Giá và cách bán (Sản phẩm)" },
-        ]}
+        badge={<Badge tone="neutral">{STAGE_LABELS[card.stage]}</Badge>}
+        eyebrow={PLATFORM_LABELS[card.source_platform] ?? card.source_platform}
+        backHref="/desk/ban-chon"
+        actions={
+          <DeskMoreMenu
+            items={relatedItems([
+              { href: `/desk/san-hang/ung-vien/${card.id}`, label: "Hồ sơ thẩm định" },
+              { href: `/desk/nguon-cung/gia-von/${card.id}`, label: "Giá vốn" },
+              card.stage === "selected" && productId && { href: `/desk/san-pham/${productId}`, label: "Giá và cách bán (Sản phẩm)" },
+            ])}
+          />
+        }
       />
 
       <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">

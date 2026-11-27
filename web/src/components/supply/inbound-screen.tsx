@@ -38,7 +38,7 @@ export function InboundScreen({ id }: { id: string }) {
   if (isPending)
     return (
       <div className="flex flex-col gap-4">
-        <PageHeader title="Đang tải…" backHref="/desk/nguon-cung?tab=lo-hang" />
+        <PageHeader loading backHref="/desk/nguon-cung?tab=lo-hang" />
         <SkeletonList rows={3} />
       </div>
     );
@@ -74,10 +74,10 @@ function InboundDetail({ s }: { s: Inbound }) {
   const [open, setOpen] = useState(false);
   const [tracking, setTracking] = useState(s.tracking_code ?? "");
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       <PageHeader
         title={INBOUND_LABELS[s.status]}
-        eyebrow={`LÔ HÀNG${s.code ? ` · ${s.code}` : ""}`}
+        eyebrow={`Lô hàng${s.code ? ` · ${s.code}` : ""}`}
         backHref="/desk/nguon-cung?tab=lo-hang"
       />
       <div className="grid gap-4 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">

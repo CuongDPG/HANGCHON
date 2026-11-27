@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
   Badge,
   Button,
-  ButtonLink,
   Card,
   DataList,
   DateTime,
@@ -30,6 +29,8 @@ import {
   type CotrialApplication,
   type CotrialOfferDetail,
 } from "@/lib/api/crm";
+import { DeskMoreMenu } from "@/components/desk/desk-more-menu";
+import { relatedItems } from "@/components/desk/related-links";
 import { copyLink } from "./cotrial-card";
 import { HistoryLine } from "./cotrial-screen";
 
@@ -50,7 +51,7 @@ export function CotrialOfferScreen({ id }: { id: string }) {
   if (isPending) {
     return (
       <div className="flex flex-col gap-4">
-        <PageHeader title="Đang tải…" backHref="/desk/khach/dung-thu" />
+        <PageHeader loading backHref="/desk/khach/dung-thu" />
         <SkeletonList rows={3} />
       </div>
     );
@@ -65,19 +66,17 @@ export function CotrialOfferScreen({ id }: { id: string }) {
   }
   const o = data;
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       <PageHeader
         title={o.title}
-        eyebrow="MỜI THỬ CÙNG"
+        eyebrow="Mời thử cùng"
         backHref="/desk/khach/dung-thu"
         actions={
           <>
             <Button size="sm" variant="secondary" icon={<Copy className="size-4" aria-hidden />} onClick={() => copyLink(o.link)}>
               Chép link
             </Button>
-            <ButtonLink size="sm" variant="ghost" href={`/desk/ban-chon/${o.candidate_id}`}>
-              Bàn chọn
-            </ButtonLink>
+            <DeskMoreMenu items={relatedItems([{ href: `/desk/ban-chon/${o.candidate_id}`, label: "Bàn chọn" }])} />
           </>
         }
       />

@@ -22,6 +22,7 @@ import {
   notifyError,
   notifySuccess,
   useConfirm,
+  TabLinks,
 } from "@/components/ui";
 import {
   useBroadcasts,
@@ -35,7 +36,7 @@ import {
   type Broadcast,
   type GroupDigest,
 } from "@/lib/api/crm";
-import { KhachNav } from "./khach-nav";
+import { KHACH_CARE_TABS, KHACH_SECTIONS } from "@/lib/desk-sections";
 
 const STATUS: Record<Broadcast["status"], { label: string; tone: "warning" | "success" | "neutral" | "danger" }> = {
   draft: { label: "Nháp", tone: "neutral" },
@@ -53,16 +54,19 @@ export function RegularsScreen() {
   const regulars = useRegulars();
   const [composeOpen, setComposeOpen] = useState(false);
   return (
-    <div className="flex flex-col gap-5">
-      <PageHeader
-        title="Khách quen"
-        description={regulars.data ? `${regulars.data.total} khách · ${regulars.data.reachable} khách nhận được tin` : " "}
+    <div className="flex flex-col gap-4">
+      <PageHeader sections={KHACH_SECTIONS} active="care" />
+      <TabLinks
+        aria-label="Chăm khách"
+        items={KHACH_CARE_TABS.map((t) => (t.key === "regulars" ? { ...t, count: regulars.data?.total } : t))}
+        active="regulars"
       />
-      <KhachNav active="regulars" />
       <Broadcasts onCompose={() => setComposeOpen(true)} />
       <Digest />
       <section className="flex flex-col gap-2.5">
-        <SectionLabel aside={regulars.data ? <Threshold value={regulars.data.min_orders} /> : null}>Danh sách khách quen</SectionLabel>
+        <SectionLabel aside={regulars.data ? <Threshold value={regulars.data.min_orders} /> : null}>
+          Danh sách khách quen{regulars.data ? ` · ${regulars.data.reachable} khách nhận được tin` : ""}
+        </SectionLabel>
         {regulars.isPending ? (
           <SkeletonList rows={3} />
         ) : regulars.error ? (

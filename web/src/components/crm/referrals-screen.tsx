@@ -18,6 +18,7 @@ import {
   SkeletonList,
   StatTile,
   notifySuccess,
+  TabLinks,
 } from "@/components/ui";
 import {
   useCreateReferral,
@@ -32,7 +33,7 @@ import {
 } from "@/lib/api/crm";
 import { formatPercent } from "@/lib/format";
 import { CustomerPicker } from "./customer-picker";
-import { KhachNav } from "./khach-nav";
+import { KHACH_CARE_TABS, KHACH_SECTIONS } from "@/lib/desk-sections";
 
 const USE_STATUS: Record<ReferralUse["status"], { label: string; tone: "warning" | "success" | "neutral" | "accent" }> = {
   pending: { label: "Chờ đơn giao xong", tone: "neutral" },
@@ -51,12 +52,13 @@ export function ReferralsScreen() {
   const router = useRouter();
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       <PageHeader
-        title="Giới thiệu bạn"
+        sections={KHACH_SECTIONS}
+        active="care"
         actions={<Button size="sm" variant="secondary" icon={<Plus className="size-4" />} onClick={() => setPickOpen(true)}>Tạo mã</Button>}
       />
-      <KhachNav active="referral" />
+      <TabLinks aria-label="Chăm khách" items={KHACH_CARE_TABS} active="referral" />
       <Card tone="soft" className="flex items-start gap-2 text-[14px]">
         <LevelTag level="auto" size="sm">AI tự làm</LevelTag>
         <span className="[text-wrap:pretty]">
