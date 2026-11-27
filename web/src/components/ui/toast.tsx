@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleAlert, CircleCheck, X } from "lucide-react";
+import { CircleAlert, CircleCheck, Info, X } from "lucide-react";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { errorMessage } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
@@ -11,8 +11,10 @@ import { cn } from "@/lib/cn";
  * <Toaster /> đã gắn sẵn trong Providers.
  */
 
-type ToastTone = "success" | "error";
-type Toast = { id: number; tone: ToastTone; message: string };
+type ToastTone = "success" | "error" | "info";
+/** Nút một chạm trong thông báo (vd. «Chuyển sang Tự xếp»); bấm xong tự đóng thông báo. */
+export type ToastAction = { label: string; onClick: () => void };
+type Toast = { id: number; tone: ToastTone; message: string; action?: ToastAction };
 
 let toasts: Toast[] = [];
 let nextId = 1;
@@ -23,9 +25,9 @@ function emit() {
   listeners.forEach((l) => l());
 }
 
-function push(tone: ToastTone, message: string, durationMs: number) {
+function push(tone: ToastTone, message: string, durationMs: number, action?: ToastAction) {
   const id = nextId++;
-  toasts = [...toasts.slice(-2), { id, tone, message }];
+  toasts = [...toasts.slice(-2), { id, tone, message, action }];
   emit();
   setTimeout(() => dismissToast(id), durationMs);
   return id;
@@ -38,6 +40,11 @@ export function dismissToast(id: number) {
 
 export function notifySuccess(message: string) {
   return push("success", message, 3500);
+}
+
+/** Thông báo trung tính, có thể kèm một nút thao tác. */
+export function notifyInfo(message: string, action?: ToastAction) {
+  return push("info", message, action ? 6000 : 3500, action);
 }
 
 export function notifyError(error: unknown) {
@@ -89,10 +96,24 @@ export function Toaster() {
         >
           {t.tone === "error" ? (
             <CircleAlert className="mt-0.5 size-4 shrink-0 text-seal" aria-hidden />
+          ) : t.tone === "info" ? (
+            <Info className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
           ) : (
             <CircleCheck className="mt-0.5 size-4 shrink-0 text-auto" aria-hidden />
           )}
           <p className="min-w-0 flex-1 text-ink">{t.message}</p>
+          {t.action ? (
+            <button
+              type="button"
+              onClick={() => {
+                t.action?.onClick();
+                dismissToast(t.id);
+              }}
+              className="-my-0.5 shrink-0 rounded-md px-1.5 py-0.5 font-semibold text-accent hover:bg-accent-wash"
+            >
+              {t.action.label}
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => dismissToast(t.id)}

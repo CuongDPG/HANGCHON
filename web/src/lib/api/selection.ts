@@ -155,7 +155,7 @@ const B = "/api/desk/selection";
 
 export const selectionKeys = {
   all: ["selection"] as const,
-  board: (q?: string) => ["selection", "board", q ?? ""] as const,
+  board: (q?: string, sort: BoardSortParam = "manual") => ["selection", "board", q ?? "", sort] as const,
   candidate: (id: string) => ["selection", "candidate", id] as const,
   reasons: ["selection", "reject-reasons"] as const,
   stats: (briefId?: string | null) => ["selection", "rejection-stats", briefId ?? ""] as const,
@@ -171,8 +171,14 @@ function useInvalidateSelection() {
   return () => qc.invalidateQueries({ queryKey: selectionKeys.all });
 }
 
-export function useBoard(q?: string) {
-  return useQuery({ queryKey: selectionKeys.board(q), queryFn: () => api.get<Board>(`${B}/board`, { query: { q: q || undefined } }) });
+/** Cách xếp thẻ trong cột: `manual` = thứ tự chị kéo; `newest`/`oldest` = theo lúc thẻ vào cột hiện tại. */
+export type BoardSortParam = "manual" | "newest" | "oldest";
+
+export function useBoard(q?: string, sort: BoardSortParam = "manual") {
+  return useQuery({
+    queryKey: selectionKeys.board(q, sort),
+    queryFn: () => api.get<Board>(`${B}/board`, { query: { q: q || undefined, sort: sort === "manual" ? undefined : sort } }),
+  });
 }
 
 export function useCandidate(id: string) {

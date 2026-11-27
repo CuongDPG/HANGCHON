@@ -175,7 +175,7 @@ Nhập từ một chỗ: `import { Button, Card, Money } from "@/components/ui";
 | `Card`, `CardLink`, `CardHeader`, `SectionLabel` | `<Card tone="default\|soft\|accent\|danger\|plain">` · `<CardHeader title="…" aside={<LevelTag … />} />` · `<SectionLabel>HÀNG ĐANG VỀ</SectionLabel>` |
 | `Sheet`, `Dialog` | `<Sheet open={o} onClose={() => setO(false)} title="Lọc" footer={<Button>Áp dụng</Button>}>…</Sheet>` (dưới lên ở điện thoại, giữa màn hình ở máy tính) |
 | `useConfirm()` | `if (await confirm({ title: "Loại món này?", message: "…", confirmLabel: "Loại", tone: "danger" })) …` |
-| `notifySuccess`, `notifyError` | `notifySuccess("Đã lưu")` · `notifyError(err)` (nhận `ApiError`, `Error` hoặc chuỗi) |
+| `notifySuccess`, `notifyError`, `notifyInfo` | `notifySuccess("Đã lưu")` · `notifyError(err)` (nhận `ApiError`, `Error` hoặc chuỗi) · `notifyInfo("…", { label: "Chuyển sang Tự xếp", onClick })` (trung tính, kèm một nút) |
 | `ProgressBar`, `ScoreBar` | `<ProgressBar value={86} max={120} label="86 trên 120 suất" />` · `<ScoreBar label="Chất lượng" score={22} max={25} />` |
 | `Skeleton`, `SkeletonList` | `<Skeleton className="h-5 w-40" />` · `<SkeletonList rows={3} />` |
 | `EmptyState` | `<EmptyState icon={<Search />} title="Chưa có ứng viên" description="…" action={<Button>Ra đề</Button>} tone="error" />` |

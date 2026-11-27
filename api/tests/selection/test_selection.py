@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import timedelta
 
 import httpx
 from sqlalchemy import select
@@ -10,6 +11,7 @@ from sqlalchemy import select
 from app.core import events
 from app.core.db import SessionLocal
 from app.core.jobs import enqueue
+from app.core.timeutil import now_utc
 from app.modules.catalog.models import Category
 from app.modules.control.models import ApprovalItem, ApprovalStatus
 from app.modules.selection.models import TasteProfile
@@ -72,6 +74,41 @@ async def test_move_emits_stage_changed_and_orders_column(owner_client: httpx.As
     assert [x["title"] for x in col] == ["Bình giữ nhiệt", "Hộp đựng gia vị"]
     r = await _stage(owner_client, a.id, "trial")
     assert r.status_code == 409 and r.json()["code"] == "same_stage"
+
+
+async def test_board_sort_by_time_keeps_manual_order(owner_client: httpx.AsyncClient, monkeypatch) -> None:
+    old = await make_candidate("Móc treo cũ", stage=CandidateStage.TRIAL, days_in_stage=5)
+    mid = await make_candidate("Kẹp phơi", stage=CandidateStage.TRIAL, days_in_stage=3)
+    new = await make_candidate("Giá úp cốc", stage=CandidateStage.TRIAL, days_in_stage=1)
+    # thứ tự chị kéo: kẹp phơi, móc treo, giá úp cốc
+    for cid, pos in ((mid.id, 0), (old.id, 1), (new.id, 2)):
+        assert (await _stage(owner_client, cid, "trial", position=pos)).status_code == 200
+
+    async def titles(**query) -> list[str]:
+        r = await owner_client.get(f"{B}/board", params=query)
+        assert r.status_code == 200, r.text
+        return [x["title"] for x in r.json()["columns"]["trial"]]
+
+    manual = ["Kẹp phơi", "Móc treo cũ", "Giá úp cốc"]
+    assert await titles() == manual
+    assert await titles(sort="newest") == ["Giá úp cốc", "Kẹp phơi", "Móc treo cũ"]
+    assert await titles(sort="oldest") == ["Móc treo cũ", "Kẹp phơi", "Giá úp cốc"]
+    assert await titles(sort="manual") == manual  # xếp theo thời gian không ghi đè thứ tự tự xếp
+
+    # cột vượt trần: trần chọn đúng phần đầu theo cách xếp
+    monkeypatch.setattr("app.modules.selection.service.BOARD_LIMIT", 2)
+    assert await titles(sort="newest") == ["Giá úp cốc", "Kẹp phơi"]
+    assert await titles(sort="oldest") == ["Móc treo cũ", "Kẹp phơi"]
+    assert await titles() == manual[:2]
+    assert (await owner_client.get(f"{B}/board", params={"sort": "newest"})).json()["counts"]["trial"] == 3
+
+    # ứng viên chưa chuyển cột lần nào: tính theo lúc tìm thấy
+    await make_candidate("Tìm trước", created_at=now_utc() - timedelta(days=2))
+    await make_candidate("Tìm sau", created_at=now_utc() - timedelta(days=1))
+    r = await owner_client.get(f"{B}/board", params={"sort": "oldest"})
+    assert [x["title"] for x in r.json()["columns"]["candidate"]] == ["Tìm trước", "Tìm sau"]
+
+    assert (await owner_client.get(f"{B}/board", params={"sort": "moi"})).status_code == 422
 
 
 async def test_helper_cannot_decide(helper_client: httpx.AsyncClient) -> None:

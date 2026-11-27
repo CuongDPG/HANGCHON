@@ -13,7 +13,7 @@ import uuid
 from collections import Counter
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import distinct_on
@@ -60,6 +60,8 @@ STAGES = [s.value for s in CandidateStage]
 TRIAL_DAYS_KEY = "selection.trial_days"
 DEFAULT_TRIAL_DAYS = 14
 BOARD_LIMIT = 200
+# Thứ tự thẻ trong cột: «Tự xếp» (thứ tự chị kéo, `board_position`) hoặc theo lúc thẻ vào cột hiện tại.
+BoardSort = Literal["manual", "newest", "oldest"]
 
 # ---- c4: nhóm lý do loại (để thống kê «21 mẫu loại: rò nước 8…») ------------------------------------------------
 
@@ -283,7 +285,17 @@ async def chosen_peers(db: AsyncSession, c: Candidate) -> list[dict[str, Any]]:
     return [{"candidate_id": p.id, "title": p.title_vi, "product_id": products.get(p.id)} for p in peers]
 
 
-async def board(db: AsyncSession, q: str | None = None) -> dict[str, Any]:
+def _board_order(sort: BoardSort) -> tuple[Any, ...]:
+    if sort == "manual":
+        return (Candidate.board_position, Candidate.stage_changed_at.desc().nulls_last(), Candidate.created_at.desc())
+    # lúc vào cột hiện tại; ứng viên chưa từng chuyển cột thì là lúc tìm thấy
+    entered = func.coalesce(Candidate.stage_changed_at, Candidate.created_at)
+    if sort == "newest":
+        return (entered.desc(), Candidate.id)
+    return (entered.asc(), Candidate.id)
+
+
+async def board(db: AsyncSession, q: str | None = None, sort: BoardSort = "manual") -> dict[str, Any]:
     stmt = select(Candidate).where(Candidate.is_archived.is_(False))
     if q:
         stmt = stmt.where(Candidate.title_vi.ilike(f"%{q.strip()}%"))
@@ -296,15 +308,7 @@ async def board(db: AsyncSession, q: str | None = None) -> dict[str, Any]:
     for stage in CandidateStage:
         rows = list(
             (
-                await db.execute(
-                    stmt.where(Candidate.stage == stage)
-                    .order_by(
-                        Candidate.board_position,
-                        Candidate.stage_changed_at.desc().nulls_last(),
-                        Candidate.created_at.desc(),
-                    )
-                    .limit(BOARD_LIMIT)
-                )
+                await db.execute(stmt.where(Candidate.stage == stage).order_by(*_board_order(sort)).limit(BOARD_LIMIT))
             ).scalars()
         )
         columns[stage.value] = await build_cards(db, rows)
