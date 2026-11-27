@@ -44,7 +44,9 @@ ai.task(
     "có; đó là xương sống của bài. Nếu hồ sơ có `customer_reasons` (lý do chọn của khách đã mua, chị đã duyệt) thì "
     "bài CÓ THỂ trích 1–2 câu, ghi rõ là lời khách kèm tên (vd «Bạn Lan đã mua kể: “…”»), trích đúng nguyên văn, "
     "không sửa ý, không gộp lời nhiều khách; không bắt buộc, và không thay cho phần «Vì sao mình chọn món này». "
-    "Không có `customer_reasons` thì tuyệt đối không viết lời khách. Nếu có `insights` thì áp dụng. "
+    "Không có `customer_reasons` thì tuyệt đối không viết lời khách. Nếu hồ sơ có `public_trial_notes` (ghi chú dùng "
+    "thử chị đã đưa lên website) thì bài CÓ THỂ trích một ghi chú như trải nghiệm của chính mình (vd «Ghi chú lúc "
+    "mình dùng thử: “…”»), trích đúng nguyên văn, không bắt buộc. Nếu có `insights` thì áp dụng. "
     "Nếu có `instruction` (ý của chị) thì làm theo trong giới hạn luật trên. Instagram: điền `slides` theo chỉ số ảnh "
     "có thật (0..image_count-1). TikTok: điền `scenes`, tổng 20–30 giây.",
     tier="smart",

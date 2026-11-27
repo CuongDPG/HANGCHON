@@ -4,21 +4,23 @@ công khai cho khách (/api/store/crm/thu-hang/<token>)."""
 from __future__ import annotations
 
 import uuid
-from typing import Literal
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Query, Response, status
+from fastapi import APIRouter, File, Form, Query, Request, Response, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import control
+from app.core import ratelimit
 from app.core.db import DbSession
 from app.core.deps import CurrentUser, OwnerUser
-from app.core.errors import NotFound
+from app.core.errors import BadRequest, NotFound
 from app.core.pagination import Page, Paginated, paginate
 from app.modules.catalog.models import Category, Drop, Product
-from app.modules.crm import service
+from app.modules.crm import cotrial, service
 from app.modules.crm.models import (
     Broadcast,
+    CotrialOffer,
     CustomerNote,
     GroupDigest,
     NoteKind,
@@ -28,8 +30,12 @@ from app.modules.crm.models import (
     ReorderReminder,
     TesterInvite,
     TesterInviteStatus,
+    TesterProfile,
 )
 from app.modules.crm.schemas import (
+    ApplicationActionIn,
+    ApplicationView,
+    ApplyIn,
     BroadcastIn,
     BroadcastView,
     CrmSettingsIn,
@@ -45,10 +51,16 @@ from app.modules.crm.schemas import (
     ManualUseIn,
     NoteIn,
     NotePatch,
+    OfferDetail,
+    OfferIn,
+    OfferPatch,
+    OfferView,
     OptOutIn,
     OrderBrief,
     OrderLine,
+    PublicCotrial,
     PublicInvite,
+    PublicOffer,
     QuestionView,
     ReferralOut,
     ReferralStats,
@@ -63,7 +75,13 @@ from app.modules.crm.schemas import (
     RewardIn,
     RunDueOut,
     SendIn,
+    SignupForm,
+    SignupIn,
+    SignupOut,
     TagIn,
+    TesterHistory,
+    TesterPatch,
+    TesterView,
     ThreadBrief,
     TrialCandidateView,
     TrialNoteView,
@@ -594,6 +612,25 @@ async def _public(db: AsyncSession, inv: TesterInvite) -> PublicInvite:
     cand = await db.get(Candidate, inv.candidate_id)
     cust = await db.get(Customer, inv.customer_id)
     s = inv.status
+    if inv.offer_id is not None:  # «Mời thử cùng»: tên món, ảnh, giá theo lời mời (không lộ ảnh/tên gốc của nguồn)
+        o = await cotrial.get_offer(db, inv.offer_id)
+        photos = _offer_photos(o)
+        return PublicInvite(
+            first_name=((cust.name if cust else None) or "bạn").split()[-1],
+            product_title=o.title,
+            image_url=photos[0]["thumb"] if photos else None,
+            message=o.description,
+            status=s,
+            can_answer=False,
+            can_feedback=s == TesterInviteStatus.SAMPLE_SENT,
+            feedback=inv.feedback,
+            feedback_rating=inv.feedback_rating,
+            cotrial=PublicCotrial(
+                price_vnd=o.price_vnd, refund_vnd=cotrial.refund_amount(o), ask_price_vnd=o.ask_price_vnd or o.price_vnd,
+                feedback_days=o.feedback_days, feedback_due_at=inv.feedback_due_at,
+                refunded=s == TesterInviteStatus.REFUNDED,
+            ),
+        )  # fmt: skip
     return PublicInvite(
         first_name=((cust.name if cust else None) or "bạn").split()[-1],
         product_title=cand.title_vi if cand else "món thử",
@@ -616,3 +653,198 @@ async def public_invite(token: str, db: DbSession) -> PublicInvite:
 async def respond(token: str, body: RespondIn, db: DbSession) -> PublicInvite:
     inv = await service.respond_invite(db, token, body.action, feedback=body.feedback, rating=body.rating)
     return await _public(db, inv)
+
+
+@store.post("/thu-hang/{token}/cam-nhan", response_model=PublicInvite)
+async def cotrial_feedback(
+    token: str,
+    request: Request,
+    db: DbSession,
+    rating: Annotated[int, Form(ge=1, le=5)],
+    liked: Annotated[str, Form(max_length=2000)],
+    disliked: Annotated[str, Form(max_length=2000)],
+    would_buy: Annotated[Literal["yes", "maybe", "no"], Form()],
+    refund_account: Annotated[str | None, Form(max_length=300)] = None,
+    photos: Annotated[list[UploadFile] | None, File()] = None,
+) -> PublicInvite:
+    """«Mời thử cùng»: cảm nhận có cấu trúc (mirror /danh-gia/<token>), gửi một lần; đủ thì đề xuất hoàn tiền."""
+    from app.modules.catalog import images as img_lib
+
+    await ratelimit.limit(f"crm:cotrial-feedback:{ratelimit.client_ip(request)}", 10, 600)
+    files = [f for f in (photos or []) if f.filename]
+    if len(files) > cotrial.MAX_FEEDBACK_PHOTOS:
+        raise BadRequest(f"Tối đa {cotrial.MAX_FEEDBACK_PHOTOS} ảnh.")
+    if any((f.size or 0) > img_lib.MAX_UPLOAD_BYTES for f in files):
+        raise BadRequest("Ảnh lớn quá 15 MB, bạn chọn ảnh nhỏ hơn nhé.", code="image_too_large")
+    blobs = []
+    for f in files:  # mở bằng thư viện ảnh (tệp không phải ảnh bị từ chối), bỏ EXIF, lưu kho riêng
+        processed = img_lib.process_photo(await f.read(), enhance=False)
+        blobs.append((processed.renditions[max(processed.renditions)]["jpg"], "image/jpeg"))
+    inv = await cotrial.submit_feedback(
+        db, token, rating=rating, liked=liked, disliked=disliked, would_buy=would_buy, refund_account=refund_account,
+        photos=blobs,
+    )  # fmt: skip
+    return await _public(db, inv)
+
+
+# ---- «Mời thử cùng» (27/11) --------------------------------------------------------------------------------------
+
+
+def _offer_photos(o: CotrialOffer) -> list[dict[str, str | None]]:
+    from app.modules.catalog.reviews import photo_url
+
+    return [{"src": photo_url(p, 800), "thumb": photo_url(p, 400)} for p in o.photos]
+
+
+async def _offer_views(db: AsyncSession, offers: list[CotrialOffer]) -> list[OfferView]:
+    apps = await cotrial.applications(db, [o.id for o in offers])
+    titles = dict(
+        (await db.execute(select(Candidate.id, Candidate.title_vi).where(Candidate.id.in_({o.candidate_id for o in offers})))).all()
+    ) if offers else {}  # fmt: skip
+    out = []
+    for o in offers:
+        mine = [a for a in apps if a.offer_id == o.id]
+        counts: dict[str, int] = {}
+        for a in mine:
+            counts[a.status.value] = counts.get(a.status.value, 0) + 1
+        out.append(
+            OfferView(
+                id=o.id, candidate_id=o.candidate_id, candidate_title=titles.get(o.candidate_id), status=o.status,
+                title=o.title, description=o.description, photo_urls=[p["thumb"] or "" for p in _offer_photos(o)],
+                price_vnd=o.price_vnd, refund_vnd=o.refund_vnd, refund_pct=o.refund_pct,
+                refund_amount_vnd=cotrial.refund_amount(o), ask_price_vnd=o.ask_price_vnd, slots=o.slots,
+                feedback_days=o.feedback_days, link=cotrial.offer_link(o.token), counts=counts,
+                taken=cotrial.taken(mine), created_at=o.created_at,
+            )
+        )  # fmt: skip
+    return out
+
+
+async def _application_views(db: AsyncSession, apps: list[TesterInvite]) -> list[ApplicationView]:
+    from app.modules.selection.service import file_url
+
+    cids = list({a.customer_id for a in apps})
+    custs = (
+        {c.id: c for c in (await db.execute(select(Customer).where(Customer.id.in_(cids)))).scalars()} if cids else {}
+    )
+    hist = await cotrial.history(db, cids)
+    profiles = await cotrial.profiles_of(db, cids)
+    out = []
+    for a in apps:
+        c, p = custs.get(a.customer_id), profiles.get(a.customer_id)
+        out.append(
+            ApplicationView(
+                id=a.id, offer_id=a.offer_id, customer_id=a.customer_id, customer_name=c.name if c else None,
+                phone=c.phone if c else None, email=c.email if c else None, status=a.status, note=a.message,
+                applied_at=a.created_at, selected_at=a.selected_at, paid_at=a.paid_at, paid_vnd=a.paid_vnd,
+                shipped_at=a.sample_sent_at, feedback_due_at=a.feedback_due_at, feedback_at=a.feedback_at,
+                feedback_rating=a.feedback_rating, feedback_answers=a.feedback_answers,
+                feedback_photo_urls=[u for u in (file_url(m.get("storage_key")) for m in a.feedback_media) if u],
+                refund_vnd=a.refund_vnd, refund_approval_id=a.refund_approval_id, refunded_at=a.refunded_at,
+                excluded=bool(p and p.excluded), excluded_reason=p.excluded_reason if p else None,
+                history=TesterHistory(**hist.get(a.customer_id, {})), link=service.invite_link(a.token),
+            )
+        )  # fmt: skip
+    return out
+
+
+async def _offer_detail(db: AsyncSession, o: CotrialOffer) -> OfferDetail:
+    (view,) = await _offer_views(db, [o])
+    apps = await cotrial.applications(db, [o.id])
+    return OfferDetail(**view.model_dump(), applications=await _application_views(db, apps))
+
+
+@router.get("/cotrial/offers", response_model=list[OfferView])
+async def list_offers(_: CurrentUser, db: DbSession, candidate_id: uuid.UUID | None = None) -> list[OfferView]:
+    return await _offer_views(db, await cotrial.offers(db, candidate_id))
+
+
+@router.post("/cotrial/offers", response_model=OfferDetail, status_code=status.HTTP_201_CREATED)
+async def create_offer(body: OfferIn, user: OwnerUser, db: DbSession) -> OfferDetail:
+    data = body.model_dump()
+    data["images"] = [i.model_dump() for i in body.images]
+    return await _offer_detail(db, await cotrial.create_offer(db, body.candidate_id, data, user))
+
+
+@router.get("/cotrial/offers/{offer_id}", response_model=OfferDetail)
+async def get_offer(offer_id: uuid.UUID, _: CurrentUser, db: DbSession) -> OfferDetail:
+    return await _offer_detail(db, await cotrial.get_offer(db, offer_id))
+
+
+@router.patch("/cotrial/offers/{offer_id}", response_model=OfferDetail)
+async def patch_offer(offer_id: uuid.UUID, body: OfferPatch, user: OwnerUser, db: DbSession) -> OfferDetail:
+    return await _offer_detail(db, await cotrial.update_offer(db, offer_id, body.model_dump(exclude_unset=True), user))
+
+
+@router.post("/cotrial/applications/{invite_id}/status", response_model=ApplicationView)
+async def application_status(
+    invite_id: uuid.UUID, body: ApplicationActionIn, user: OwnerUser, db: DbSession
+) -> ApplicationView:
+    inv = await cotrial.change(db, invite_id, body.action, user, override=body.override)
+    return (await _application_views(db, [inv]))[0]
+
+
+@router.get("/cotrial/testers", response_model=list[TesterView])
+async def tester_registry(_: CurrentUser, db: DbSession) -> list[TesterView]:
+    rows = await cotrial.registry(db)
+    hist = await cotrial.history(db, [c.id for _, c in rows])
+    return [
+        TesterView(
+            id=p.id,
+            customer_id=c.id,
+            name=c.name,
+            phone=c.phone,
+            email=c.email,
+            interests=p.interests,
+            agreed_at=p.agreed_at,
+            excluded=p.excluded,
+            excluded_reason=p.excluded_reason,
+            history=TesterHistory(**hist[c.id]),
+        )
+        for p, c in rows
+    ]
+
+
+@router.patch("/cotrial/testers/{profile_id}", response_model=TesterView)
+async def patch_tester(profile_id: uuid.UUID, body: TesterPatch, user: OwnerUser, db: DbSession) -> TesterView:
+    p: TesterProfile = await cotrial.set_excluded(db, profile_id, body.excluded, user)
+    c = await service.get_customer(db, p.customer_id)
+    hist = await cotrial.history(db, [c.id])
+    return TesterView(
+        id=p.id, customer_id=c.id, name=c.name, phone=c.phone, email=c.email, interests=p.interests,
+        agreed_at=p.agreed_at, excluded=p.excluded, excluded_reason=p.excluded_reason, history=TesterHistory(**hist[c.id]),
+    )  # fmt: skip
+
+
+# công khai: sổ người dùng thử + link riêng của lời mời (không liệt kê, noindex — trang web tự đặt)
+
+
+@store.get("/dung-thu", response_model=SignupForm)
+async def signup_form(db: DbSession) -> SignupForm:
+    return SignupForm(categories=await cotrial.categories(db))  # type: ignore[arg-type]
+
+
+@store.post("/dung-thu", response_model=SignupOut, status_code=status.HTTP_201_CREATED)
+async def signup(body: SignupIn, request: Request, db: DbSession) -> SignupOut:
+    await ratelimit.limit(f"crm:tester-signup:{ratelimit.client_ip(request)}", 10, 600)
+    await cotrial.signup(db, name=body.name, phone=body.phone, email=body.email, interests=body.interests,
+                         agree=body.agree)  # fmt: skip
+    return SignupOut(message="Mình đã ghi tên bạn vào sổ người dùng thử. Có món hợp, mình nhắn bạn nhé.")
+
+
+@store.get("/dung-thu/m/{token}", response_model=PublicOffer)
+async def public_offer(token: str, db: DbSession) -> PublicOffer:
+    o = await cotrial.offer_by_token(db, token)
+    return PublicOffer(
+        title=o.title, description=o.description, photos=_offer_photos(o), price_vnd=o.price_vnd,  # type: ignore[arg-type]
+        refund_vnd=cotrial.refund_amount(o), feedback_days=o.feedback_days, slots=o.slots,
+        full=cotrial.taken(await cotrial.applications(db, [o.id])) >= o.slots,
+    )  # fmt: skip
+
+
+@store.post("/dung-thu/m/{token}", response_model=SignupOut, status_code=status.HTTP_201_CREATED)
+async def apply_offer(token: str, body: ApplyIn, request: Request, db: DbSession) -> SignupOut:
+    await ratelimit.limit(f"crm:cotrial-apply:{ratelimit.client_ip(request)}", 10, 600)
+    await cotrial.apply(db, token, name=body.name, phone=body.phone, email=body.email, interests=body.interests,
+                        agree=body.agree, note=body.note)  # fmt: skip
+    return SignupOut(message="Mình đã nhận đăng ký của bạn. Chọn xong người thử, mình nhắn bạn nhé.")

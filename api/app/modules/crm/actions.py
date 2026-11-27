@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import control
 from app.core.money import format_vnd
 from app.core.timeutil import VN_TZ, local_today
-from app.modules.crm import service
+from app.modules.crm import cotrial, service
 from app.modules.crm.models import CustomerNote, NoteKind, NoteSource, ReminderStatus, ReorderReminder
 from app.modules.crm.service import (
     ACTION_BROADCAST,
@@ -74,6 +74,33 @@ async def _reward(ctx: control.ActionContext) -> control.HandlerResult:
 @control.undoer(ACTION_REFERRAL_REWARD)
 async def _unreward(ctx: control.UndoContext) -> None:
     await service.revoke_reward(ctx.db, uuid.UUID(str(ctx.undo["referral_use_id"])))
+
+
+control.register_action(
+    cotrial.ACTION_REFUND,
+    "Hoàn tiền cho người dùng thử cùng",
+    GROUP,
+    locked=True,
+    customer_facing=True,
+    description="Người dùng thử gửi cảm nhận đủ trước hạn → đề xuất hoàn tiền theo lời mời. Chị chuyển khoản tay rồi "
+    "duyệt để ghi «đã hoàn» (sửa được số tiền); trả lại = chưa hoàn.",
+)
+
+
+@control.handler(cotrial.ACTION_REFUND)
+async def _cotrial_refund(ctx: control.ActionContext) -> control.HandlerResult:
+    inv = await cotrial.apply_refund(
+        ctx.db, uuid.UUID(str(ctx.payload["tester_invite_id"])), int(ctx.payload["refund_vnd"])
+    )
+    return control.HandlerResult(
+        result={"tester_invite_id": str(inv.id), "refund_vnd": inv.refund_vnd},
+        summary=f"Đã hoàn {format_vnd(inv.refund_vnd)} cho người dùng thử", ref_type="tester_invites", ref_id=inv.id,
+    )  # fmt: skip
+
+
+@control.on_returned(cotrial.ACTION_REFUND)
+async def _cotrial_refund_returned(ctx: control.ReturnContext) -> None:
+    await cotrial.refund_returned(ctx.db, uuid.UUID(str(ctx.item.payload["tester_invite_id"])))
 
 
 @control.handler(ACTION_PROFILE)

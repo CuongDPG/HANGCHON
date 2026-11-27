@@ -82,6 +82,9 @@ export type PublicReview = {
 /** «Vì sao khách chọn»: lý do của người đã mua, chỉ từ đánh giá chị đã duyệt. */
 export type CustomerReason = { display_name: string; text: string };
 
+/** «Ghi chú dùng thử»: ghi chú của chị đã tích «Đưa lên website» (ảnh chỉ khi chị tích kèm). */
+export type PublicTrialNote = { text: string | null; day: number | null; photos: { src: string | null; thumb: string | null }[] };
+
 export type ProductDetail = ProductCard & {
   short_description: string | null;
   description: string | null;
@@ -102,6 +105,7 @@ export type ProductDetail = ProductCard & {
   ai_generated: boolean;
   reviews: PublicReview[];
   customer_reasons?: CustomerReason[];
+  trial_notes?: PublicTrialNote[];
   url: string;
   /** Tên người chọn (Cài đặt `store.picker_name`); chưa đặt thì là tên trung tính mặc định. */
   picker_name?: string | null;

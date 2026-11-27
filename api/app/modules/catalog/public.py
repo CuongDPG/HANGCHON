@@ -30,7 +30,7 @@ from app.modules.catalog.models import (
 from app.modules.catalog.products import image_set, primary_image
 from app.modules.catalog.reviews import photo_url
 from app.modules.catalog.textutil import matches_vi
-from app.modules.selection.models import PrincipleKind, SelectionPrinciple
+from app.modules.selection.models import NoteAuthor, PrincipleKind, SelectionPrinciple, TrialNote
 
 DEFAULTS = {
     "store.name": "Hàng Chọn",
@@ -230,6 +230,32 @@ async def customer_reasons(db: AsyncSession, product_id: uuid.UUID, limit: int =
     return [{"display_name": name or "Khách", "text": text} for name, text in rows if text and text.strip()]
 
 
+async def public_trial_notes(db: AsyncSession, p: Product, limit: int = 6) -> list[dict[str, Any]]:
+    """«Ghi chú dùng thử» (đọc bảng selection): chỉ ghi chú của chị mà chị đã tích «Đưa lên website». Lời là bản chị
+    sửa cho website; ảnh chỉ là bản sao công khai chị tích kèm (đã bỏ EXIF), không bao giờ ảnh gốc."""
+    if not p.candidate_id:
+        return []
+    rows = (
+        await db.execute(
+            select(TrialNote)
+            .where(
+                TrialNote.candidate_id == p.candidate_id,
+                TrialNote.is_public.is_(True),
+                TrialNote.author == NoteAuthor.OWNER,
+            )
+            .order_by(TrialNote.recorded_at)
+            .limit(limit)
+        )
+    ).scalars()
+    out = []
+    for n in rows:
+        text = (n.public_text or "").strip()
+        photos = [{"src": photo_url(ph, 800), "thumb": photo_url(ph, 400)} for ph in n.public_photos]
+        if text or photos:
+            out.append({"text": text or None, "day": n.trial_day, "photos": photos})
+    return out
+
+
 async def product_detail(db: AsyncSession, p: Product) -> dict[str, Any]:
     cats = await _categories(db)
     drops, stock = await _open_drop_items(db, [p.id]), await _stock(db, [p.id])
@@ -257,6 +283,7 @@ async def product_detail(db: AsyncSession, p: Product) -> dict[str, Any]:
         "ai_generated": p.ai_generated,
         "reviews": await published_reviews(db, p.id),
         "customer_reasons": await customer_reasons(db, p.id),
+        "trial_notes": await public_trial_notes(db, p),
         "url": f"{settings.web_base_url.rstrip('/')}/san-pham/{p.slug}",
         # tên người chọn cho nhãn «… trả lời» (chưa đặt thì là tên trung tính mặc định)
         "picker_name": await setting(db, "store.picker_name"),

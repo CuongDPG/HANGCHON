@@ -133,7 +133,7 @@ thứ tự **Cài đặt > env**; driver đọc `channel_config.value(kênh, ô)
 | `assistant` | e7 | `assistant_conversations`, `assistant_messages` |
 | `content` | f1–f8 | `voice_profiles`, `content_drafts`, `scheduled_posts`, `media_assets`, `post_metrics`, `livestream_scripts` |
 | `inbox` | h1–h3, g6 | `channel_accounts`, `threads`, `messages`, `reply_drafts` |
-| `crm` | h4–h8 | `customer_notes`, `customer_tags`, `broadcasts`, `reorder_reminders`, `referrals`, `tester_invites` |
+| `crm` | h4–h8 | `customer_notes`, `customer_tags`, `broadcasts`, `reorder_reminders`, `referrals`, `tester_invites`, `tester_profiles`, `cotrial_offers` |
 | `finance` | i5, k1, k4, k5 | `ledger_entries`, `expenses`, `invoices`, `weekly_reports`, `backups` |
 
 Quan hệ xương sống: `sourcing_brief → candidate → assessment → (trial_notes, selection_decision) → product →
@@ -190,6 +190,7 @@ Module không gọi service của module khác. Bên phát gọi `await events.e
 | `order.refunded` | `order_id`, `amount_vnd`, `return_id?`, `payment_id?` | orders | finance (ghi giảm trừ), catalog (trả suất/tồn) |
 | `inbound.arrived` | `inbound_shipment_id` | supply | orders (đơn chuyển sang chờ giao), catalog (lô bổ sung → nhập tồn; mọi lô của đợt đã về → đợt sang giao) |
 | `message.received` | `thread_id`, `message_id` | inbox | orders (hồ sơ khách cho người lạ; nhận ra ý định mua g6), crm (sổ khách), sourcing (nghe khách muốn gì, a6) |
+| `customer.contact_submitted` | `name`, `phone?`, `email?` | crm (sổ người dùng thử «Mời thử cùng»: khách tự để lại liên hệ) | orders (khớp hồ sơ khách theo số điện thoại rồi email, không có thì tạo; crm đọc lại theo liên hệ) |
 | `customer.identified` | `customer_id`, `thread_id`, `channel`, `external_id`, `created` | orders | inbox (gắn hội thoại vào hồ sơ khách), crm (tóm tắt sổ khách) |
 | `review.published` | `review_id`, `product_id` | catalog | content (đánh giá ≥ 4★ → gợi ý bài kể lại lời khách, `content.suggest_post`) |
 | `find_request.created` | `find_request_id` | catalog | sourcing (tín hiệu nhu cầu, a6) |

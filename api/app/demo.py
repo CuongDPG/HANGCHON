@@ -739,6 +739,20 @@ class Story:
                 await self.call("POST", f"/api/store/crm/thu-hang/{token}", public=True, json={"action": "accept"})
                 await self.call("POST", f"/api/store/crm/thu-hang/{token}", public=True,
                                 json={"action": "feedback", "feedback": "Vải dày, bé mặc ấm; mũ hơi rộng với bé 2 tuổi.", "rating": 4})  # fmt: skip
+        # «Mời thử cùng»: lời mời riêng cho áo choàng tắm, một người lạ đăng ký qua link (số ví dụ), chị đã chọn
+        offer = await self.call("POST", f"{OWNER}/crm/cotrial/offers", ok=(201, 400), json={
+            "candidate_id": self.ids["c_aochoang"], "price_vnd": 320_000, "refund_pct": 50, "slots": 3, "feedback_days": 10,
+            "description": "Áo choàng tắm cotton cho bé 2–6 tuổi. Mình muốn biết vải có ấm và mau khô không.",
+        })  # fmt: skip
+        if offer.get("link"):
+            token = offer["link"].rsplit("/", 1)[1]
+            await self.call("POST", f"/api/store/crm/dung-thu/m/{token}", public=True, ok=(201, 409), json={
+                "name": "Thảo Ví Dụ", "phone": "0900000901", "agree": True, "note": "Bé nhà mình 3 tuổi, hay tắm tối.",
+            })  # fmt: skip
+            apps = (await self.call("GET", f"{OWNER}/crm/cotrial/offers/{offer['id']}")).get("applications") or []
+            if apps:
+                await self.call("POST", f"{OWNER}/crm/cotrial/applications/{apps[0]['id']}/status",
+                                json={"action": "select"}, ok=(200, 409))  # fmt: skip
 
     async def books(self) -> None:
         await self.call("POST", f"{OWNER}/finance/expenses", json={

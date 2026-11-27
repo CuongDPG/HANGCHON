@@ -33,6 +33,7 @@ import { ReasonsCard } from "./reasons-card";
 import { RejectSheet } from "./reject-sheet";
 import { RelatedLinks } from "@/components/desk/related-links";
 import { SupplierGallery } from "@/components/sourcing/supplier-gallery";
+import { CotrialCard } from "@/components/crm/cotrial-card";
 
 /** Một món trên bàn chọn: thông tin nguồn, nhật ký thử (c2), lý do chọn (c3) / loại (c4), chuyển cột (c1). */
 export function CandidateScreen({ id }: { id: string }) {
@@ -159,6 +160,8 @@ export function CandidateScreen({ id }: { id: string }) {
       ) : null}
       {data.decision?.decision === "rejected" ? <RejectionCard decision={data.decision} /> : null}
       {card.stage === "rejected" ? <ChosenInstead peers={data.chosen_peers ?? []} /> : null}
+
+      {card.stage === "sample" || card.stage === "trial" ? <CotrialCard candidateId={id} title={card.title} notes={data.notes} /> : null}
 
       <section className="flex flex-col gap-3">
         <SectionLabel aside={<LevelTag level="owner" size="sm" />}>Ghi chú thử · {data.notes.length}</SectionLabel>

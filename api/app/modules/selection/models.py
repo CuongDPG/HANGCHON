@@ -85,6 +85,12 @@ class TrialNote(UUIDPk, Timestamps, Base):
     assignment_confidence: Mapped[Decimal | None] = mapped_column(Numeric(3, 2))
     sentiment: Mapped[str | None] = mapped_column(String(20), comment="positive / negative / mixed")
     tags: Mapped[list[Any]] = json_list()
+    # «Ghi chú dùng thử» trên website (27/11): chị tích từng ghi chú; chỉ ghi chú của chị, không bao giờ của khách thử
+    is_public: Mapped[bool] = flag(comment="Chị tích «Đưa lên website»")
+    public_text: Mapped[str | None] = mapped_column(Text, comment="Lời hiện trên website (chị sửa được, khác lời gốc)")
+    public_photos: Mapped[list[Any]] = json_list(
+        comment='Ảnh chị tích kèm: bản sao công khai đã bỏ EXIF [{"files": {"800": {"webp","jpg"}}}]'
+    )
     created_by_id: Mapped[uuid.UUID | None] = fk("users", index=False)
     ai_run_id: Mapped[uuid.UUID | None] = fk("ai_runs", index=False)
 

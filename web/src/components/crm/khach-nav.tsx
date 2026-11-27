@@ -12,6 +12,7 @@ export const KHACH_SECTIONS = [
   { key: "reorder", href: "/desk/khach/nhac-mua-lai", label: "Nhắc mua lại" },
   { key: "referral", href: "/desk/khach/gioi-thieu", label: "Giới thiệu bạn" },
   { key: "testers", href: "/desk/khach/thu-hang", label: "Thử hàng" },
+  { key: "cotrial", href: "/desk/khach/dung-thu", label: "Người dùng thử" },
 ] as const;
 
 export type KhachSection = (typeof KHACH_SECTIONS)[number]["key"];

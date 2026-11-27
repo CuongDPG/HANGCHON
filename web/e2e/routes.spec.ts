@@ -58,6 +58,10 @@ async function collectIds(req: APIRequestContext): Promise<Ids> {
   const testers = await (await req.get("/api/desk/crm/testers/candidates")).json();
   const link: string | undefined = testers.flatMap((c: { invites: { link: string | null }[] }) => c.invites).find((i: { link: string | null }) => i.link)?.link;
   ids.testerPath = link ? new URL(link).pathname : undefined;
+  // «Mời thử cùng»: lời mời riêng (link không liệt kê ở đâu) + màn desk của lời mời
+  const offer = await first<{ id: string; link: string; status: string }>(req, "/api/desk/crm/cotrial/offers", (o) => o.status === "open");
+  ids.offer = offer?.id;
+  ids.offerPath = offer ? new URL(offer.link).pathname : undefined;
   return ids;
 }
 
@@ -75,6 +79,8 @@ const STORE = (i: Ids) => [
   "/hoi",
   i.reviewToken && `/danh-gia/${i.reviewToken}`,
   i.testerPath,
+  "/dung-thu",
+  i.offerPath,
 ];
 
 const DESK = (i: Ids) => [
@@ -105,6 +111,9 @@ const DESK = (i: Ids) => [
   "/desk/khach/nhac-mua-lai",
   "/desk/khach/gioi-thieu",
   "/desk/khach/thu-hang",
+  "/desk/khach/dung-thu",
+  "/desk/khach/dung-thu?tab=so",
+  i.offer && `/desk/khach/dung-thu/${i.offer}`,
   "/desk/don-hang",
   i.order && `/desk/don-hang/${i.order}`,
   "/desk/don-hang/tao",

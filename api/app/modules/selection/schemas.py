@@ -47,6 +47,8 @@ class TrialNoteOut(ORM):
     assignment_confidence: Decimal | None
     sentiment: str | None
     tags: list[Any]
+    is_public: bool
+    public_text: str | None
     created_by_id: uuid.UUID | None
     ai_run_id: uuid.UUID | None
     created_at: datetime
@@ -173,6 +175,8 @@ class TrialNoteView(TrialNoteOut):
     points: list[NotePoint]
     photo_urls: list[str]
     audio_url: str | None
+    public_photo_urls: list[str] = []  # bản sao công khai (đã bỏ EXIF) khi chị tích «kèm ảnh»
+    public_warnings: list[str] = []  # soát lời (f5) trên bản cho website: chỉ báo, không chặn
 
 
 class DecisionView(SelectionDecisionOut):
@@ -212,6 +216,9 @@ class NoteUpdate(BaseModel):
     text: str | None = Field(default=None, max_length=5000)
     candidate_id: uuid.UUID | None = None
     points: list[NotePoint] | None = None
+    is_public: bool | None = Field(default=None, description="«Đưa lên website» (chỉ ghi chú của chị)")
+    public_text: str | None = Field(default=None, max_length=1500, description="Lời hiện trên website")
+    public_photos: bool | None = Field(default=None, description="Kèm ảnh của ghi chú lên website")
 
 
 class ApproveReasonsIn(BaseModel):

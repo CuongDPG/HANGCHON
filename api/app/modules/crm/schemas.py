@@ -15,6 +15,7 @@ from app.core.enums import Channel
 from app.modules.crm.models import (
     BroadcastKind,
     BroadcastStatus,
+    CotrialOfferStatus,
     NoteKind,
     NoteSource,
     ReferralUseStatus,
@@ -388,6 +389,17 @@ class InviteStatusIn(BaseModel):
     status: Literal["invited", "sample_sent", "closed"]
 
 
+class PublicCotrial(BaseModel):
+    """Phần «Mời thử cùng» của trang /thu-hang/<token> (chỉ người đăng ký đó thấy)."""
+
+    price_vnd: int
+    refund_vnd: int
+    ask_price_vnd: int
+    feedback_days: int
+    feedback_due_at: datetime | None
+    refunded: bool
+
+
 class PublicInvite(BaseModel):
     first_name: str
     product_title: str
@@ -398,9 +410,167 @@ class PublicInvite(BaseModel):
     can_feedback: bool
     feedback: str | None
     feedback_rating: int | None
+    cotrial: PublicCotrial | None = None
 
 
 class RespondIn(BaseModel):
     action: Literal["accept", "decline", "feedback"]
     feedback: str | None = Field(default=None, max_length=4000)
     rating: int | None = Field(default=None, ge=1, le=5)
+
+
+# ---- «Mời thử cùng» (27/11) --------------------------------------------------------------------------------------
+
+
+class SignupIn(BaseModel):
+    name: str | None = Field(default=None, max_length=120)
+    phone: str | None = Field(default=None, max_length=30, description="Số điện thoại / Zalo")
+    email: str | None = Field(default=None, max_length=254)
+    interests: list[str] = Field(default_factory=list, max_length=20)
+    agree: bool = False
+
+
+class SignupOut(BaseModel):
+    ok: bool = True
+    message: str
+
+
+class CategoryChoice(BaseModel):
+    slug: str
+    name: str
+
+
+class SignupForm(BaseModel):
+    categories: list[CategoryChoice]
+
+
+class ApplyIn(SignupIn):
+    note: str | None = Field(default=None, max_length=1000, description="Vì sao bạn muốn thử")
+
+
+class PublicPhoto(BaseModel):
+    src: str | None
+    thumb: str | None
+
+
+class PublicOffer(BaseModel):
+    """Trang riêng /dung-thu/m/<token>: chỉ món này + điều kiện, không có gì về quá trình chọn."""
+
+    title: str
+    description: str | None
+    photos: list[PublicPhoto]
+    price_vnd: int
+    refund_vnd: int
+    feedback_days: int
+    slots: int
+    full: bool
+
+
+class ImagePick(BaseModel):
+    kind: Literal["supplier", "note"]
+    ref: str = Field(max_length=2000, description="supplier: link ảnh gốc đã lưu bản sao · note: id ghi chú thử")
+    index: int = Field(default=0, ge=0, le=20)
+
+
+class OfferIn(BaseModel):
+    candidate_id: uuid.UUID
+    title: str | None = Field(default=None, max_length=200)
+    description: str | None = Field(default=None, max_length=2000)
+    price_vnd: int = Field(ge=1000)
+    refund_vnd: int | None = Field(default=None, ge=0)
+    refund_pct: int | None = Field(default=None, ge=1, le=100)
+    ask_price_vnd: int | None = Field(default=None, ge=1000)
+    slots: int = Field(default=3, ge=1, le=50)
+    feedback_days: int = Field(default=10, ge=1, le=60)
+    images: list[ImagePick] = Field(default_factory=list, max_length=4)
+
+
+class OfferPatch(BaseModel):
+    title: str | None = Field(default=None, min_length=2, max_length=200)
+    description: str | None = Field(default=None, max_length=2000)
+    slots: int | None = Field(default=None, ge=1, le=50)
+    feedback_days: int | None = Field(default=None, ge=1, le=60)
+    status: CotrialOfferStatus | None = None
+
+
+class OfferView(BaseModel):
+    id: uuid.UUID
+    candidate_id: uuid.UUID
+    candidate_title: str | None
+    status: CotrialOfferStatus
+    title: str
+    description: str | None
+    photo_urls: list[str]
+    price_vnd: int
+    refund_vnd: int | None
+    refund_pct: int | None
+    refund_amount_vnd: int
+    ask_price_vnd: int | None
+    slots: int
+    feedback_days: int
+    link: str
+    counts: dict[str, int]
+    taken: int
+    created_at: datetime
+
+
+class TesterHistory(BaseModel):
+    orders: int
+    trials: int
+    completed: int
+    missed: int
+    dropped: int
+
+
+class ApplicationView(BaseModel):
+    id: uuid.UUID
+    offer_id: uuid.UUID
+    customer_id: uuid.UUID
+    customer_name: str | None
+    phone: str | None
+    email: str | None
+    status: TesterInviteStatus
+    note: str | None
+    applied_at: datetime
+    selected_at: datetime | None
+    paid_at: datetime | None
+    paid_vnd: int | None
+    shipped_at: datetime | None
+    feedback_due_at: datetime | None
+    feedback_at: datetime | None
+    feedback_rating: int | None
+    feedback_answers: dict[str, Any]
+    feedback_photo_urls: list[str]
+    refund_vnd: int | None
+    refund_approval_id: uuid.UUID | None
+    refunded_at: datetime | None
+    excluded: bool
+    excluded_reason: str | None
+    history: TesterHistory
+    link: str
+
+
+class OfferDetail(OfferView):
+    applications: list[ApplicationView]
+
+
+class ApplicationActionIn(BaseModel):
+    action: Literal["select", "decline", "paid", "shipped", "propose_refund"]
+    override: bool = Field(default=False, description="Chọn cả người đang bị loại trừ (lỡ hạn trước đây)")
+
+
+class TesterView(BaseModel):
+    id: uuid.UUID
+    customer_id: uuid.UUID
+    name: str | None
+    phone: str | None
+    email: str | None
+    interests: list[str]
+    agreed_at: datetime
+    excluded: bool
+    excluded_reason: str | None
+    history: TesterHistory
+
+
+class TesterPatch(BaseModel):
+    excluded: bool

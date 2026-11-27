@@ -70,6 +70,8 @@ def note_view(n: TrialNote) -> TrialNoteView:
             "points": service.note_points(n),
             "photo_urls": [service.file_url(m.get("storage_key")) for m in n.media if m.get("storage_key")],
             "audio_url": service.file_url(n.audio_storage_key),
+            "public_photo_urls": service.public_photo_urls(n),
+            "public_warnings": service.public_warnings(n),
         }
     )
     return base
@@ -338,6 +340,10 @@ async def update_note(note_id: uuid.UUID, body: NoteUpdate, _: CurrentUser, db: 
         n.text = data["text"].strip() or None
     if body.points is not None:
         n.tags = [p.model_dump() for p in body.points]
+    if body.is_public is not None or body.public_text is not None or body.public_photos is not None:
+        await service.set_note_public(
+            db, n, is_public=body.is_public, public_text=body.public_text, with_photos=body.public_photos
+        )
     await db.flush()
     return note_view(n)
 
@@ -355,6 +361,7 @@ async def reorganize_note(note_id: uuid.UUID, _: CurrentUser, db: DbSession) -> 
 async def delete_note(note_id: uuid.UUID, _: CurrentUser, db: DbSession) -> None:
     n = await _note(db, note_id)
     keys = [m.get("storage_key") for m in n.media] + [n.audio_storage_key]
+    keys += [k for p in n.public_photos for f in (p.get("files") or {}).values() for k in f.values()]
     await db.delete(n)
     await db.flush()
     for k in keys:

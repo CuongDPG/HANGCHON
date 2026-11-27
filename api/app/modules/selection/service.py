@@ -44,6 +44,7 @@ from app.modules.selection.ai_tasks import (
 from app.modules.selection.models import (
     Decision,
     DraftStatus,
+    NoteAuthor,
     ProcessingStatus,
     SelectionDecision,
     SelectionPrinciple,
@@ -560,6 +561,72 @@ async def list_notes(db: AsyncSession, candidate_id: uuid.UUID | None) -> list[T
     return list((await db.execute(stmt.limit(300))).scalars())
 
 
+# ---- «Ghi chú dùng thử» trên website (27/11) ---------------------------------------------------------------------
+# Chị tích từng ghi chú. Bản cho website là `public_text` (mặc định = lời gốc đã đổi «chị» → «mình», chị sửa được);
+# ảnh chỉ lên khi chị tích «kèm ảnh»: chép sang kho công khai qua cùng đường xử lý ảnh (bỏ EXIF/vị trí chụp).
+# Ghi chú của khách thử (author=tester, h8 / «Mời thử cùng») không bao giờ lên website.
+
+_COMPARE = re.compile(r"(?<!\w)(?:so với|hơn hẳn|thua xa|không bằng|tốt hơn|kém hơn)(?!\w)", re.IGNORECASE)
+
+
+def public_warnings(note: TrialNote) -> list[str]:
+    """Soát lời (luật f5) trên bản cho website: nói quá, kể quá trình chọn, gọi «chị», so sánh. Chỉ báo, không chặn."""
+    from app.modules.content.checks import check_claims, check_process, check_voice
+
+    if not note.is_public:
+        return []
+    text = (note.public_text or note.text or "").strip()
+    if not text:
+        return ["Ghi chú chưa có lời để hiện trên website."]
+    out = [*check_claims(text), *check_process(text), *check_voice(text)[0]]
+    out += [f"«{m.group(0)}» so sánh với món khác — website chỉ kể món này." for m in _COMPARE.finditer(text)]
+    return list(dict.fromkeys(out))
+
+
+def public_photo_urls(note: TrialNote, size: int = 800) -> list[str]:
+    from app.modules.catalog.images import pick
+
+    return [u for u in (file_url(pick(p.get("files") or {}, size)) for p in note.public_photos) if u]
+
+
+async def _drop_public_photos(note: TrialNote) -> None:
+    keys = [k for p in note.public_photos for f in (p.get("files") or {}).values() for k in f.values()]
+    note.public_photos = []
+    for k in keys:
+        try:
+            await get_storage().delete(k)
+        except Exception:  # tệp mất trước rồi: bỏ qua
+            pass
+
+
+async def set_note_public(
+    db: AsyncSession, note: TrialNote, *, is_public: bool | None, public_text: str | None, with_photos: bool | None
+) -> TrialNote:
+    from app.modules.catalog import images as img_lib
+
+    if note.author != NoteAuthor.OWNER and (is_public or with_photos):
+        raise BadRequest("Chỉ ghi chú của chị mới đưa lên website được.", code="tester_note_private")
+    if is_public is not None:
+        note.is_public = is_public
+        if is_public and not (note.public_text or "").strip():
+            note.public_text = to_mine(note.text or "").strip() or None
+    if public_text is not None:
+        note.public_text = public_text.strip() or None
+    if with_photos is False or is_public is False:
+        await _drop_public_photos(note)
+    elif with_photos and note.is_public and not note.public_photos:
+        stored = []
+        for m in note.media:
+            key = m.get("storage_key")
+            if not key:
+                continue
+            processed = img_lib.process_photo(await get_storage().get(key), enhance=False)  # xoay, cắt, bỏ EXIF
+            stored.append({"files": await img_lib.store_renditions(f"public/trial-notes/{note.id}", processed)})
+        note.public_photos = stored
+    await db.flush()
+    return note
+
+
 # ---- c3: lý do chọn, điều chưa ưng ---------------------------------------------------------------------------------
 
 
@@ -589,7 +656,12 @@ async def draft_reasons(db: AsyncSession, decision: SelectionDecision, owner_req
                 candidate_title=cand.title_vi if cand else "",
                 trial_days=decision.trial_days,
                 notes=[
-                    DraftNote(day=n.trial_day, text=n.text or "", points=[OrganizedPoint(**p) for p in note_points(n)])
+                    DraftNote(
+                        day=n.trial_day,
+                        text=n.text or "",
+                        points=[OrganizedPoint(**p) for p in note_points(n)],
+                        author="tester" if n.author == NoteAuthor.TESTER else "owner",
+                    )
                     for n in notes
                 ],
                 owner_request=owner_request,

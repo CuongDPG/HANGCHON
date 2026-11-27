@@ -63,6 +63,12 @@ export type TrialNote = {
   points: NotePoint[];
   photo_urls: string[];
   audio_url: string | null;
+  /** «Ghi chú dùng thử» trên website: chị tích từng ghi chú (chỉ ghi chú của chị). */
+  is_public: boolean;
+  public_text: string | null;
+  public_photo_urls: string[];
+  /** Soát lời (f5) trên bản cho website — chỉ báo, không chặn. */
+  public_warnings: string[];
 };
 
 export type Decision = {
@@ -205,7 +211,18 @@ export function useCreateNote(candidateId: string | null) {
 export function useUpdateNote() {
   const invalidate = useInvalidateSelection();
   return useMutation({
-    mutationFn: ({ id, ...body }: { id: string; text?: string; candidate_id?: string; points?: NotePoint[] }) =>
+    mutationFn: ({
+      id,
+      ...body
+    }: {
+      id: string;
+      text?: string;
+      candidate_id?: string;
+      points?: NotePoint[];
+      is_public?: boolean;
+      public_text?: string;
+      public_photos?: boolean;
+    }) =>
       api.patch<TrialNote>(`${B}/notes/${id}`, body),
     onSuccess: invalidate,
   });

@@ -492,6 +492,14 @@ class CustomerReason(BaseModel):
     text: str
 
 
+class PublicTrialNote(BaseModel):
+    """«Ghi chú dùng thử»: ghi chú của chị đã tích «Đưa lên website» (lời chị sửa cho website, ảnh chị tích kèm)."""
+
+    text: str | None
+    day: int | None
+    photos: list[ReviewPhoto] = Field(default_factory=list)
+
+
 class Funnel(BaseModel):
     viewed: int | None = None
     compared: int | None = None
@@ -519,6 +527,7 @@ class ProductDetail(ProductCard):
     ai_generated: bool
     reviews: list[PublicReview]
     customer_reasons: list[CustomerReason] = Field(default_factory=list)
+    trial_notes: list[PublicTrialNote] = Field(default_factory=list)
     url: str
     picker_name: str | None = None
 

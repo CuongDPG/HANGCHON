@@ -15,7 +15,7 @@ from app.core.timeutil import to_local
 from app.modules.catalog.models import Drop, Product, Review, ReviewStatus
 from app.modules.content.ai_io import CustomerQuote, DropFacts, DropItemFacts, ProductFacts, VoiceCard
 from app.modules.content.models import ContentInsight, VoiceProfile
-from app.modules.selection.models import TrialNote
+from app.modules.selection.models import NoteAuthor, TrialNote
 
 
 def store_url(path: str, src: str | None = None) -> str:
@@ -85,6 +85,7 @@ async def product_facts_full(db: AsyncSession, p: Product) -> ProductFacts:
     pf = product_facts(p)
     pf.trial_notes = await trial_notes(db, p)
     pf.customer_reasons = await customer_reasons(db, p)
+    pf.public_trial_notes = await public_trial_notes(db, p)
     if p.candidate_id:
         safety = await db.scalar(select(Assessment.safety).where(Assessment.candidate_id == p.candidate_id))
         pf.safety_warnings = customer_warnings(safety)
@@ -123,11 +124,33 @@ async def trial_notes(db: AsyncSession, p: Product, limit: int = 5) -> list[str]
         return []
     rows = await db.execute(
         select(TrialNote.text)
-        .where(TrialNote.candidate_id == p.candidate_id, TrialNote.text.is_not(None))
+        .where(
+            TrialNote.candidate_id == p.candidate_id,
+            TrialNote.text.is_not(None),
+            TrialNote.author == NoteAuthor.OWNER,  # cảm nhận của người dùng thử không bao giờ ra bài cho khách
+        )
         .order_by(TrialNote.recorded_at.desc())
         .limit(limit)
     )
     return [t for t in rows.scalars() if t and t.strip()]
+
+
+async def public_trial_notes(db: AsyncSession, p: Product, limit: int = 3) -> list[str]:
+    """«Ghi chú dùng thử» chị đã tích «Đưa lên website» (lời bản website), đọc bảng selection."""
+    if not p.candidate_id:
+        return []
+    rows = await db.execute(
+        select(TrialNote.public_text)
+        .where(
+            TrialNote.candidate_id == p.candidate_id,
+            TrialNote.is_public.is_(True),
+            TrialNote.author == NoteAuthor.OWNER,
+            TrialNote.public_text.is_not(None),
+        )
+        .order_by(TrialNote.recorded_at)
+        .limit(limit)
+    )
+    return [t.strip() for t in rows.scalars() if t and t.strip()]
 
 
 async def customer_reasons(db: AsyncSession, p: Product, limit: int = 3) -> list[CustomerQuote]:

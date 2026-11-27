@@ -64,3 +64,39 @@ async def ensure_from_message(db: AsyncSession, thread_id: uuid.UUID, message_id
             db=db,
         )  # fmt: skip
     return c.id
+
+
+async def ensure_from_contact(db: AsyncSession, payload: dict) -> uuid.UUID | None:
+    """Khách tự để lại liên hệ trên website (sổ người dùng thử): khớp theo số điện thoại, rồi email; không có thì tạo.
+    Chỉ điền tên khi hồ sơ cũ chưa có tên (không ghi đè dữ liệu của chị). Chạy lặp lại không sinh trùng."""
+    from sqlalchemy import func
+
+    from app.core.enums import Channel
+    from app.modules.orders.service import upsert_customer
+
+    name = (payload.get("name") or "").strip() or None
+    phone = payload.get("phone") or None
+    email = (payload.get("email") or "").strip().lower() or None
+    if phone:
+        c = await upsert_customer(db, phone, name, Channel.WEB)
+        if email and not c.email:
+            c.email = email
+        await db.flush()
+        return c.id
+    if not email:
+        return None
+    c = (
+        await db.execute(
+            select(Customer)
+            .where(func.lower(Customer.email) == email, Customer.merged_into_id.is_(None))
+            .order_by(Customer.created_at)
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if c is None:
+        c = Customer(name=name, email=email, first_channel=Channel.WEB)
+        db.add(c)
+    elif name and not c.name:
+        c.name = name
+    await db.flush()
+    return c.id

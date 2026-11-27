@@ -10,7 +10,20 @@ from typing import Any
 from sqlalchemy import Date, Index, Integer, SmallInteger, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.db import Base, CreatedAt, Timestamps, UUIDPk, count, enum_col, fk, flag, json_list, json_obj, money
+from app.core.db import (
+    Base,
+    CreatedAt,
+    Timestamps,
+    UUIDPk,
+    count,
+    enum_col,
+    fk,
+    flag,
+    json_list,
+    json_obj,
+    money,
+    money_opt,
+)
 from app.core.enums import Channel, StrEnum
 
 
@@ -64,9 +77,21 @@ class TesterInviteStatus(StrEnum):
     DRAFT = "draft"
     INVITED = "invited"
     ACCEPTED = "accepted"
-    DECLINED = "declined"
-    SAMPLE_SENT = "sample_sent"
+    DECLINED = "declined"  # h8: khách không nhận · «Mời thử cùng»: chị không chọn người đăng ký
+    SAMPLE_SENT = "sample_sent"  # «Mời thử cùng»: đã gửi hàng, bắt đầu tính hạn gửi cảm nhận
     FEEDBACK_RECEIVED = "feedback_received"
+    CLOSED = "closed"
+    # «Mời thử cùng» (27/11): applied → selected → paid → sample_sent → feedback_received → refund_proposed → refunded
+    APPLIED = "applied"
+    SELECTED = "selected"
+    PAID = "paid"
+    REFUND_PROPOSED = "refund_proposed"
+    REFUNDED = "refunded"
+    FEEDBACK_MISSED = "feedback_missed"  # quá hạn chưa gửi cảm nhận → không hoàn tiền, sổ người dùng thử gắn «loại trừ»
+
+
+class CotrialOfferStatus(StrEnum):
+    OPEN = "open"
     CLOSED = "closed"
 
 
@@ -204,3 +229,48 @@ class TesterInvite(UUIDPk, Timestamps, Base):
     feedback_at: Mapped[datetime | None]
     reward_note: Mapped[str | None] = mapped_column(String(300))
     trial_days: Mapped[int | None] = mapped_column(Integer)
+    # «Mời thử cùng» (27/11): một dòng = một người đăng ký thử một lời mời; tiền theo dõi tay, không qua orders
+    offer_id: Mapped[uuid.UUID | None] = fk("cotrial_offers", ondelete="CASCADE", comment="Null = lời mời h8 cũ")
+    selected_at: Mapped[datetime | None]
+    paid_at: Mapped[datetime | None]
+    paid_vnd: Mapped[int | None] = money_opt(comment="Chị xác nhận đã nhận (giá thường của lời mời)")
+    feedback_due_at: Mapped[datetime | None] = mapped_column(comment="Hạn gửi cảm nhận = lúc gửi hàng + số ngày")
+    reminded_at: Mapped[datetime | None]
+    feedback_answers: Mapped[dict[str, Any]] = json_obj(
+        comment='{"liked","disliked","would_buy","refund_account"} — chỉ ở desk, không ra website'
+    )
+    refund_vnd: Mapped[int | None] = money_opt()
+    refund_approval_id: Mapped[uuid.UUID | None] = fk("approval_items", index=False)
+    refunded_at: Mapped[datetime | None]
+
+
+class TesterProfile(UUIDPk, Timestamps, Base):
+    """Sổ người dùng thử (27/11): khách đăng ký một lần ở /dung-thu, đồng ý điều kiện «Mời thử cùng»."""
+
+    __tablename__ = "tester_profiles"
+
+    customer_id: Mapped[uuid.UUID] = fk("customers", ondelete="CASCADE", nullable=False, unique=True, index=False)
+    interests: Mapped[list[Any]] = json_list(comment="Nhóm hàng quan tâm (slug danh mục)")
+    agreed_at: Mapped[datetime] = mapped_column(comment="Lúc đồng ý điều kiện: mua giá thường, gửi cảm nhận đúng hạn")
+    excluded: Mapped[bool] = flag(comment="Lỡ hạn cảm nhận → không chọn ở lời mời sau (chị bỏ qua được)")
+    excluded_reason: Mapped[str | None] = mapped_column(String(300))
+
+
+class CotrialOffer(UUIDPk, Timestamps, Base):
+    """Lời mời «Mời thử cùng» cho một món đang thử: link riêng /dung-thu/m/<token>, không liệt kê ở đâu."""
+
+    __tablename__ = "cotrial_offers"
+
+    candidate_id: Mapped[uuid.UUID] = fk("candidates", ondelete="CASCADE", nullable=False)
+    token: Mapped[str] = mapped_column(String(64), unique=True, comment="Link riêng chị tự gửi (Zalo...)")
+    status: Mapped[CotrialOfferStatus] = mapped_column(enum_col(CotrialOfferStatus), default=CotrialOfferStatus.OPEN)
+    title: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str | None] = mapped_column(Text)
+    photos: Mapped[list[Any]] = json_list(comment='Bản sao công khai chị chọn (đã bỏ EXIF) [{"files": {...}}]')
+    price_vnd: Mapped[int] = money(comment="Giá thường người thử trả")
+    refund_vnd: Mapped[int | None] = money_opt(comment="Hoàn lại khi gửi cảm nhận đủ (số tiền)")
+    refund_pct: Mapped[int | None] = mapped_column(SmallInteger, comment="…hoặc theo % giá")
+    ask_price_vnd: Mapped[int | None] = money_opt(comment="Câu hỏi «Giá X bạn có mua không?» (trống = giá thường)")
+    slots: Mapped[int] = mapped_column(SmallInteger, default=3, server_default="3")
+    feedback_days: Mapped[int] = mapped_column(SmallInteger, default=10, server_default="10")
+    created_by_id: Mapped[uuid.UUID | None] = fk("users", index=False)

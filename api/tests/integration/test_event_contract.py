@@ -45,6 +45,7 @@ CONTRACT: dict[str, set[str]] = {
     "inbound.arrived": {"orders", "catalog"},
     "message.received": {"crm", "sourcing", "orders"},
     "customer.identified": {"inbox", "crm"},
+    "customer.contact_submitted": {"orders"},
     "review.published": {"content"},
     "find_request.created": {"sourcing"},
     "find_request.threshold": {"sourcing"},

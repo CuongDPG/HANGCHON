@@ -128,6 +128,27 @@ async function ProductBody({ params }: { params: PageProps<"/san-pham/[slug]">["
             </Card>
           ) : null}
 
+          {p.trial_notes?.length ? (
+            <Card tone="soft">
+              <h2 className="text-[17px] font-bold">Ghi chú dùng thử</h2>
+              <ul className="mt-2 flex flex-col gap-3">
+                {p.trial_notes.map((n, i) => (
+                  <li key={i} className="flex flex-col gap-1.5">
+                    {n.day ? <p className="text-[13px] text-ink-2">Ngày dùng thứ {n.day}</p> : null}
+                    {n.text ? <p className="text-[15px] [text-wrap:pretty]">{n.text}</p> : null}
+                    {n.photos.length ? (
+                      <div className="grid grid-cols-3 gap-2">
+                        {n.photos.map((ph, k) => (
+                          <ImageBox key={k} src={ph.thumb ?? ph.src} alt={`Ảnh lúc mình dùng thử ${k + 1}`} />
+                        ))}
+                      </div>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          ) : null}
+
           {p.not_satisfied ? (
             <Card>
               <h2 className="flex items-center gap-1.5 text-[17px] font-bold">

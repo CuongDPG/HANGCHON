@@ -1289,7 +1289,7 @@ async def invites_of(db: AsyncSession, candidate_ids: list[uuid.UUID]) -> list[T
         (
             await db.execute(
                 select(TesterInvite)
-                .where(TesterInvite.candidate_id.in_(candidate_ids))
+                .where(TesterInvite.candidate_id.in_(candidate_ids), TesterInvite.offer_id.is_(None))
                 .order_by(TesterInvite.created_at)
             )
         ).scalars()
@@ -1354,7 +1354,7 @@ async def mark_invite(db: AsyncSession, invite_id: uuid.UUID, status: TesterInvi
         TesterInviteStatus.SAMPLE_SENT: {TesterInviteStatus.INVITED, TesterInviteStatus.ACCEPTED},
         TesterInviteStatus.CLOSED: set(TesterInviteStatus) - {TesterInviteStatus.CLOSED},
     }
-    if status not in allowed or inv.status not in allowed[status]:
+    if inv.offer_id is not None or status not in allowed or inv.status not in allowed[status]:
         raise Conflict("Không chuyển lời mời sang bước này được.", code="invalid_transition")
     inv.status = status
     if status == TesterInviteStatus.SAMPLE_SENT:
@@ -1379,6 +1379,8 @@ async def respond_invite(
 ) -> TesterInvite:
     """Khách trả lời qua link (công khai): nhận / không nhận, rồi gửi cảm nhận đúng một lần."""
     inv = await invite_by_token(db, token)
+    if inv.offer_id is not None:  # «Mời thử cùng» gửi cảm nhận qua form riêng (crm.cotrial.submit_feedback)
+        raise BadRequest("Thao tác không hợp lệ.")
     now = now_utc()
     if action in ("accept", "decline"):
         if inv.status != TesterInviteStatus.INVITED:

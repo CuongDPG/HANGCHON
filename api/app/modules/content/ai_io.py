@@ -40,6 +40,11 @@ class ProductFacts(BaseModel):
         default_factory=list,
         description="«Vì sao khách chọn»: lời khách đã mua, chị đã duyệt; được trích 1–2 câu, không bắt buộc",
     )
+    public_trial_notes: list[str] = Field(
+        default_factory=list,
+        description="«Ghi chú dùng thử» chị đã đưa lên website: trải nghiệm thật của mình, được trích nguyên văn, "
+        "không bắt buộc",
+    )
 
 
 class DropItemFacts(BaseModel):

@@ -25,7 +25,7 @@ trạng thái** của từng bảng để các module viết song song không gi
 sourcing_brief ─┬─ sourcing_run
                 └─ candidate (stage: candidate → sample → trial → selected | rejected)
                      ├─ assessment (+ assessment_scores) · review_digests · market_prices · comparison_items
-                     ├─ trial_notes · selection_decisions · tester_invites
+                     ├─ trial_notes · selection_decisions · tester_invites (← cotrial_offers, tester_profiles)
                      ├─ cost_sheet → price_proposal
                      └─ product (chỉ khi selected) ─┬─ product_variants · product_images · inventory_items
                                                     ├─ drop_items ← drop → purchase_order → inbound_shipment
@@ -83,7 +83,7 @@ ghi trực tiếp — **thống nhất: chỉ module selection ghi `candidates.s
 
 | Bảng | Mục đích · cột chính · vòng đời |
 |---|---|
-| `trial_notes` | Nhật ký thử hàng (c2): `kind` (`voice`/`text`/`photo`/`video`), `text` (chép lời), `audio_storage_key`, `media`, `recorded_at`, `trial_day`, `author` (`owner` / `tester` — h8 qua `tester_invite_id`), `ai_assigned` + `assignment_confidence` (AI xếp vào đúng món; `candidate_id` null khi chưa xếp được). `processing_status`: `pending` → `processing` → `done` / `failed`. |
+| `trial_notes` | Nhật ký thử hàng (c2): `kind` (`voice`/`text`/`photo`/`video`), `text` (chép lời), `audio_storage_key`, `media`, `recorded_at`, `trial_day`, `author` (`owner` / `tester` — h8 qua `tester_invite_id`), `ai_assigned` + `assignment_confidence` (AI xếp vào đúng món; `candidate_id` null khi chưa xếp được). `processing_status`: `pending` → `processing` → `done` / `failed`. «Ghi chú dùng thử» trên website (27/11, migration `0004_cotrial_public_notes`): `is_public` (chị tích), `public_text` (lời bản website, mặc định lời gốc đổi «chị» → «mình»), `public_photos` (bản sao công khai đã bỏ EXIF khi chị tích kèm ảnh). Chỉ ghi chú `author=owner` được tích; catalog đọc (chỉ đọc) để hiện trên trang sản phẩm. |
 | `selection_decisions` | Quyết định chọn/loại; nhiều dòng cho một ứng viên (đổi ý), dòng mới nhất (`decided_at`) là hiện hành. Chọn (c3): `draft_reason_selected`/`draft_not_satisfied` (AI soạn) → chị sửa → `reason_selected`/`not_satisfied`, `draft_status` `none` → `drafting` → `pending_review` → `approved`; `trial_days`, `product_id` khi đã thành sản phẩm. Loại (c4): `rejection_reason`, `rejection_tags`, `show_on_profile`. |
 | `selection_principles` | Bộ nguyên tắc (c5): `kind` (`must`/`must_not`/`prefer`/`avoid`), `text`, `structured` (dạng máy đọc), `category_id` (null = mọi nhóm), `is_active`, `source` (`owner`/`ai_suggested`). |
 | `taste_profiles` | Gu của chị (c6), một dòng cho mỗi nhóm hàng (+ một dòng chung `category_id` null): `summary`, `weights`, `examples`, `sample_count`, `version`, `trained_at`. |
@@ -166,7 +166,9 @@ ghi trực tiếp — **thống nhất: chỉ module selection ghi `candidates.s
 | `group_digests` | Tóm tắt thảo luận nhóm khách quen (h5): `thread_id`, kỳ, `summary`, `highlights`, `open_questions`, `product_mentions`. |
 | `reorder_reminders` | Nhắc mua lại (h6), một nhắc cho mỗi dòng hàng tiêu hao (`order_item_id` duy nhất): `due_on`, `reason`, `channel`, `message_body`, `converted_order_id`. Vòng đời: `scheduled` → `pending_review` → `sent` → `converted`; `skipped` (khách không nhận tin / đã mua lại), `cancelled`. |
 | `referrals` / `referral_uses` | Giới thiệu bạn (h7): mỗi khách một mã (`code` duy nhất), phần thưởng hai phía, `uses_count`, `rewarded_count`. Lượt dùng: mỗi khách được giới thiệu tối đa một lần; `pending` → `qualified` (đơn hoàn tất) → `rewarded`; `void`. |
-| `tester_invites` | Khách thử hàng cùng chị (h8): `candidate_id` + `customer_id` (duy nhất theo cặp), `token` (link gửi cảm nhận), `feedback`, `feedback_rating`, `feedback_media`. Vòng đời: `draft` → `invited` → `accepted` / `declined` → `sample_sent` → `feedback_received` → `closed`. Cảm nhận cũng có thể ghi thành `trial_notes` (author `tester`). |
+| `tester_invites` | Khách thử hàng cùng chị (h8): `candidate_id` + `customer_id` (duy nhất theo cặp), `token` (link gửi cảm nhận), `feedback`, `feedback_rating`, `feedback_media`. Vòng đời: `draft` → `invited` → `accepted` / `declined` → `sample_sent` → `feedback_received` → `closed`. Cảm nhận cũng có thể ghi thành `trial_notes` (author `tester`). «Mời thử cùng» (27/11): dòng có `offer_id` là một người đăng ký một lời mời — `applied` → `selected` (`selected_at`) / `declined` → `paid` (`paid_at`, `paid_vnd`, chị xác nhận tay) → `sample_sent` (gửi hàng, `feedback_due_at` = lúc gửi + `feedback_days`) → `feedback_received` (`feedback_answers` {liked, disliked, would_buy, ask_price_vnd, refund_account}, `feedback_media` kho riêng) → `refund_proposed` (`refund_vnd`, `refund_approval_id`, hành động `crm.cotrial_refund` luôn hỏi chị) → `refunded` (`refunded_at`); quá hạn → `feedback_missed`. `reminded_at`: đã nhắc trước hạn 2 ngày. |
+| `tester_profiles` | Sổ người dùng thử (27/11): một dòng mỗi khách (`customer_id` duy nhất; hồ sơ khách tạo/khớp qua sự kiện `customer.contact_submitted`), `interests` (slug danh mục), `agreed_at` (đồng ý điều kiện), `excluded` + `excluded_reason` (lỡ hạn cảm nhận → chị phải xác nhận khi chọn lại). |
+| `cotrial_offers` | Lời mời «Mời thử cùng» cho một ứng viên đang mua mẫu / đang thử: `token` (link riêng `/dung-thu/m/<token>`, không liệt kê), `status` (`open`/`closed`), `title`, `description`, `photos` (bản sao công khai), `price_vnd`, `refund_vnd` **hoặc** `refund_pct`, `ask_price_vnd` (câu «giá X có mua không»), `slots`, `feedback_days`. Tiền người thử trả không tạo đơn, không vào sổ doanh thu (xem status.md). |
 
 ## finance — tài chính nền (i5, k1, k4, k5)
 

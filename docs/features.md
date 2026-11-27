@@ -40,6 +40,7 @@ Phần của chị. Hệ thống chỉ ghi lại và sắp xếp.
 |---|---|---|---|---|
 | c1 | Bảng chọn | Chị quyết | 1 | Ứng viên, Mua mẫu, Đang thử, Đã chọn, Đã loại. Chị chuyển món qua từng cột. |
 | c2 | Nhật ký thử hàng bằng giọng nói | Chị quyết | 1 | Chị nói vài câu và chụp ảnh trong lúc dùng. AI chép lại và xếp vào đúng món. |
+| c2, e2 | Ghi chú dùng thử trên website (27/11) | Chị quyết | 1 | Chị tích «Đưa lên website» từng ghi chú thử của mình; sửa được lời bản website, chọn kèm ảnh. Soát lời như bài quảng cáo (nói quá, kể quá trình chọn, so sánh, gọi «chị») — chỉ báo, không chặn. Trang sản phẩm có mục «Ghi chú dùng thử» sau «Vì sao khách chọn». |
 | c3 | Lý do chọn và điều chưa ưng | AI làm, chị duyệt | 1 | Từ ghi chú của chị, AI soạn hai đoạn này cho trang sản phẩm. Chị sửa lời. |
 | c4 | Lý do loại | Chị quyết | 1 | Ghi vì sao loại từng ứng viên. Thành dữ liệu cho hồ sơ chọn ở desk (nội bộ, không hiện trên website). |
 | c5 | Bộ nguyên tắc của chị | Chị quyết | 2 | Lưu nguyên tắc chọn theo từng nhóm hàng để AI lọc từ đầu. |
@@ -122,6 +123,7 @@ Trả lời nhanh, nhớ từng khách, giữ khách ở lại.
 | h6 | Nhắc mua lại đúng lúc | AI làm, chị duyệt | 2 | Món tiêu hao sắp hết thì nhắc đúng người. Không nhắn đại trà. |
 | h7 | Giới thiệu bạn | AI tự làm | 3 | Mã giới thiệu, quà cho cả hai. Đo trước rồi mới mở rộng. |
 | h8 | Khách thử hàng cùng chị | Chị quyết | 3 | Mời vài khách quen dùng thử mẫu trước khi chị quyết định chọn. |
+| h8 | Mời thử cùng (27/11) | Chị quyết | 3 | Sổ người dùng thử (khách đăng ký một lần ở `/dung-thu`, đồng ý điều kiện: mua giá thường, gửi cảm nhận đúng hạn, gửi đủ thì được hoàn). Với món đang mua mẫu / đang thử, chị tạo lời mời có link riêng (không liệt kê, không lập chỉ mục) gửi qua Zalo; chị chọn người theo lịch sử (số đơn, lần thử đã gửi đủ / lỡ hạn / bỏ ngang). Cảm nhận có cấu trúc vào hồ sơ món ở Bàn chọn và làm căn cứ cho AI soạn lý do chọn, không bao giờ ra website; gửi đủ thì đề xuất hoàn tiền vào hàng chờ, chị chuyển tay. Lỡ hạn → loại trừ ở lời mời sau (chị bỏ qua được). |
 
 ## Trung tâm điều khiển
 

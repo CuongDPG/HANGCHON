@@ -54,7 +54,20 @@ export type TesterInvite = {
   candidate_title: string | null;
   customer_id: string;
   customer_name: string | null;
-  status: "draft" | "invited" | "accepted" | "declined" | "sample_sent" | "feedback_received" | "closed";
+  status:
+    | "draft"
+    | "invited"
+    | "accepted"
+    | "declined"
+    | "sample_sent"
+    | "feedback_received"
+    | "closed"
+    | "applied"
+    | "selected"
+    | "paid"
+    | "refund_proposed"
+    | "refunded"
+    | "feedback_missed";
   message: string | null;
   invited_at: string | null;
   responded_at: string | null;
@@ -180,6 +193,15 @@ export type PublicInvite = {
   can_feedback: boolean;
   feedback: string | null;
   feedback_rating: number | null;
+  /** «Mời thử cùng»: giá, tiền hoàn, hạn gửi cảm nhận của người đăng ký này. */
+  cotrial?: {
+    price_vnd: number;
+    refund_vnd: number;
+    ask_price_vnd: number;
+    feedback_days: number;
+    feedback_due_at: string | null;
+    refunded: boolean;
+  } | null;
 };
 
 export type CustomerSegment = "all" | "regular" | "optout" | "new";
@@ -199,6 +221,9 @@ export const crmKeys = {
   referralUses: ["crm", "referral-uses"] as const,
   referralStats: ["crm", "referral-stats"] as const,
   testers: ["crm", "testers"] as const,
+  offers: (candidateId?: string) => ["crm", "cotrial-offers", candidateId ?? "all"] as const,
+  offer: (id: string) => ["crm", "cotrial-offer", id] as const,
+  registry: ["crm", "cotrial-testers"] as const,
 };
 
 function useInvalidateCrm() {
@@ -471,6 +496,12 @@ export const INVITE_STATUS_LABEL: Record<TesterInvite["status"], string> = {
   sample_sent: "Đã gửi mẫu",
   feedback_received: "Đã gửi cảm nhận",
   closed: "Đã đóng",
+  applied: "Đăng ký thử",
+  selected: "Đã chọn, chờ tiền",
+  paid: "Đã nhận tiền",
+  refund_proposed: "Chờ chị hoàn tiền",
+  refunded: "Đã hoàn tiền",
+  feedback_missed: "Lỡ hạn cảm nhận",
 };
 
 export const REMINDER_STATUS_LABEL: Record<Reminder["status"], string> = {
@@ -480,4 +511,163 @@ export const REMINDER_STATUS_LABEL: Record<Reminder["status"], string> = {
   skipped: "Bỏ qua",
   converted: "Đã mua lại",
   cancelled: "Đã huỷ",
+};
+
+
+// ---- «Mời thử cùng» (27/11): sổ người dùng thử, lời mời theo món, người đăng ký ----------------------------------
+
+export type TesterHistory = { orders: number; trials: number; completed: number; missed: number; dropped: number };
+
+export type CotrialOffer = {
+  id: string;
+  candidate_id: string;
+  candidate_title: string | null;
+  status: "open" | "closed";
+  title: string;
+  description: string | null;
+  photo_urls: string[];
+  price_vnd: number;
+  refund_vnd: number | null;
+  refund_pct: number | null;
+  refund_amount_vnd: number;
+  ask_price_vnd: number | null;
+  slots: number;
+  feedback_days: number;
+  /** Link riêng /dung-thu/m/<token> — chị tự gửi, không liệt kê ở đâu. */
+  link: string;
+  counts: Partial<Record<TesterInvite["status"], number>>;
+  taken: number;
+  created_at: string;
+};
+
+export type CotrialApplication = {
+  id: string;
+  offer_id: string;
+  customer_id: string;
+  customer_name: string | null;
+  phone: string | null;
+  email: string | null;
+  status: TesterInvite["status"];
+  note: string | null;
+  applied_at: string;
+  selected_at: string | null;
+  paid_at: string | null;
+  paid_vnd: number | null;
+  shipped_at: string | null;
+  feedback_due_at: string | null;
+  feedback_at: string | null;
+  feedback_rating: number | null;
+  feedback_answers: { liked?: string; disliked?: string; would_buy?: "yes" | "maybe" | "no"; ask_price_vnd?: number; refund_account?: string | null };
+  feedback_photo_urls: string[];
+  refund_vnd: number | null;
+  refund_approval_id: string | null;
+  refunded_at: string | null;
+  excluded: boolean;
+  excluded_reason: string | null;
+  history: TesterHistory;
+  link: string;
+};
+
+export type CotrialOfferDetail = CotrialOffer & { applications: CotrialApplication[] };
+
+export type RegistryTester = {
+  id: string;
+  customer_id: string;
+  name: string | null;
+  phone: string | null;
+  email: string | null;
+  interests: string[];
+  agreed_at: string;
+  excluded: boolean;
+  excluded_reason: string | null;
+  history: TesterHistory;
+};
+
+export type ImagePick = { kind: "supplier" | "note"; ref: string; index?: number };
+
+export type OfferInput = {
+  candidate_id: string;
+  title?: string;
+  description?: string;
+  price_vnd: number;
+  refund_vnd?: number | null;
+  refund_pct?: number | null;
+  ask_price_vnd?: number | null;
+  slots: number;
+  feedback_days: number;
+  images: ImagePick[];
+};
+
+export type ApplicationAction = "select" | "decline" | "paid" | "shipped" | "propose_refund";
+
+export const WOULD_BUY_LABEL = { yes: "Có, sẽ mua", maybe: "Còn phân vân", no: "Không mua" } as const;
+
+export function useCotrialOffers(candidateId?: string) {
+  return useQuery({
+    queryKey: crmKeys.offers(candidateId),
+    queryFn: () => api.get<CotrialOffer[]>(`${BASE}/cotrial/offers`, { query: { candidate_id: candidateId } }),
+  });
+}
+
+export function useCotrialOffer(id: string) {
+  return useQuery({ queryKey: crmKeys.offer(id), queryFn: () => api.get<CotrialOfferDetail>(`${BASE}/cotrial/offers/${id}`) });
+}
+
+export function useCreateOffer() {
+  const invalidate = useInvalidateCrm();
+  return useMutation({ mutationFn: (v: OfferInput) => api.post<CotrialOfferDetail>(`${BASE}/cotrial/offers`, v), onSuccess: invalidate });
+}
+
+export function usePatchOffer() {
+  const invalidate = useInvalidateCrm();
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: string; status?: "open" | "closed"; slots?: number }) =>
+      api.patch<CotrialOfferDetail>(`${BASE}/cotrial/offers/${id}`, body),
+    onSuccess: invalidate,
+  });
+}
+
+export function useApplicationAction() {
+  const invalidate = useInvalidateCrm();
+  return useMutation({
+    mutationFn: (v: { id: string; action: ApplicationAction; override?: boolean }) =>
+      api.post<CotrialApplication>(`${BASE}/cotrial/applications/${v.id}/status`, { action: v.action, override: v.override ?? false }),
+    meta: { silentError: true },
+    onSuccess: invalidate,
+  });
+}
+
+export function useTesterRegistry() {
+  return useQuery({ queryKey: crmKeys.registry, queryFn: () => api.get<RegistryTester[]>(`${BASE}/cotrial/testers`) });
+}
+
+export function useSetExcluded() {
+  const invalidate = useInvalidateCrm();
+  return useMutation({
+    mutationFn: (v: { id: string; excluded: boolean }) => api.patch<RegistryTester>(`${BASE}/cotrial/testers/${v.id}`, { excluded: v.excluded }),
+    onSuccess: invalidate,
+  });
+}
+
+export type PublicOffer = {
+  title: string;
+  description: string | null;
+  photos: { src: string | null; thumb: string | null }[];
+  price_vnd: number;
+  refund_vnd: number;
+  feedback_days: number;
+  slots: number;
+  full: boolean;
+};
+
+export type SignupInput = { name: string; phone?: string; email?: string; interests: string[]; agree: boolean };
+
+/** Trang công khai /dung-thu và /dung-thu/m/[token] (khách không đăng nhập). */
+export const publicCotrialApi = {
+  form: () => api.get<{ categories: { slug: string; name: string }[] }>(`/api/store/crm/dung-thu`),
+  signup: (body: SignupInput) => api.post<{ ok: boolean; message: string }>(`/api/store/crm/dung-thu`, body),
+  offer: (token: string) => api.get<PublicOffer>(`/api/store/crm/dung-thu/m/${encodeURIComponent(token)}`),
+  apply: (token: string, body: SignupInput & { note?: string }) =>
+    api.post<{ ok: boolean; message: string }>(`/api/store/crm/dung-thu/m/${encodeURIComponent(token)}`, body),
+  feedback: (token: string, form: FormData) => api.post<PublicInvite>(`/api/store/crm/thu-hang/${encodeURIComponent(token)}/cam-nhan`, form),
 };

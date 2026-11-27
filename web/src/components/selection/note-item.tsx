@@ -1,8 +1,9 @@
 "use client";
 
-import { Mic, Trash2 } from "lucide-react";
-import { Badge, DateTime, IconButton, ImageBox, useConfirm } from "@/components/ui";
-import { POINT_LABELS, useDeleteNote, type PointKind, type TrialNote } from "@/lib/api/selection";
+import { Globe, Mic, Trash2, TriangleAlert } from "lucide-react";
+import { useState } from "react";
+import { Badge, Button, Checkbox, DateTime, IconButton, ImageBox, Switch, Textarea, notifySuccess, useConfirm } from "@/components/ui";
+import { POINT_LABELS, useDeleteNote, useUpdateNote, type PointKind, type TrialNote } from "@/lib/api/selection";
 
 const POINT_TONE: Record<PointKind, "success" | "danger" | "accent"> = { good: "success", bad: "danger", measure: "accent" };
 
@@ -19,6 +20,7 @@ export function NoteItem({ note }: { note: TrialNote }) {
         {note.trial_day ? <span>· ngày thử thứ {note.trial_day}</span> : null}
         {note.processing_status === "pending" ? <Badge tone="warning">AI chờ chị duyệt cách sắp</Badge> : null}
         {note.processing_status === "failed" ? <Badge tone="danger">AI chưa sắp được</Badge> : null}
+        {note.is_public ? <Badge tone="success" icon={<Globe className="size-3" aria-hidden />}>Trên website</Badge> : null}
         <IconButton
           size="sm"
           label="Xoá ghi chú"
@@ -61,6 +63,69 @@ export function NoteItem({ note }: { note: TrialNote }) {
         </div>
       ) : null}
       {note.audio_url ? <audio controls preload="none" src={note.audio_url} className="mt-2 h-9 w-full" /> : null}
+      {note.author === "owner" && note.candidate_id ? <PublicNote note={note} /> : null}
     </li>
+  );
+}
+
+/** «Ghi chú dùng thử» trên website: chị tích từng ghi chú, sửa lời bản website, chọn kèm ảnh. Soát lời chỉ báo, không chặn. */
+function PublicNote({ note }: { note: TrialNote }) {
+  const update = useUpdateNote();
+  const [text, setText] = useState(note.public_text ?? "");
+  const [shown, setShown] = useState(note.public_text);
+  if (shown !== note.public_text) {
+    // bản lời máy chủ trả về (vd lần đầu tích: lời gốc đã đổi «chị» → «mình») thay cho ô đang sửa
+    setShown(note.public_text);
+    setText(note.public_text ?? "");
+  }
+  const dirty = (note.public_text ?? "") !== text.trim();
+  return (
+    <div className="mt-2 border-t border-line pt-2">
+      <Switch
+        label="Đưa lên website"
+        checked={note.is_public}
+        disabled={update.isPending}
+        onChange={(v) => update.mutate({ id: note.id, is_public: v }, { onSuccess: () => notifySuccess(v ? "Đã đưa lên website" : "Đã gỡ khỏi website") })}
+      />
+      {note.is_public ? (
+        <div className="mt-2 flex flex-col gap-2">
+          <Textarea
+            label="Lời trên website"
+            rows={2}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
+          {dirty ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              className="self-start"
+              loading={update.isPending}
+              onClick={() => update.mutate({ id: note.id, public_text: text }, { onSuccess: () => notifySuccess("Đã lưu lời trên website") })}
+            >
+              Lưu lời trên website
+            </Button>
+          ) : null}
+          {note.photo_urls.length ? (
+            <Checkbox
+              label="Kèm ảnh của ghi chú"
+              checked={note.public_photo_urls.length > 0}
+              disabled={update.isPending}
+              onChange={(e) => update.mutate({ id: note.id, public_photos: e.target.checked })}
+            />
+          ) : null}
+          {note.public_warnings.length ? (
+            <ul className="flex flex-col gap-1 rounded-md bg-soft px-3 py-2 text-[13.5px]" aria-label="Soát lời trước khi lên website">
+              {note.public_warnings.map((w) => (
+                <li key={w} className="flex items-start gap-1.5">
+                  <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-seal" aria-hidden />
+                  <span>{w}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
   );
 }

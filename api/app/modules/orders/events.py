@@ -28,3 +28,9 @@ async def _message_received(db: AsyncSession, payload: dict[str, Any]) -> None:
     """h4: người lạ nhắn → có hồ sơ khách ngay; g6: AI nhận ra ý định mua → đơn nháp chờ chị chốt."""
     await customers.ensure_from_message(db, uuid.UUID(str(payload["thread_id"])), uuid.UUID(str(payload["message_id"])))
     await drafts.on_message(db, uuid.UUID(str(payload["thread_id"])), uuid.UUID(str(payload["message_id"])))
+
+
+@events.on("customer.contact_submitted")
+async def _contact_submitted(db: AsyncSession, payload: dict[str, Any]) -> None:
+    """h4: khách tự để lại liên hệ (sổ người dùng thử «Mời thử cùng») → khớp hoặc tạo hồ sơ khách."""
+    await customers.ensure_from_contact(db, payload)
