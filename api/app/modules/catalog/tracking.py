@@ -73,6 +73,8 @@ POST_STATUS_LABELS = {
     PostStatus.DRAFT_PUSHED: "Nháp TikTok, chờ chị bấm đăng",
     PostStatus.FAILED: "Đăng lỗi",
     PostStatus.CANCELLED: "Đã huỷ",
+    PostStatus.HIDDEN: "Đã ẩn (ngừng bán)",
+    PostStatus.REMOVED: "Đã gỡ (ngừng bán)",
 }
 
 ORDER_STATUS_LABELS = {
@@ -325,7 +327,7 @@ def _draft_state(d: ContentDraft | None) -> str:
 
 
 def _page_state(p: Product) -> str:
-    if p.status in (ProductStatus.PUBLISHED, ProductStatus.PAUSED) or p.content_approved_at:
+    if p.status in (ProductStatus.PUBLISHED, ProductStatus.PAUSED, ProductStatus.STOPPED) or p.content_approved_at:
         return "approved"
     if p.status == ProductStatus.PENDING_REVIEW:
         return "pending"

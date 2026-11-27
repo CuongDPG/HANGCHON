@@ -21,7 +21,7 @@ from app.modules.catalog import dossier as dossier_svc
 from app.modules.catalog import drops as drop_svc
 from app.modules.catalog import finds as find_svc
 from app.modules.catalog import products as product_svc
-from app.modules.catalog import public, tracking
+from app.modules.catalog import public, stop_selling, tracking
 from app.modules.catalog import reviews as review_svc
 from app.modules.catalog.images import MAX_UPLOAD_BYTES
 from app.modules.catalog.models import (
@@ -79,6 +79,9 @@ from app.modules.catalog.schemas import (
     SelectionTrailOut,
     ShelfOut,
     SitemapEntry,
+    StopIn,
+    StopPlanOut,
+    StopRunOut,
     SupplierImageOption,
     SupplierImagesIn,
     VoiceIssue,
@@ -424,6 +427,28 @@ async def unpublish_product(product_id: uuid.UUID, user: OwnerUser, db: DbSessio
     p = await product_svc.get_product(db, product_id)
     await product_svc.unpublish(db, p, user)
     return await _desk_product(db, p)
+
+
+@desk.get("/products/{product_id}/stop-plan", response_model=StopPlanOut)
+async def stop_plan(product_id: uuid.UUID, _: CurrentUser, db: DbSession) -> Any:
+    """«Ngừng bán»: mọi nơi món đang có (website, lịch đăng, bài đã đăng, sàn, đợt đang mở) + lần ngừng bán gần nhất."""
+    return await stop_selling.plan(db, await product_svc.get_product(db, product_id))
+
+
+@desk.post("/products/{product_id}/stop", response_model=StopRunOut)
+async def stop_product(product_id: uuid.UUID, body: StopIn, user: OwnerUser, db: DbSession) -> Any:
+    p = await product_svc.get_product(db, product_id)
+    act = await stop_selling.stop(db, p, user, body.model_dump())
+    await db.refresh(p)
+    return {"product": await _desk_product(db, p), "steps": (act.result or {}).get("steps", []), "activity_id": act.id}
+
+
+@desk.post("/products/{product_id}/resume", response_model=StopRunOut)
+async def resume_product(product_id: uuid.UUID, user: OwnerUser, db: DbSession) -> Any:
+    p = await product_svc.get_product(db, product_id)
+    steps = await stop_selling.resume(db, p, user)
+    await db.refresh(p)
+    return {"product": await _desk_product(db, p), "steps": steps}
 
 
 @desk.post("/products/{product_id}/images", response_model=DeskProduct, status_code=status.HTTP_201_CREATED)

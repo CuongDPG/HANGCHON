@@ -234,6 +234,9 @@ def voice_issues(product: Product) -> list[dict[str, str]]:
 
 
 def check_publishable(product: Product) -> None:
+    if product.status == ProductStatus.STOPPED:
+        raise BadRequest("Món này đang ngừng bán. Chị bấm «Mở bán lại» để đưa món lên lại mọi kênh.",
+                         code="product_stopped")  # fmt: skip
     if not product.name.strip():
         raise BadRequest("Sản phẩm chưa có tên.")
     if product.price_vnd <= 0:

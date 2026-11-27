@@ -178,6 +178,8 @@ Module không gọi service của module khác. Bên phát gọi `await events.e
 | `candidate.rejected` | `candidate_id`, `decision_id` | selection | selection (học gu) |
 | `price.approved` | `candidate_id`, `price_vnd`, `price_proposal_id`, `product_id` | supply | catalog (cập nhật giá bán) |
 | `product.published` | `product_id` | catalog | content (soạn bài các kênh, f1) |
+| `product.sale_stop_requested` | `stop_id`, `product_id`, `user_id`, `cancel_post_ids`, `remove_posts` (`id`, `manual_done`), `delete_posts`, `listing_ids` | catalog (chị «Ngừng bán», hành động `catalog.stop_selling`) | content (huỷ lịch đăng; ẩn / xoá hẳn / ghi «đã gỡ tay» bài đã đăng → `scheduled_posts.removal`), orders (ngừng bán trên sàn, sàn chưa có lệnh thì tồn về 0 → `marketplace_listings.data.stop`); catalog đọc lại kết quả từng bước |
+| `product.sale_resume_requested` | `stop_id`, `product_id`, `user_id`, `post_ids`, `listing_ids` | catalog («Mở bán lại» = hoàn tác `catalog.stop_selling`) | content (hiện lại bài đã ẩn), orders (mở bán lại trên sàn, đẩy lại tồn) |
 | `drop.opened` | `drop_id` | catalog | content (bài báo mở đợt), crm (tin cho nhóm khách quen) |
 | `drop.closed` | `drop_id` | catalog | orders (chốt danh sách đơn của đợt), supply (soạn đơn đặt nguồn, g3) |
 | `order.created` | `order_id` | orders | crm (sổ khách, mã giới thiệu, đánh dấu đã mua lại) |

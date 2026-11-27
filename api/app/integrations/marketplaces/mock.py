@@ -19,6 +19,7 @@ from app.integrations.marketplaces import (
 
 class Driver(MarketplacesDriver):
     name = "mock"
+    supports_deactivate = True
 
     def __init__(self) -> None:
         self.products: dict[str, tuple[Channel, MarketplaceProduct]] = {}
@@ -26,6 +27,8 @@ class Driver(MarketplacesDriver):
         self.status_updates: list[
             tuple[Channel, str, str, str | None]
         ] = []  # (sàn, mã đơn sàn, trạng thái, mã vận đơn)
+        self.deactivated: set[str] = set()
+        self.fail: set[str] = set()  # test: mã món trên sàn mà lệnh ngừng/mở bán sẽ lỗi
 
     async def upsert_product(self, marketplace: Channel, product: MarketplaceProduct) -> str:
         ext = product.external_id or f"{marketplace.value}_{short_id(product.sku, marketplace)}"
@@ -37,6 +40,17 @@ class Driver(MarketplacesDriver):
             raise IntegrationError("Sản phẩm chưa có trên sàn.")
         ch, p = self.products[external_id]
         self.products[external_id] = (ch, p.model_copy(update={"stock": stock}))
+
+    async def deactivate_product(self, marketplace: Channel, external_id: str) -> None:
+        # sàn giả giữ món trong bộ nhớ từng tiến trình: món đồng bộ ở tiến trình khác vẫn nhận lệnh (ghi lại)
+        if external_id in self.fail:
+            raise IntegrationError("Sàn giả lập báo lỗi khi ngừng bán.")
+        self.deactivated.add(external_id)
+
+    async def activate_product(self, marketplace: Channel, external_id: str) -> None:
+        if external_id in self.fail:
+            raise IntegrationError("Sàn giả lập báo lỗi khi mở bán lại.")
+        self.deactivated.discard(external_id)
 
     def simulate_order(self, marketplace: Channel, sku: str, quantity: int = 1, unit_price_vnd: int = 150_000):
         o = MarketplaceOrder(

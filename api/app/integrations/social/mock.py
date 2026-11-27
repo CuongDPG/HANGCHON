@@ -17,10 +17,19 @@ from app.integrations.social import (
     InboundEvent,
     PostMetrics,
     PublishResult,
+    RemoveMode,
+    RemoveResult,
     SentMessage,
     SocialDriver,
     SocialPost,
 )
+
+# Gỡ bài: giống driver thật từng kênh để màn «Ngừng bán» ở chế độ giả lập báo đúng kênh nào tự gỡ được.
+REMOVE_MODES: dict[Channel, frozenset[str]] = {
+    Channel.FACEBOOK: frozenset({"hide", "delete"}),
+    Channel.INSTAGRAM: frozenset({"delete"}),
+    Channel.THREADS: frozenset({"delete"}),
+}
 
 
 class Driver(SocialDriver):
@@ -31,6 +40,9 @@ class Driver(SocialDriver):
         self.sent: list[dict[str, str]] = []
         self._inbound: list[InboundEvent] = []
         self._n = 0
+        self.hidden: set[str] = set()
+        self.deleted: set[str] = set()
+        self.fail_remove: set[str] = set()  # test: mã bài gỡ/hiện lại sẽ lỗi
 
     def _next(self, prefix: str) -> str:
         self._n += 1
@@ -104,6 +116,28 @@ class Driver(SocialDriver):
             clicks=r.randint(0, 300),
             video_views=r.randint(0, reach * 2) if channel in (Channel.TIKTOK, Channel.INSTAGRAM) else 0,
         )
+
+    def remove_modes(self, channel: Channel) -> frozenset[str]:
+        return REMOVE_MODES.get(channel, frozenset())
+
+    async def remove_post(self, channel: Channel, external_id: str, *, mode: RemoveMode = "hide") -> RemoveResult:
+        if mode not in self.remove_modes(channel):
+            return RemoveResult(mode="unsupported")
+        if external_id in self.fail_remove:
+            raise IntegrationError("Kênh giả lập báo lỗi khi gỡ bài.")
+        if mode == "hide":
+            self.hidden.add(external_id)
+            return RemoveResult(mode="hidden")
+        self.hidden.discard(external_id)
+        self.deleted.add(external_id)
+        return RemoveResult(mode="deleted")
+
+    async def restore_post(self, channel: Channel, external_id: str) -> None:
+        if "hide" not in self.remove_modes(channel) or external_id in self.deleted:
+            raise IntegrationError("Bài này không hiện lại được.", code="unsupported")
+        if external_id in self.fail_remove:
+            raise IntegrationError("Kênh giả lập báo lỗi khi hiện lại bài.")
+        self.hidden.discard(external_id)
 
     async def parse_webhook(self, headers: dict[str, str], body: bytes) -> list[InboundEvent]:
         sig = {k.lower(): v for k, v in headers.items()}.get("x-mock-signature", "")

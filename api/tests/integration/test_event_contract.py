@@ -32,6 +32,8 @@ CONTRACT: dict[str, set[str]] = {
     "candidate.rejected": {"selection"},
     "price.approved": {"catalog"},
     "product.published": {"content"},
+    "product.sale_stop_requested": {"content", "orders"},
+    "product.sale_resume_requested": {"content", "orders"},
     "drop.opened": {"content", "crm"},
     "drop.closed": {"orders", "supply"},
     "order.created": {"crm"},

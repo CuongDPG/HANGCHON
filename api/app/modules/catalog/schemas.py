@@ -1052,3 +1052,92 @@ class ProductPipelineRow(BaseModel):
     orders: int
     units: int
     revenue_vnd: int
+
+
+# ---- ngừng bán trên mọi kênh / mở bán lại ------------------------------------------------------------------------
+
+StopStepStatus = Literal["done", "needs_manual", "failed", "skipped", "info"]
+
+
+class StopPostRow(BaseModel):
+    id: uuid.UUID
+    channel: str
+    label: str
+    status: str
+    url: str | None = None
+    scheduled_at: datetime | None = None
+    published_at: datetime | None = None
+    can_hide: bool = False  # kênh ẩn được bài (hiện lại khi mở bán lại)
+    can_delete: bool = False  # kênh xoá hẳn được (khi chị chọn «Xoá hẳn»)
+    simulated: bool = False
+
+
+class StopListingRow(BaseModel):
+    id: uuid.UUID
+    marketplace: str
+    label: str
+    status: str
+    external_id: str | None = None
+    auto: bool = False  # sàn có lệnh ngừng bán qua API; không thì đặt tồn về 0
+    simulated: bool = False
+
+
+class StopDropRow(BaseModel):
+    id: uuid.UUID
+    code: str
+    title: str
+    status: str
+    status_label: str
+    slots_reserved: int = 0
+
+
+class StopStep(BaseModel):
+    kind: Literal["website", "scheduled_post", "post", "listing", "drop"]
+    label: str
+    status: StopStepStatus
+    detail: str
+    id: str | None = None
+    channel: str | None = None
+    url: str | None = None
+
+
+class LastStop(BaseModel):
+    activity_id: uuid.UUID
+    at: datetime
+    steps: list[StopStep] = Field(default_factory=list)
+    undone_at: datetime | None = None
+    undoable: bool = False
+    hidden_posts: int = 0
+    gone_posts: int = 0
+    listings: int = 0
+    cancelled_posts: int = 0
+
+
+class StopPlanOut(BaseModel):
+    product_id: uuid.UUID
+    status: ProductStatus
+    can_stop: bool
+    website_published: bool
+    scheduled_posts: list[StopPostRow] = Field(default_factory=list)
+    posts: list[StopPostRow] = Field(default_factory=list)
+    listings: list[StopListingRow] = Field(default_factory=list)
+    drops: list[StopDropRow] = Field(default_factory=list)
+    last_stop: LastStop | None = None
+
+
+class StopPostChoice(BaseModel):
+    id: uuid.UUID
+    manual_done: bool = False  # kênh gỡ tay: chị đã gỡ rồi, ghi lại
+
+
+class StopIn(BaseModel):
+    cancel_post_ids: list[uuid.UUID] = Field(default_factory=list)
+    remove_posts: list[StopPostChoice] = Field(default_factory=list)
+    listing_ids: list[uuid.UUID] = Field(default_factory=list)
+    delete_posts: bool = False  # «Xoá hẳn»: xoá bài đã đăng (không khôi phục được) thay vì ẩn
+
+
+class StopRunOut(BaseModel):
+    product: DeskProduct
+    steps: list[StopStep]
+    activity_id: uuid.UUID | None = None

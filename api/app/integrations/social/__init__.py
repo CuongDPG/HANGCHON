@@ -56,6 +56,17 @@ class SentMessage(BaseModel):
     sent_at: datetime
 
 
+RemoveMode = Literal["hide", "delete"]
+
+
+class RemoveResult(BaseModel):
+    """Kết quả gỡ một bài đã đăng: «hidden» (ẩn, hiện lại được), «deleted» (xoá hẳn), «unsupported» (driver không gỡ
+    được theo cách được yêu cầu — chị gỡ tay)."""
+
+    mode: Literal["deleted", "hidden", "unsupported"]
+    detail: str | None = None
+
+
 class PostMetrics(BaseModel):
     external_id: str
     impressions: int = 0
@@ -123,6 +134,23 @@ class SocialDriver(abc.ABC):
 
     @abc.abstractmethod
     async def post_metrics(self, channel: Channel, external_id: str) -> PostMetrics: ...
+
+    # ---- gỡ bài khi ngừng bán (không bắt buộc: driver không ghi đè thì mọi kênh là «gỡ tay») -------------------------
+
+    def remove_modes(self, channel: Channel) -> frozenset[str]:
+        """Cách gỡ bài driver làm được với kênh: "hide" (ẩn, hiện lại được) và/hoặc "delete" (xoá hẳn, không khôi phục).
+        Rỗng = chị gỡ tay. Màn «Ngừng bán» đọc cờ này để báo trước kênh nào tự gỡ được."""
+        return frozenset()
+
+    async def remove_post(self, channel: Channel, external_id: str, *, mode: RemoveMode = "hide") -> RemoveResult:
+        """Gỡ một bài đã đăng theo `mode`. Không làm được đúng `mode` thì trả «unsupported» (không tự đổi sang xoá hẳn)."""
+        return RemoveResult(mode="unsupported")
+
+    async def restore_post(self, channel: Channel, external_id: str) -> None:
+        """Hiện lại bài đã ẩn (chỉ kênh có "hide")."""
+        from app.integrations.base import IntegrationError
+
+        raise IntegrationError("Kênh này không hiện lại bài đã ẩn được.", code="unsupported")
 
     @abc.abstractmethod
     async def parse_webhook(self, headers: dict[str, str], body: bytes) -> list[InboundEvent]:

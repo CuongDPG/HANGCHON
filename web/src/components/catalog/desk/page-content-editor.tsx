@@ -1,13 +1,12 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CircleAlert, ExternalLink, EyeOff, Send, Sparkles } from "lucide-react";
+import { CircleAlert, ExternalLink, Send, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { useConfirm } from "@/components/ui/confirm";
 import { EmptyState, SkeletonList } from "@/components/ui/feedback";
 import { Input, Textarea } from "@/components/ui/field";
 import { Sheet } from "@/components/ui/overlay";
@@ -28,6 +27,7 @@ import { RowsEditor, SaveBar, Section, useServerDraft } from "./editor-parts";
 import { ImageManager } from "./image-manager";
 import { STATUS_TONE } from "./products-screen";
 import { sellerAddressIssues } from "./seller-voice";
+import { StopSellingButton } from "./stop-selling";
 
 /** Lời trên trang website (AI soạn, chị sửa) — phần còn lại của sản phẩm (giá, cách bán, tồn kho) ở `product-editor.tsx`. */
 type PageDraft = {
@@ -138,7 +138,6 @@ export function PageContentEditor({ productId }: { productId: string }) {
   const { data: p, isPending, error } = useDeskProduct(productId);
   const { user } = useSession();
   const isOwner = user?.role === "owner";
-  const confirm = useConfirm();
   const qc = useQueryClient();
   const { draft, setDraft, dirty, reset } = useServerDraft(p, toDraft, toPatch);
   const [rewriteOpen, setRewriteOpen] = useState(false);
@@ -157,7 +156,6 @@ export function PageContentEditor({ productId }: { productId: string }) {
     if (body) await deskProductApi.patch(productId, body);
     return deskProductApi.publish(productId);
   });
-  const unpublish = useProductMutation(productId, () => deskProductApi.unpublish(productId));
   const rewrite = useProductMutation(productId, (n: string) => deskProductApi.rewrite(productId, n));
 
   if (isPending) return <SkeletonList rows={6} />;
@@ -177,6 +175,7 @@ export function PageContentEditor({ productId }: { productId: string }) {
     : [];
   const voice = draftVoiceIssues(draft);
   const live = p.status === "published";
+  const stopped = p.status === "stopped";
   const noPrice = p.price_vnd <= 0;
   const saveNow = () => save.mutate(toPatch(draft), { onSuccess: () => notifySuccess("Đã lưu") });
 
@@ -202,7 +201,7 @@ export function PageContentEditor({ productId }: { productId: string }) {
           </p>
         ) : null}
         <div className="flex flex-wrap gap-2">
-          {isOwner && !live ? (
+          {isOwner && !live && !stopped ? (
             <Button
               icon={<Send className="size-4" />}
               loading={publish.isPending}
@@ -234,22 +233,11 @@ export function PageContentEditor({ productId }: { productId: string }) {
               <ButtonLink href={`/san-pham/${p.slug}`} variant="secondary" icon={<ExternalLink className="size-4" />} target="_blank">
                 Xem trên website
               </ButtonLink>
-              {isOwner ? (
-                <Button
-                  variant="ghost"
-                  icon={<EyeOff className="size-4" />}
-                  onClick={async () => {
-                    if (await confirm({ title: "Tạm ẩn trang này?", message: "Món sẽ không hiện trên website cho tới khi chị đăng lại.", confirmLabel: "Tạm ẩn" }))
-                      unpublish.mutate(undefined, { onSuccess: () => { void refreshContent(); notifySuccess("Đã tạm ẩn"); } });
-                  }}
-                >
-                  Tạm ẩn
-                </Button>
-              ) : null}
             </>
           ) : null}
+          {isOwner ? <StopSellingButton product={p} /> : null}
         </div>
-        {!isOwner && !live ? <p className="text-[13px] text-ink-2">Chị là người đăng trang.</p> : null}
+        {!isOwner && !live && !stopped ? <p className="text-[13px] text-ink-2">Chị là người đăng trang.</p> : null}
       </Card>
 
       {voice.length ? (

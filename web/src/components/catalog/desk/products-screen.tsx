@@ -33,6 +33,7 @@ export const STATUS_TONE: Record<ProductStatus, BadgeTone> = {
   pending_review: "warning",
   published: "success",
   paused: "neutral",
+  stopped: "danger",
   archived: "neutral",
 };
 
@@ -88,6 +89,7 @@ export function ProductsScreen() {
           { value: "published", label: "Trên kệ", count: count("published") },
           { value: "draft", label: "Nháp", count: count("draft") },
           { value: "paused", label: "Tạm ẩn", count: count("paused") },
+          { value: "stopped", label: "Đã ngừng bán", count: count("stopped") },
         ]}
       />
       {isPending ? (

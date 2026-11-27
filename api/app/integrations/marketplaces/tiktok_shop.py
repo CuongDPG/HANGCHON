@@ -2,7 +2,8 @@
 (partner.tiktokshop.com/docv2), CHƯA thử thật.
 
 Đã có: ký yêu cầu, kéo đơn (orders/search), cập nhật tồn theo SKU, báo đã gửi hàng (người bán tự giao, kèm mã vận
-đơn — xem `update_order_status`). Chưa làm: tạo sản phẩm mới (ngành hàng, ảnh, thuộc tính bắt buộc), làm mới access
+đơn — xem `update_order_status`), ngừng bán / mở bán lại (`POST /product/202309/products/deactivate` và `/activate`,
+body `product_ids` — theo tài liệu bên thứ ba, CHƯA đối chiếu Partner Center). Chưa làm: tạo sản phẩm mới (ngành hàng, ảnh, thuộc tính bắt buộc), làm mới access
 token. Khoá: `TIKTOK_SHOP_APP_KEY`, `TIKTOK_SHOP_APP_SECRET`
 (config chung); `TIKTOK_SHOP_ACCESS_TOKEN`, `TIKTOK_SHOP_CIPHER` đọc từ biến môi trường hệ thống.
 `external_id` của món = `<product_id>:<sku_id>` trên TikTok Shop.
@@ -41,6 +42,7 @@ def sign(app_secret: str, path: str, params: dict[str, Any], body: str = "") -> 
 
 class Driver(MarketplacesDriver):
     name = "tiktok_shop"
+    supports_deactivate = True
 
     async def _creds(self) -> tuple[str, str, str, str]:
         """Cài đặt → Mạng xã hội (thẻ TikTok Shop, token tự làm mới) > biến môi trường."""
@@ -95,6 +97,21 @@ class Driver(MarketplacesDriver):
             "POST",
             f"/product/202309/products/{product_id}/inventory/update",
             body={"skus": [{"id": sku_id, "inventory": [{"quantity": max(0, stock)}]}]},
+        )
+
+    async def deactivate_product(self, marketplace: Channel, external_id: str) -> None:
+        """«Deactivate Products» 202309 (cả món, mọi SKU). Đường dẫn và body theo tài liệu bên thứ ba, CHƯA đối chiếu
+        tài liệu chính thức và CHƯA thử thật — kiểm trước khi bật."""
+        self._check(marketplace)
+        await self._call(
+            "POST", "/product/202309/products/deactivate", body={"product_ids": [external_id.split(":", 1)[0]]}
+        )
+
+    async def activate_product(self, marketplace: Channel, external_id: str) -> None:
+        """«Activate Product» 202309 — cùng ghi chú như `deactivate_product`."""
+        self._check(marketplace)
+        await self._call(
+            "POST", "/product/202309/products/activate", body={"product_ids": [external_id.split(":", 1)[0]]}
         )
 
     async def fetch_orders(self, marketplace: Channel, since: datetime | None = None) -> list[MarketplaceOrder]:

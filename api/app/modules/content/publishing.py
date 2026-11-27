@@ -29,7 +29,7 @@ from app.core.errors import AppError, BadRequest, Conflict
 from app.core.timeutil import local_today, now_utc, to_local
 from app.integrations.social import SocialPost
 from app.integrations.social import driver_for as social_driver_for
-from app.modules.catalog.models import Drop, Product
+from app.modules.catalog.models import Drop, Product, ProductStatus
 from app.modules.content import facts
 from app.modules.content.ai_io import InsightIn, InsightOut, PostStat
 from app.modules.content.channels import channel_label
@@ -45,7 +45,7 @@ from app.modules.content.models import (
     ScheduledPost,
 )
 from app.modules.content.schedule import WEEKDAY_NAMES, src_code
-from app.modules.content.service import ACTION_INSIGHT, ACTION_RETRY
+from app.modules.content.service import ACTION_INSIGHT, ACTION_PUBLISH, ACTION_RETRY, publish_key
 from app.modules.orders.models import Order, OrderStatus
 
 log = logging.getLogger("app.content.publish")
@@ -117,10 +117,41 @@ def _due(post: ScheduledPost, now: datetime) -> bool:
     return post.attempts == 0 or post.updated_at + timedelta(minutes=wait) <= now
 
 
+CANCELLABLE = (PostStatus.PLANNED, PostStatus.APPROVED, PostStatus.FAILED)
+
+
+async def cancel_scheduled(db: AsyncSession, post: ScheduledPost, user: Any, *, summary: str = "Huỷ lịch đăng") -> None:
+    """Huỷ một bài chưa đăng (đang chờ duyệt / hẹn giờ / lỗi): bản nháp về «đã duyệt», bỏ việc chờ duyệt đăng."""
+    if post.status not in CANCELLABLE:
+        raise Conflict("Bài đã đăng, không huỷ lịch được.", code="post_locked")
+    post.status = PostStatus.CANCELLED
+    d = await db.get(ContentDraft, post.draft_id)
+    if d is not None and d.status == DraftStatus.SCHEDULED:
+        d.status = DraftStatus.APPROVED
+    await control.cancel_pending(db, action=ACTION_PUBLISH, dedupe_key=publish_key(post.draft_id))
+    await control.audit(
+        db, "content.post_cancelled", user=user, entity_type="scheduled_posts", entity_id=post.id, summary=summary
+    )
+    await db.flush()
+
+
+def stopped_products() -> Any:
+    """Món đã ngừng bán: bài của món đó không được đăng (cả bài chị lỡ để lại trên lịch)."""
+    return select(Product.id).where(Product.status == ProductStatus.STOPPED)
+
+
+async def is_stopped(db: AsyncSession, product_id: uuid.UUID | None) -> bool:
+    return bool(product_id) and await db.scalar(select(Product.status).where(Product.id == product_id)) == (
+        ProductStatus.STOPPED
+    )
+
+
 async def publish_one(db: AsyncSession, post: ScheduledPost) -> ScheduledPost:
-    """Đăng một bài đã duyệt. Lỗi thì đếm lần thử; hết lượt → `failed` + việc chờ chị."""
+    """Đăng một bài đã duyệt. Lỗi thì đếm lần thử; hết lượt → `failed` + việc chờ chị. Món đã ngừng bán → không đăng."""
     draft = await db.get(ContentDraft, post.draft_id)
     if draft is None or post.status not in (PostStatus.APPROVED, PostStatus.PUBLISHING):
+        return post
+    if await is_stopped(db, post.product_id):
         return post
     post.status = PostStatus.PUBLISHING
     await db.flush()
@@ -197,6 +228,7 @@ async def publish_due(db: AsyncSession, *, limit: int = 20) -> int:
             await db.execute(
                 select(ScheduledPost)
                 .where(ScheduledPost.status == PostStatus.APPROVED, ScheduledPost.scheduled_at <= now)
+                .where(ScheduledPost.product_id.is_(None) | ScheduledPost.product_id.not_in(stopped_products()))
                 .order_by(ScheduledPost.scheduled_at)
                 .limit(limit)
                 .with_for_update(skip_locked=True)
@@ -215,6 +247,8 @@ async def apply_retry(db: AsyncSession, payload: dict[str, Any]) -> control.Hand
     post = await db.get(ScheduledPost, uuid.UUID(payload["scheduled_post_id"]))
     if post is None or post.status not in (PostStatus.FAILED, PostStatus.APPROVED):
         raise Conflict("Bài này không còn ở trạng thái lỗi.", code="not_failed")
+    if await is_stopped(db, post.product_id):
+        raise Conflict("Món này đang ngừng bán. Chị mở bán lại rồi mới đăng bài.", code="product_stopped")
     post.status = PostStatus.APPROVED
     post.attempts = 0
     if post.scheduled_at < now_utc():

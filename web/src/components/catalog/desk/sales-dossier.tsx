@@ -145,7 +145,7 @@ function LiveBlock({ d, slug }: { d: SalesDossier; slug: string }) {
       <Card className="flex flex-col gap-3 border border-line">
         <Row
           label="Website"
-          meta={w.published && w.published_at ? <>đăng <DateTime value={w.published_at} /></> : w.status === "paused" ? "đang tạm ẩn" : "chưa đăng"}
+          meta={w.published && w.published_at ? <>đăng <DateTime value={w.published_at} /></> : w.status === "paused" ? "đang tạm ẩn" : w.status === "stopped" ? "đã ngừng bán" : "chưa đăng"}
           right={w.published ? <SmallLink href={`/san-pham/${slug}`} external>Xem trang ↗</SmallLink> : <Badge tone="outline">Chưa lên web</Badge>}
         />
         {d.live.posts.length ? (

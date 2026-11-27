@@ -73,3 +73,19 @@ async def on_review_published(db: AsyncSession, payload: dict[str, Any]) -> None
         db=db, summary="Khách vừa khen món này; một bài kể lại lời khách thường ra đơn tốt.",
         ref_type="reviews", ref_id=review.id, dedupe_key=f"review-post:{review.id}", ai_generated=False,
     )  # fmt: skip
+
+
+@events.on("product.sale_stop_requested")
+async def on_sale_stop(db: AsyncSession, payload: dict[str, Any]) -> None:
+    """Chị ngừng bán một món: huỷ lịch đăng chưa đăng, ẩn / xoá hẳn / ghi «đã gỡ tay» bài đã đăng (theo chị chọn)."""
+    from app.modules.content import withdraw
+
+    await withdraw.on_stop(db, payload)
+
+
+@events.on("product.sale_resume_requested")
+async def on_sale_resume(db: AsyncSession, payload: dict[str, Any]) -> None:
+    """Chị mở bán lại: hiện lại các bài đã ẩn trong lần ngừng bán đó."""
+    from app.modules.content import withdraw
+
+    await withdraw.on_resume(db, payload)

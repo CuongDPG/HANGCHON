@@ -10,6 +10,13 @@
 - Threads API (graph.threads.net): POST /{threads-user-id}/threads (`media_type=TEXT|IMAGE|VIDEO|CAROUSEL`) → POST
   /{threads-user-id}/threads_publish `creation_id`. Hạn mức 250 bài / 24 giờ, chữ tối đa 500 ký tự.
 
+- Gỡ bài khi ngừng bán (CHƯA THỬ THẬT): Facebook ẩn = POST /{page-post-id} `is_hidden=true` (Page token, quyền
+  `pages_manage_posts`; hiện lại `is_hidden=false`), xoá hẳn = DELETE /{post-id}. Instagram xoá hẳn = DELETE
+  /{ig-media-id} (quyền `instagram_manage_contents`) — chỉ dựa trên changelog Meta (12/2025, «IG Media Deleting API»),
+  CHƯA đối chiếu tài liệu tham chiếu đầy đủ. Threads xoá hẳn = DELETE graph.threads.net /{threads-media-id} (quyền
+  `threads_delete`, 100 lượt xoá / 24 giờ). Instagram, Threads không có «ẩn» → chỉ xoá hẳn khi chị chọn «Xoá hẳn».
+  Bài video Facebook đăng qua /videos có mã là video id, ẩn bằng `is_hidden` có thể không áp dụng — kiểm khi bật thật.
+
 Cấu hình (settings): META_PAGE_ID, META_PAGE_TOKEN, META_IG_USER_ID, THREADS_USER_ID, THREADS_ACCESS_TOKEN,
 META_GRAPH_VERSION. Cài đặt → Mạng xã hội ghi đè các biến này (`channel_config`, khoá mã hoá trong CSDL). Lớp `MetaPublisher` được gộp vào driver `meta` (`meta.py`).
 """
@@ -26,7 +33,7 @@ from app.core.enums import Channel
 from app.core.timeutil import now_utc
 from app.integrations import channel_config as cc
 from app.integrations.base import IntegrationError, IntegrationNotConfigured
-from app.integrations.social import PostMetrics, PublishResult, SocialPost
+from app.integrations.social import PostMetrics, PublishResult, RemoveMode, RemoveResult, SocialPost
 from app.integrations.social._ratelimit import RateLimited, limiter
 
 GRAPH = "https://graph.facebook.com"
@@ -35,6 +42,12 @@ THREADS = "https://graph.threads.net"
 # Mã lỗi Graph API về giới hạn tần suất (application/user/page/business throttling).
 RATE_CODES = {4, 17, 32, 613, 80001, 80002, 80006}
 DAY = 24 * 3600
+# Cách gỡ bài từng kênh: Facebook ẩn được (hiện lại được) hoặc xoá hẳn; Instagram, Threads chỉ xoá hẳn.
+REMOVE_MODES: dict[Channel, frozenset[str]] = {
+    Channel.FACEBOOK: frozenset({"hide", "delete"}),
+    Channel.INSTAGRAM: frozenset({"delete"}),
+    Channel.THREADS: frozenset({"delete"}),
+}
 
 
 def _version() -> str:
@@ -79,7 +92,10 @@ class MetaPublisher:
         async with httpx.AsyncClient(timeout=60, transport=self._transport) as c:
             try:
                 r = await c.request(
-                    method, url, data=params if method == "POST" else None, params=params if method == "GET" else None
+                    method,
+                    url,
+                    data=params if method == "POST" else None,
+                    params=params if method in ("GET", "DELETE") else None,
                 )
             except httpx.HTTPError as e:
                 raise IntegrationError(f"Không kết nối được Meta: {e}") from e
@@ -240,6 +256,36 @@ class MetaPublisher:
             "permalink"
         )
         return PublishResult(external_id=tid, url=link, status="published", published_at=now_utc())
+
+    # ---- gỡ bài (ngừng bán) --------------------------------------------------------------------------------------
+
+    def remove_modes(self, channel: Channel) -> frozenset[str]:
+        return REMOVE_MODES.get(channel, frozenset())
+
+    async def remove_post(self, channel: Channel, external_id: str, *, mode: RemoveMode = "hide") -> RemoveResult:
+        if mode not in self.remove_modes(channel):
+            return RemoveResult(mode="unsupported")
+        if channel == Channel.FACEBOOK:
+            _, token = self._page()
+            if mode == "hide":
+                await self._call("POST", self._g(external_id), {"is_hidden": "true", "access_token": token})
+                return RemoveResult(mode="hidden")
+            await self._call("DELETE", self._g(external_id), {"access_token": token})
+            return RemoveResult(mode="deleted")
+        if channel == Channel.INSTAGRAM:
+            _, token = self._ig()
+            await self._call("DELETE", self._g(external_id), {"access_token": token})
+            return RemoveResult(mode="deleted")
+        uid, token = self._threads()
+        limiter.check(f"threads-delete:{uid}", limit=100, per_seconds=DAY, label="Threads (xoá bài)")
+        await self._call("DELETE", f"{THREADS}/v1.0/{external_id}", {"access_token": token})
+        return RemoveResult(mode="deleted")
+
+    async def restore_post(self, channel: Channel, external_id: str) -> None:
+        if channel != Channel.FACEBOOK:
+            raise IntegrationError(f"Kênh {channel} không hiện lại bài được.", code="unsupported")
+        _, token = self._page()
+        await self._call("POST", self._g(external_id), {"is_hidden": "false", "access_token": token})
 
     # ---- số liệu -------------------------------------------------------------------------------------------------
 

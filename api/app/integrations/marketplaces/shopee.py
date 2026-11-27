@@ -1,7 +1,8 @@
 """Shopee Open Platform v2 — **khung driver**, viết theo tài liệu công khai (open.shopee.com), CHƯA thử thật.
 
 Đã có: ký yêu cầu, kéo đơn (get_order_list + get_order_detail), cập nhật tồn, sửa tên/giá sản phẩm đã có,
-báo đã gửi hàng (logistics/get_shipping_parameter + ship_order, kèm mã vận đơn). Chưa làm: tạo sản phẩm mới (cần mã
+báo đã gửi hàng (logistics/get_shipping_parameter + ship_order, kèm mã vận đơn), ngừng bán / mở bán lại
+(v2.product.unlist_item, `item_list` với `unlist` true/false — CHƯA thử thật). Chưa làm: tạo sản phẩm mới (cần mã
 ngành hàng, ảnh tải lên media_space, cài đặt vận chuyển), làm mới access token (OAuth). Khoá: `SHOPEE_PARTNER_ID`, `SHOPEE_PARTNER_KEY` (config chung);
 `SHOPEE_SHOP_ID`, `SHOPEE_ACCESS_TOKEN` đọc từ biến môi trường hệ thống (người tích hợp nên chuyển vào Settings).
 Bật: `MARKETPLACES_DRIVER=shopee` (orders dùng driver thật theo từng sàn khi driver khác `mock`).
@@ -36,6 +37,7 @@ def sign(partner_key: str, partner_id: str, path: str, ts: int, access_token: st
 
 class Driver(MarketplacesDriver):
     name = "shopee"
+    supports_deactivate = True
 
     async def _creds(self) -> tuple[str, str, str, str]:
         """Cài đặt → Mạng xã hội (thẻ Shopee, token tự làm mới) > biến môi trường."""
@@ -110,6 +112,22 @@ class Driver(MarketplacesDriver):
                 "stock_list": [{"model_id": 0, "seller_stock": [{"stock": max(0, stock)}]}],
             },
         )
+
+    async def deactivate_product(self, marketplace: Channel, external_id: str) -> None:
+        await self._unlist(marketplace, external_id, True)
+
+    async def activate_product(self, marketplace: Channel, external_id: str) -> None:
+        await self._unlist(marketplace, external_id, False)
+
+    async def _unlist(self, marketplace: Channel, external_id: str, unlist: bool) -> None:
+        """v2.product.unlist_item theo tài liệu open.shopee.com, CHƯA thử thật. Món lỗi nằm ở `failure_list`."""
+        self._check(marketplace)
+        res = await self._call(
+            "POST", "/api/v2/product/unlist_item", body={"item_list": [{"item_id": int(external_id), "unlist": unlist}]}
+        )
+        failed = res.get("failure_list") or []
+        if failed:
+            raise IntegrationError(f"Shopee báo lỗi: {failed[0].get('failed_reason') or failed[0]}")
 
     async def fetch_orders(self, marketplace: Channel, since: datetime | None = None) -> list[MarketplaceOrder]:
         self._check(marketplace)

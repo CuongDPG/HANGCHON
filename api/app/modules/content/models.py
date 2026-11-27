@@ -50,6 +50,8 @@ class PostStatus(StrEnum):
     DRAFT_PUSHED = "draft_pushed"  # TikTok: đã đẩy bản nháp vào app
     FAILED = "failed"
     CANCELLED = "cancelled"
+    HIDDEN = "hidden"  # đã ẩn trên kênh khi chị ngừng bán (hiện lại được khi mở bán lại)
+    REMOVED = "removed"  # đã xoá hẳn trên kênh hoặc chị đã gỡ tay khi ngừng bán
 
 
 class MediaKind(StrEnum):
@@ -181,6 +183,10 @@ class ScheduledPost(UUIDPk, Timestamps, Base):
     error: Mapped[str | None] = mapped_column(Text)
     approval_item_id: Mapped[uuid.UUID | None] = fk("approval_items", index=False)
     ai_label_applied: Mapped[bool] = flag()
+    removal: Mapped[dict[str, Any]] = json_obj(
+        comment='Ngừng bán: {"stop_id","outcome":"cancelled|hidden|deleted|manual|needs_manual|failed","error","at",'
+        '"prev_status","restored_at","restore_error"}'
+    )
 
 
 class PostMetric(UUIDPk, CreatedAt, Base):

@@ -18,6 +18,7 @@ from app.modules.catalog import drops as drop_svc
 from app.modules.catalog import finds as find_svc
 from app.modules.catalog import products as product_svc
 from app.modules.catalog import reviews as review_svc
+from app.modules.catalog import stop_selling
 from app.modules.catalog.models import (
     Drop,
     DropStatus,
@@ -96,6 +97,23 @@ async def _unpublish_product(ctx: control.UndoContext) -> None:
     p = await product_svc.get_product(ctx.db, uuid.UUID(ctx.undo["product_id"]))
     p.status = ProductStatus.PAUSED
     await ctx.db.flush()
+
+
+control.register_action(
+    stop_selling.ACTION, "Ngừng bán một món trên mọi kênh", GROUP, default="ask", customer_facing=True,
+    description="Chị bấm «Ngừng bán»: gỡ khỏi website, huỷ lịch đăng, ẩn/xoá bài đã đăng, ngừng bán trên sàn. Chị tự "
+    "bấm thì làm ngay; hoàn tác = «Mở bán lại».",
+)  # fmt: skip
+
+
+@control.handler(stop_selling.ACTION)
+async def _stop_selling(ctx: control.ActionContext) -> control.HandlerResult:
+    return await stop_selling.apply_stop(ctx)
+
+
+@control.undoer(stop_selling.ACTION)
+async def _resume_selling(ctx: control.UndoContext) -> None:
+    await stop_selling.undo_stop(ctx)
 
 
 @control.on_returned("catalog.publish_product")

@@ -41,6 +41,8 @@ export const DISPLAY_STATUS: Record<DisplayStatus, { label: string; tone: BadgeT
   needs_fix: { label: "Cần sửa", tone: "danger" },
   failed: { label: "Đăng lỗi", tone: "danger" },
   publishing: { label: "Đang đăng", tone: "accent" },
+  hidden: { label: "Đã ẩn (ngừng bán)", tone: "neutral" },
+  removed: { label: "Đã gỡ (ngừng bán)", tone: "neutral" },
 };
 
 export function StatusBadge({ status }: { status: DisplayStatus }) {

@@ -53,7 +53,8 @@ Ghi chú: tài liệu hôm nay nói phiên bản Graph mới nhất là **v27.0*
 
 **Chị cần chuẩn bị:** tài khoản Instagram **chuyên nghiệp** (doanh nghiệp hoặc nhà sáng tạo) liên kết với Trang ở trên;
 quyền `instagram_basic`, `instagram_content_publish`, `pages_read_engagement` (API Instagram qua Đăng nhập bằng Facebook,
-dùng mã Trang).
+dùng mã Trang). «Ngừng bán» xoá hẳn bài Instagram cần thêm `instagram_manage_contents` (theo changelog Meta 12/2025, chưa
+đối chiếu tài liệu tham chiếu, chưa thử thật); Instagram không có «ẩn bài».
 
 **Bước 1.** Trong Graph API Explorer (mã Trang), gọi `GET /{ID Trang}?fields=instagram_business_account`.
 **Bước 2.** Chép `id` vào ô «ID tài khoản Instagram công việc», Lưu → Kiểm tra (hiện @tên).
@@ -69,7 +70,8 @@ Nguồn: [Đăng nội dung](https://developers.facebook.com/docs/instagram-plat
 
 **Chị cần chuẩn bị:** ứng dụng Meta tạo với trường hợp sử dụng **Threads** (có ID + khoá bí mật ứng dụng Threads riêng);
 tài khoản Threads của chị được mời làm «Người dùng thử Threads» và đã chấp nhận; quyền `threads_basic`,
-`threads_content_publish` (thêm `threads_manage_insights` để xem số liệu).
+`threads_content_publish` (thêm `threads_manage_insights` để xem số liệu; `threads_delete` nếu muốn «Ngừng bán» xoá hẳn
+bài Threads — tối đa 100 lượt xoá / 24 giờ).
 
 **Bước 1.** Bảng điều khiển ứng dụng → Vai trò → mời tài khoản Threads; chấp nhận trong Cài đặt Threads → Quyền.
 **Bước 2.** Tạo mã người dùng (Graph API Explorer, máy chủ graph.threads.net), đổi sang mã dài hạn (`GET /access_token`).

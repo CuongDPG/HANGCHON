@@ -48,8 +48,24 @@ class MarketplaceOrder(BaseModel):
     raw: dict = Field(default_factory=dict)
 
 
+def driver_for(mk: Channel) -> MarketplacesDriver:
+    """Công tắc của sàn ở Cài đặt → Mạng xã hội; chưa đặt thì theo MARKETPLACES_DRIVER (mock = sàn giả, khác = driver
+    thật của đúng sàn đó: tiktok_shop / shopee)."""
+    from app.core.config import settings
+    from app.integrations import channel_config, get_driver
+
+    chosen = channel_config.mode(mk.value)
+    if chosen == "real":
+        return get_driver("marketplaces", mk.value)
+    if chosen == "mock" or settings.marketplaces_driver == "mock":
+        return get_driver("marketplaces", "mock")
+    return get_driver("marketplaces", mk.value)
+
+
 class MarketplacesDriver(abc.ABC):
     name: str
+    # Ngừng bán / mở bán lại một món trên sàn qua API. False = nơi gọi tự đặt tồn về 0 thay thế (và nói rõ với chị).
+    supports_deactivate: bool = False
 
     @abc.abstractmethod
     async def upsert_product(self, marketplace: Channel, product: MarketplaceProduct) -> str:
@@ -67,3 +83,15 @@ class MarketplacesDriver(abc.ABC):
     ) -> None:
         """Báo trạng thái giao của đơn lên sàn. `status` ∈ ORDER_STATUSES: «shipped» (kèm mã vận đơn của hãng giao
         mình tự gọi) · «delivered». Gọi lặp cùng mốc phải an toàn ở phía mình (orders tự giữ mốc đã báo)."""
+
+    async def deactivate_product(self, marketplace: Channel, external_id: str) -> None:
+        """Ngừng bán (ẩn khỏi gian hàng, giữ nguyên món trên sàn để mở bán lại). Chỉ gọi khi `supports_deactivate`."""
+        from app.integrations.base import IntegrationNotConfigured
+
+        raise IntegrationNotConfigured("Sàn này chưa có lệnh ngừng bán qua API.")
+
+    async def activate_product(self, marketplace: Channel, external_id: str) -> None:
+        """Mở bán lại món đã ngừng bằng `deactivate_product`."""
+        from app.integrations.base import IntegrationNotConfigured
+
+        raise IntegrationNotConfigured("Sàn này chưa có lệnh mở bán lại qua API.")

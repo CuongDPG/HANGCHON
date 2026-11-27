@@ -13,13 +13,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import events
-from app.core.config import settings
 from app.core.enums import Actor, Channel, ShippingStatus
 from app.core.errors import BadRequest
 from app.core.timeutil import now_utc
-from app.integrations import get_driver
 from app.integrations.base import IntegrationError
 from app.integrations.marketplaces import MarketplaceOrder, MarketplaceProduct
+from app.integrations.marketplaces import driver_for as marketplaces_driver_for
 from app.modules.catalog.models import Product, ProductStatus, SaleMode
 from app.modules.orders import refs, service
 from app.modules.orders.models import (
@@ -44,16 +43,8 @@ MARKETPLACES = (Channel.TIKTOK_SHOP, Channel.SHOPEE)
 
 
 def driver_for(mk: Channel) -> Any:
-    """Công tắc của sàn ở Cài đặt → Mạng xã hội; chưa đặt thì theo MARKETPLACES_DRIVER (mock = sàn giả, khác = driver
-    thật của đúng sàn đó: tiktok_shop / shopee)."""
-    from app.integrations import channel_config
-
-    chosen = channel_config.mode(mk.value)
-    if chosen == "real":
-        return get_driver("marketplaces", mk.value)
-    if chosen == "mock" or settings.marketplaces_driver == "mock":
-        return get_driver("marketplaces", "mock")
-    return get_driver("marketplaces", mk.value)
+    """Driver của sàn (xem `app.integrations.marketplaces.driver_for`)."""
+    return marketplaces_driver_for(mk)
 
 
 def check_marketplace(mk: Channel) -> Channel:

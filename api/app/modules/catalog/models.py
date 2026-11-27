@@ -32,6 +32,7 @@ class ProductStatus(StrEnum):
     PENDING_REVIEW = "pending_review"  # AI dựng trang xong, chờ chị duyệt (e1)
     PUBLISHED = "published"
     PAUSED = "paused"  # tạm ẩn
+    STOPPED = "stopped"  # chị ngừng bán trên mọi kênh (web, bài đăng, sàn); «Mở bán lại» trả về như trước
     ARCHIVED = "archived"
 
 

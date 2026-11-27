@@ -40,8 +40,11 @@ from app.modules.control.models import ApprovalItem, ApprovalStatus
 
 def display_status(post: ScheduledPost, draft: ContentDraft | None) -> str:
     """Trạng thái hiển thị trên lịch: published · draft_pushed · approved («Đã duyệt, chờ giờ») · pending · needs_fix ·
-    failed · publishing."""
-    if post.status in (PostStatus.PUBLISHED, PostStatus.DRAFT_PUSHED, PostStatus.FAILED, PostStatus.PUBLISHING):
+    failed · publishing · hidden / removed (gỡ khi ngừng bán)."""
+    if post.status in (
+        PostStatus.PUBLISHED, PostStatus.DRAFT_PUSHED, PostStatus.FAILED, PostStatus.PUBLISHING, PostStatus.HIDDEN,
+        PostStatus.REMOVED,
+    ):  # fmt: skip
         return post.status.value
     if post.status == PostStatus.APPROVED:
         return "approved"

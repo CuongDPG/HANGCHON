@@ -243,7 +243,7 @@ export const catalogApi = {
 
 /* ---------------- desk ---------------- */
 
-export type ProductStatus = "draft" | "pending_review" | "published" | "paused" | "archived";
+export type ProductStatus = "draft" | "pending_review" | "published" | "paused" | "stopped" | "archived";
 export type DeskProductRow = {
   id: string;
   slug: string;
@@ -599,6 +599,7 @@ export const PRODUCT_STATUS_LABELS: Record<ProductStatus, string> = {
   pending_review: "Chờ chị duyệt",
   published: "Đang trên kệ",
   paused: "Tạm ẩn",
+  stopped: "Đã ngừng bán",
   archived: "Lưu trữ",
 };
 
@@ -776,4 +777,85 @@ export function useSalesDossier(id: string) {
 
 export function useProductPipeline() {
   return useQuery({ queryKey: ["catalog", "pipeline"], queryFn: () => api.get<ProductPipeline[]>(`${D}/products/pipeline`) });
+}
+
+/* ---------------- ngừng bán trên mọi kênh / mở bán lại ---------------- */
+
+export type StopPostRow = {
+  id: string;
+  channel: string;
+  label: string;
+  status: string;
+  url: string | null;
+  scheduled_at: string | null;
+  published_at: string | null;
+  /** Kênh ẩn được bài (hiện lại khi mở bán lại). */
+  can_hide: boolean;
+  /** Kênh xoá hẳn được (chỉ khi chị chọn «Xoá hẳn»). */
+  can_delete: boolean;
+  simulated: boolean;
+};
+export type StopListingRow = { id: string; marketplace: string; label: string; status: string; external_id: string | null; auto: boolean; simulated: boolean };
+export type StopDropRow = { id: string; code: string; title: string; status: string; status_label: string; slots_reserved: number };
+export type StopStepStatus = "done" | "needs_manual" | "failed" | "skipped" | "info";
+export type StopStep = {
+  kind: "website" | "scheduled_post" | "post" | "listing" | "drop";
+  label: string;
+  status: StopStepStatus;
+  detail: string;
+  id: string | null;
+  channel: string | null;
+  url: string | null;
+};
+export type StopPlan = {
+  product_id: string;
+  status: ProductStatus;
+  can_stop: boolean;
+  website_published: boolean;
+  scheduled_posts: StopPostRow[];
+  posts: StopPostRow[];
+  listings: StopListingRow[];
+  drops: StopDropRow[];
+  last_stop: {
+    activity_id: string;
+    at: string;
+    steps: StopStep[];
+    undone_at: string | null;
+    undoable: boolean;
+    hidden_posts: number;
+    gone_posts: number;
+    listings: number;
+    cancelled_posts: number;
+  } | null;
+};
+export type StopChoice = {
+  cancel_post_ids: string[];
+  remove_posts: { id: string; manual_done: boolean }[];
+  listing_ids: string[];
+  delete_posts: boolean;
+};
+export type StopRun = { product: DeskProduct; steps: StopStep[]; activity_id?: string | null };
+
+export function useStopPlan(id: string, enabled: boolean) {
+  return useQuery({ queryKey: ["catalog", "stop-plan", id], queryFn: () => api.get<StopPlan>(`${D}/products/${id}/stop-plan`), enabled });
+}
+
+function useStopMutation<V>(id: string, fn: (v: V) => Promise<StopRun>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: (run) => {
+      qc.setQueryData(catalogKeys.product(id), run.product);
+      void qc.invalidateQueries({ queryKey: ["catalog"] });
+      void qc.invalidateQueries({ queryKey: ["content"] });
+    },
+  });
+}
+
+export function useStopSelling(id: string) {
+  return useStopMutation(id, (body: StopChoice) => api.post<StopRun>(`${D}/products/${id}/stop`, body));
+}
+
+export function useResumeSelling(id: string) {
+  return useStopMutation(id, () => api.post<StopRun>(`${D}/products/${id}/resume`));
 }

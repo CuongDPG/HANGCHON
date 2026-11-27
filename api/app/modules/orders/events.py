@@ -34,3 +34,19 @@ async def _message_received(db: AsyncSession, payload: dict[str, Any]) -> None:
 async def _contact_submitted(db: AsyncSession, payload: dict[str, Any]) -> None:
     """h4: khách tự để lại liên hệ (sổ người dùng thử «Mời thử cùng») → khớp hoặc tạo hồ sơ khách."""
     await customers.ensure_from_contact(db, payload)
+
+
+@events.on("product.sale_stop_requested")
+async def _sale_stop(db: AsyncSession, payload: dict[str, Any]) -> None:
+    """g9: chị ngừng bán một món → ngừng bán trên TikTok Shop / Shopee (sàn chưa có lệnh thì đặt tồn về 0)."""
+    from app.modules.orders import delist
+
+    await delist.on_stop(db, payload)
+
+
+@events.on("product.sale_resume_requested")
+async def _sale_resume(db: AsyncSession, payload: dict[str, Any]) -> None:
+    """g9: chị mở bán lại → mở bán lại trên sàn và đẩy lại tồn."""
+    from app.modules.orders import delist
+
+    await delist.on_resume(db, payload)

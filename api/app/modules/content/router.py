@@ -22,7 +22,6 @@ from app.modules.content import facts, livestream, planner, publishing, service,
 from app.modules.content.models import (
     ContentDraft,
     ContentInsight,
-    DraftStatus,
     LivestreamScript,
     MediaAsset,
     MediaPurpose,
@@ -239,17 +238,7 @@ async def reschedule(post_id: uuid.UUID, body: PostPatch, user: CurrentUser, db:
 @router.post("/posts/{post_id}/cancel", response_model=PostCard)
 async def cancel_post(post_id: uuid.UUID, user: OwnerUser, db: DbSession) -> PostCard:
     p = await _post(db, post_id)
-    if p.status not in (PostStatus.PLANNED, PostStatus.APPROVED, PostStatus.FAILED):
-        raise Conflict("Bài đã đăng, không huỷ lịch được.", code="post_locked")
-    p.status = PostStatus.CANCELLED
-    d = await db.get(ContentDraft, p.draft_id)
-    if d is not None and d.status == DraftStatus.SCHEDULED:
-        d.status = DraftStatus.APPROVED
-    await control.cancel_pending(db, action=service.ACTION_PUBLISH, dedupe_key=service.publish_key(p.draft_id))
-    await control.audit(
-        db, "content.post_cancelled", user=user, entity_type="scheduled_posts", entity_id=p.id, summary="Huỷ lịch đăng"
-    )
-    await db.flush()
+    await publishing.cancel_scheduled(db, p, user)
     return PostCard.model_validate((await planner.post_cards(db, [p]))[0])
 
 
@@ -263,6 +252,8 @@ async def mark_published(post_id: uuid.UUID, body: MarkPublishedBody, user: Owne
 async def publish_now(post_id: uuid.UUID, user: OwnerUser, db: DbSession) -> PostCard:
     """Đăng ngay bài đã duyệt (hoặc đăng lại bài lỗi) thay vì chờ tới giờ."""
     p = await _post(db, post_id)
+    if await publishing.is_stopped(db, p.product_id):
+        raise Conflict("Món này đang ngừng bán. Chị mở bán lại rồi mới đăng bài.", code="product_stopped")
     if p.status == PostStatus.FAILED:
         item = await db.scalar(
             select(ApprovalItem.id).where(

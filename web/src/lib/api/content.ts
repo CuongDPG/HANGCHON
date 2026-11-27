@@ -10,8 +10,8 @@ import { api, type Paginated } from "./client";
 export type ContentChannel = "facebook" | "instagram" | "threads" | "tiktok" | "zalo_oa";
 export type DraftStatus = "drafting" | "pending_review" | "approved" | "returned" | "scheduled" | "published" | "archived";
 export type CheckStatus = "unchecked" | "passed" | "warnings" | "failed";
-export type PostStatus = "planned" | "approved" | "publishing" | "published" | "draft_pushed" | "failed" | "cancelled";
-export type DisplayStatus = "published" | "draft_pushed" | "approved" | "pending" | "needs_fix" | "failed" | "publishing";
+export type PostStatus = "planned" | "approved" | "publishing" | "published" | "draft_pushed" | "failed" | "cancelled" | "hidden" | "removed";
+export type DisplayStatus = "published" | "draft_pushed" | "approved" | "pending" | "needs_fix" | "failed" | "publishing" | "hidden" | "removed";
 
 export type CheckFinding = {
   key: "numbers" | "claims" | "length" | "voice" | "process" | "reason" | "safety" | "ai_label";
