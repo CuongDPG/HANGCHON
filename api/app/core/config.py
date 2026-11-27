@@ -89,6 +89,10 @@ class Settings(BaseSettings):
     owner_password: str | None = "doimatkhau"
     owner_name: str = "Chị"
     create_owner_on_startup: bool = True
+    # phiên khách trên website («Của tôi»): cookie riêng, khoá ký riêng (bỏ trống = suy ra từ JWT_SECRET), ~90 ngày
+    customer_cookie_name: str = "hc_customer"
+    customer_session_secret: str | None = None
+    customer_session_days: int = 90
 
     # AI — chị đổi được ở Cài đặt → «AI và khoá API» (lưu trong CSDL, ghi đè các biến dưới đây)
     ai_provider: str = "fake"  # tên provider trong app/ai/providers: anthropic | openrouter | fake

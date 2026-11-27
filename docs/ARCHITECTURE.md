@@ -129,7 +129,7 @@ thứ tự **Cài đặt > env**; driver đọc `channel_config.value(kênh, ô)
 | `selection` | c1–c6 | `trial_notes`, `selection_decisions`, `selection_principles`, `taste_profiles` (giai đoạn bảng chọn là trường `candidates.stage`) |
 | `supply` | d1–d7 | `suppliers`, `cost_sheets`, `price_proposals`, `purchase_orders`, `purchase_order_lines`, `supplier_messages`, `inbound_shipments`, `provenance_documents` |
 | `catalog` | e1–e3, e6, e8–e10 | `categories`, `products`, `product_images`, `drops`, `drop_items`, `inventory_items`, `reviews`, `find_requests`, `find_request_votes` |
-| `orders` | e4, e5, g1–g9 | `customers`, `orders`, `order_items`, `payments`, `shipments`, `shipment_events`, `returns`, `notifications` |
+| `orders` | e4, e5, g1–g9 | `customers`, `orders`, `order_items`, `payments`, `shipments`, `shipment_events`, `returns`, `notifications`, `customer_login_codes` |
 | `assistant` | e7 | `assistant_conversations`, `assistant_messages` |
 | `content` | f1–f8 | `voice_profiles`, `content_drafts`, `scheduled_posts`, `media_assets`, `post_metrics`, `livestream_scripts` |
 | `inbox` | h1–h3, g6 | `channel_accounts`, `threads`, `messages`, `reply_drafts` |

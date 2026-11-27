@@ -19,6 +19,9 @@ Cấu hình: `ZALO_ZNS_TEMPLATES` (JSON) ánh xạ loại tin của hệ thống
 `{"order_received": {"template_id": "123456", "params": {"customer_name": "ten", "order_code": "ma_don"}}}` — khoá của
 `params` là tên tham số trong mẫu Zalo, giá trị là tên ô dữ liệu của hệ thống (như trong mẫu tin chị sửa: `ten`, `ma_don`,
 `tong_tien`, `link`...). Token: `app/integrations/_zalo_token.py`. `ZALO_ZNS_DEVELOPMENT=true` để gửi thử.
+Mã đăng nhập của khách trên website (loại tin `login_code`, ô dữ liệu `ma_dang_nhap`) cần một mẫu OTP riêng đã duyệt,
+vd `{"login_code": {"template_id": "…", "params": {"otp": "ma_dang_nhap"}}}`; chưa có mẫu thì khách đăng nhập bằng SĐT
+không nhận được mã (máy chủ ghi cảnh báo, câu trả lời cho khách không đổi).
 """
 
 from __future__ import annotations

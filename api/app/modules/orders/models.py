@@ -422,6 +422,22 @@ class Notification(UUIDPk, Timestamps, Base):
     ai_generated: Mapped[bool] = flag()
 
 
+class CustomerLoginCode(UUIDPk, CreatedAt, Base):
+    """Mã đăng nhập một lần của khách trên website («Của tôi» → Đơn của tôi): 6 chữ số gửi qua `notify`, chỉ lưu
+    bản băm (HMAC), hết hạn sau 10 phút, sai quá số lần thì bỏ. Không gắn khách: liên hệ lạ cũng có dòng (không gửi
+    tin) để câu trả lời không lộ số/email nào đã mua."""
+
+    __tablename__ = "customer_login_codes"
+    __table_args__ = (Index("ix_customer_login_codes_contact", "contact", "created_at"),)
+
+    contact_kind: Mapped[str] = mapped_column(String(10), comment="phone | email")
+    contact: Mapped[str] = mapped_column(String(254), comment="SĐT chuẩn hoá 0xxxxxxxxx hoặc email chữ thường")
+    code_hash: Mapped[str] = mapped_column(String(64))
+    expires_at: Mapped[datetime]
+    attempts: Mapped[int] = count()
+    consumed_at: Mapped[datetime | None] = mapped_column(comment="Đã dùng / bị thay bằng mã mới / sai quá số lần")
+
+
 class MarketplaceListing(UUIDPk, Timestamps, Base):
     """Bán trên TikTok Shop, Shopee (g9): ánh xạ sản phẩm ↔ mã trên sàn."""
 

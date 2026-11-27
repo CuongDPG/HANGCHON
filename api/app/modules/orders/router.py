@@ -24,6 +24,7 @@ from app.integrations import get_driver
 from app.integrations.base import IntegrationError
 from app.modules.catalog.models import Drop, Product
 from app.modules.orders import (
+    account,
     drafts,
     drops,
     marketplace,
@@ -108,7 +109,7 @@ from app.modules.orders.util import (
 store = APIRouter(prefix="/api/store/orders", tags=["orders · store"])
 desk = APIRouter(prefix="/api/desk/orders", tags=["orders · desk"])
 hooks = APIRouter(prefix="/api/hooks", tags=["orders · hooks"])
-routers = [store, desk, hooks]
+routers = [store, account.router, desk, hooks]
 
 
 def _address(body: Any) -> dict[str, Any]:
