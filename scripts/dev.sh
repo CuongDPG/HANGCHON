@@ -62,7 +62,7 @@ start() {
     echo "✗ Cổng $API_PORT đang bị chiếm" >&2
     exit 1
   fi
-  launch api "$ROOT/api" uv run uvicorn app.main:app --reload --host 0.0.0.0 --port "$API_PORT"
+  launch api "$ROOT/api" uv run uvicorn app.main:app --reload --host 0.0.0.0 --port "$API_PORT" --timeout-keep-alive 65
   launch worker "$ROOT/api" uv run arq app.worker.WorkerSettings --watch app
 
   if [[ -f "$ROOT/web/package.json" ]]; then
