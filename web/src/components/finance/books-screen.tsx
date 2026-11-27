@@ -61,7 +61,7 @@ export function BooksScreen() {
   const owner = hydrated && isOwner(user);
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Sổ sách" description="Sổ doanh thu, chi phí hộ kinh doanh, bảng kê khai thuế, hoá đơn điện tử." />
+      <PageHeader title="Sổ sách" />
       <Tabs
         aria-label="Phần sổ sách"
         value={tab}

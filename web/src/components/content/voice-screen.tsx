@@ -16,7 +16,7 @@ export function VoiceScreen() {
   const owner = session?.role === "owner";
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Giọng của chị" description="Mọi bài AI soạn đều theo hồ sơ này: xưng hô, độ dài câu, từ hay dùng, điều tránh." />
+      <PageHeader title="Giọng của chị" />
       <ContentNav />
       {isPending ? (
         <SkeletonList rows={4} />

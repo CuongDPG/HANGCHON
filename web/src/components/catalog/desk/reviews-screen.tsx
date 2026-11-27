@@ -33,7 +33,7 @@ export function ReviewsScreen() {
   const rows = data?.items ?? [];
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Đánh giá của khách" description="Khách nhận hàng được mời đánh giá. AI lọc spam, thô tục; chị duyệt mới hiện." />
+      <PageHeader title="Đánh giá của khách" />
       <DeskSubnav active="reviews" />
       <Tabs
         aria-label="Trạng thái đánh giá"

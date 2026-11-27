@@ -24,7 +24,6 @@ export function ContentHome() {
     <div className="flex flex-col gap-4">
       <PageHeader
         title="Nội dung"
-        description="Món đã chọn ở Bàn chọn về đây: trang website trước, rồi mỗi mạng xã hội một bài. AI soạn và soát, chị duyệt rồi mới đăng."
         actions={<ButtonLink href="/desk/noi-dung/lich" variant="secondary" size="sm" icon={<CalendarDays className="size-4" aria-hidden />}>Lịch</ButtonLink>}
       />
       <ContentNav />

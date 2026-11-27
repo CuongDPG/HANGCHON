@@ -61,7 +61,7 @@ export function DeskShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-dvh">
       <DeskTopBar activeKey={active?.key} user={user} ready={ready} />
-      <main id="noi-dung" className={MAIN_CLASS}>
+      <main id="noi-dung" data-desk className={MAIN_CLASS}>
         {gate}
         <div hidden={!ready} inert={!ready}>
           {children}
@@ -74,10 +74,13 @@ export function DeskShell({ children }: { children: ReactNode }) {
   );
 }
 
-/** Mọi màn bàn làm việc cùng một bề rộng (DESK_FRAME, tới 1440px, thẳng mép với hàng menu trên) để chuyển màn không nhảy khung. */
+/**
+ * Mọi màn bàn làm việc cùng một bề rộng (DESK_FRAME: hết bề ngang màn, thẳng mép với hàng menu trên) để chuyển màn không nhảy khung.
+ * `data-desk` bật kiểu đầu trang gọn của PageHeader.
+ */
 const MAIN_CLASS = cn(
   DESK_FRAME,
-  "px-4 pt-[max(16px,env(safe-area-inset-top))] pb-[calc(var(--spacing-tabbar)+env(safe-area-inset-bottom,0px)+88px)] md:pt-8 md:pb-28",
+  "px-4 pt-[max(16px,env(safe-area-inset-top))] pb-[calc(var(--spacing-tabbar)+env(safe-area-inset-bottom,0px)+88px)] md:pt-5 md:pb-28",
 );
 
 function ContentLoading() {
@@ -95,7 +98,7 @@ export function DeskShellFallback() {
   return (
     <div className="min-h-dvh">
       <DeskTopBar ready={false} />
-      <main className={MAIN_CLASS}>
+      <main data-desk className={MAIN_CLASS}>
         <ContentLoading />
       </main>
       <DeskTabBar onMore={() => {}} />

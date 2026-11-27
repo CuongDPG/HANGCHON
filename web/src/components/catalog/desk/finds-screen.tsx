@@ -26,7 +26,7 @@ export function FindsScreen() {
   const rows = data?.items ?? [];
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Nhờ tìm" description="Khách gửi nhu cầu, người khác bấm «mình cũng cần». Đủ người, AI báo sang Săn hàng." />
+      <PageHeader title="Nhờ tìm" />
       <DeskSubnav active="finds" />
       <ThresholdSetting />
       <Tabs

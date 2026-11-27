@@ -56,7 +56,7 @@ export function ApprovalsScreen() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Chờ duyệt" description="Mọi thứ AI làm xong cần chị gật: duyệt, sửa rồi duyệt, hoặc trả lại." />
+      <PageHeader title="Chờ duyệt" />
       <Tabs
         aria-label="Trạng thái"
         value={tab}

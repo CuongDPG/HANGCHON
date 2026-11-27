@@ -15,7 +15,7 @@ export function PerformanceScreen() {
     <div className="flex flex-col gap-4">
       <PageHeader
         title="Bài nào ra đơn"
-        description="Đơn được gắn với bài qua mã bài trong link. Số liệu cập nhật mỗi giờ."
+        description="Số liệu cập nhật mỗi giờ."
         actions={
           <Button size="sm" variant="ghost" icon={<RefreshCw className="size-4" aria-hidden />} loading={refresh.isPending} onClick={() => refresh.mutate(undefined, { onSuccess: () => notifySuccess("Đã cập nhật số liệu") })}>
             Cập nhật

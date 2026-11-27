@@ -52,7 +52,7 @@ export function AIConfigScreen() {
   if (user && !owner) return <OwnerOnly title="AI và khoá API" />;
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="AI và khoá API" description="Chọn nhà cung cấp AI, khoá API và model. Khoá được mã hoá khi lưu, chỉ hiện dạng che." />
+      <PageHeader title="AI và khoá API" description="Khoá được mã hoá khi lưu, chỉ hiện dạng che." />
       <SettingsNav />
       {isPending ? (
         <SkeletonList rows={4} />

@@ -35,7 +35,7 @@ export function LivestreamScreen() {
   const { data, isPending, error } = useLivestreams();
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Livestream" description="AI soạn dàn ý, thứ tự món, câu khách hay hỏi. Chị là người lên hình." />
+      <PageHeader title="Livestream" />
       <ContentNav />
       <CreateCard />
       <section className="flex flex-col gap-2">

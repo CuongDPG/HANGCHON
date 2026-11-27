@@ -127,6 +127,11 @@ export function BoardScreen() {
         eyebrow={data ? `${selectedTotal} món đã chọn` : undefined}
         actions={
           <>
+            {data ? (
+              <Button size="sm" variant="secondary" icon={<Mic className="size-4" aria-hidden />} onClick={() => setQuickNote(true)}>
+                Ghi nhanh<span className="max-md:hidden">, AI xếp vào món</span>
+              </Button>
+            ) : null}
             <IconLink href="/desk/ban-chon/nguyen-tac" label="Bộ nguyên tắc của chị" icon={<ListChecks />} />
             <IconLink href="/desk/ban-chon/gu" label="AI hiểu gu chị thế nào" icon={<Sparkles />} />
             <IconButton label="Cài đặt bàn chọn" icon={<Settings2 />} onClick={() => setSettingsOpen(true)} />
@@ -149,13 +154,6 @@ export function BoardScreen() {
         />
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="secondary" icon={<Mic className="size-4" aria-hidden />} onClick={() => setQuickNote(true)}>
-              Ghi nhanh, AI xếp vào món
-            </Button>
-            <p className="text-[13px] text-ink-2 max-md:hidden">Kéo thẻ sang cột khác để chuyển; loại thì ghi lý do.</p>
-          </div>
-
           {/* Điện thoại: tab */}
           <div className="flex flex-col gap-3 md:hidden">
             <Tabs
@@ -193,7 +191,7 @@ export function BoardScreen() {
                     </h2>
                     {s === "rejected" ? <RejectionSummary compact /> : null}
                     {/* tên cột + số luôn hiện; danh sách cuộn riêng trong cột */}
-                    <div data-column-list className="-mx-1.5 flex max-h-[calc(100dvh-15rem)] min-h-0 flex-col gap-2 overflow-y-auto overscroll-contain px-1.5 pt-1.5 pb-0.5">
+                    <div data-column-list className="-mx-1.5 flex max-h-[calc(100dvh-11rem)] min-h-0 flex-col gap-2 overflow-y-auto overscroll-contain px-1.5 pt-1.5 pb-0.5">
                       {page.visible.map((c, i) => (
                         <div key={c.id} className="relative">
                           {over?.stage === s && over.index === i && dragId ? (

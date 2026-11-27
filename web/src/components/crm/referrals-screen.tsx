@@ -54,7 +54,6 @@ export function ReferralsScreen() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Giới thiệu bạn"
-        description="Đo trước rồi mới mở rộng: đơn từ giới thiệu và người được giới thiệu có quay lại không."
         actions={<Button size="sm" variant="secondary" icon={<Plus className="size-4" />} onClick={() => setPickOpen(true)}>Tạo mã</Button>}
       />
       <KhachNav active="referral" />

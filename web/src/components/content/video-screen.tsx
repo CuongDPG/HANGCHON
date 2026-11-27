@@ -39,7 +39,7 @@ export function VideoScreen() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Video ngắn" description="Từ clip chị quay khi thử hàng, AI chọn đoạn, xếp thứ tự, chèn phụ đề, gợi ý nhạc. Chị xem rồi mới dùng." />
+      <PageHeader title="Video ngắn" />
       <ContentNav />
       <InlineSelect label="Món" value={productId} onChange={(v) => { setProductId(v); setPicked([]); }} options={options} placeholder="Chọn món để lọc clip" />
       <UploadCard productId={productId} />

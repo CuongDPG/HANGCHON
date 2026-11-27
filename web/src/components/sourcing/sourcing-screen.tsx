@@ -26,7 +26,7 @@ export function SourcingScreen() {
     <div className="flex flex-col gap-4">
       <PageHeader
         title="Săn hàng"
-        description={running ? `${running} đề đang chạy` : "Chị ra đề bằng lời, AI cho biết nó hiểu thế nào rồi mới tìm."}
+        description={running ? `${running} đề đang chạy` : undefined}
         actions={<IconLink href="/desk/san-hang/khung-cham" label="Khung chấm điểm" icon={<SlidersHorizontal />} />}
       />
       <Tabs

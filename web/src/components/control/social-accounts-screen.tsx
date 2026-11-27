@@ -43,7 +43,7 @@ export function SocialAccountsScreen() {
     <div className="flex flex-col gap-4">
       <PageHeader
         title="Mạng xã hội"
-        description="Nối tài khoản từng kênh để Hàng Chọn tự đăng bài, đọc tin nhắn, đồng bộ đơn. Kênh còn «Giả lập» thì không gửi gì ra ngoài."
+        description="Kênh còn «Giả lập» thì không gửi gì ra ngoài."
       />
       <SettingsNav />
       {isPending ? (

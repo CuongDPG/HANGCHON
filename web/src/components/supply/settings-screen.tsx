@@ -11,7 +11,7 @@ export function CostSettingsScreen() {
     <div className="flex flex-col gap-4">
       <PageHeader
         title="Tham số giá vốn"
-        description="Tỷ giá, cước, phí và thuế mặc định. Đổi xong, các món đang tự cập nhật sẽ được tính lại."
+        description="Đổi xong, các món đang tự cập nhật sẽ được tính lại."
         backHref="/desk/nguon-cung?tab=gia-von"
       />
       {isPending ? (

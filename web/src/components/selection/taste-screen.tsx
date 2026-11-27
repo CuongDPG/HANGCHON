@@ -28,7 +28,6 @@ export function TasteScreen() {
     <div className="flex flex-col gap-4">
       <PageHeader
         title="AI hiểu gu chị thế nào"
-        description="Sau mỗi lần chọn hoặc loại, AI tổng hợp lại để xếp hạng ứng viên cho giống mắt chị. Chị sửa nếu thấy chưa đúng."
         backHref="/desk/ban-chon"
         actions={
           <Button

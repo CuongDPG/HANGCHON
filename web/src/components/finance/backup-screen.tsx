@@ -68,7 +68,7 @@ export function BackupScreen() {
         title="Sao lưu"
         description="Sao lưu toàn bộ dữ liệu cửa hàng mỗi đêm. «Kiểm khôi phục» chỉ mở bản sao ra đọc thử, không ghi đè dữ liệu đang dùng."
         actions={
-          <Button icon={<DatabaseBackup className="size-4" />} loading={run.isPending} onClick={backupNow}>
+          <Button size="sm" icon={<DatabaseBackup className="size-4" />} loading={run.isPending} onClick={backupNow}>
             Sao lưu ngay
           </Button>
         }

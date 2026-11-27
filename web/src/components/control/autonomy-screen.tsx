@@ -61,7 +61,7 @@ export function AutonomyScreen() {
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader title="Mức tự chủ của AI" description="Mặc định là thận trọng: việc nội bộ AI tự làm, thứ khách nhìn thấy thì hỏi chị trước." />
+      <PageHeader title="Mức tự chủ của AI" />
 
       {isPending ? (
         <SkeletonList rows={4} />

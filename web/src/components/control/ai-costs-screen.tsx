@@ -37,8 +37,12 @@ export function AICostsScreen() {
   const { data, isPending, error, refetch } = useAICosts(month);
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader backHref="/desk/tu-chu" title="Chi phí AI" description="Tiền gọi AI theo tháng. Chạm trần thì AI dừng và hỏi chị." />
-      <InlineSelect aria-label="Tháng" value={month} onChange={setMonth} options={months} appearance="inline" className="self-start" />
+      <PageHeader
+        backHref="/desk/tu-chu"
+        title="Chi phí AI"
+        description="Chạm trần thì AI dừng và hỏi chị."
+        actions={<InlineSelect aria-label="Tháng" value={month} onChange={setMonth} options={months} appearance="inline" />}
+      />
       {isPending ? (
         <SkeletonList rows={3} />
       ) : error ? (
