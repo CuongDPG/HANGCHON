@@ -129,7 +129,9 @@ export function BoardScreen() {
           <>
             {data ? (
               <Button size="sm" variant="secondary" icon={<Mic className="size-4" aria-hidden />} onClick={() => setQuickNote(true)}>
-                Ghi nhanh<span className="max-md:hidden">, AI xếp vào món</span>
+                <span>
+                  Ghi nhanh<span className="max-md:hidden">, AI xếp vào món</span>
+                </span>
               </Button>
             ) : null}
             <IconLink href="/desk/ban-chon/nguyen-tac" label="Bộ nguyên tắc của chị" icon={<ListChecks />} />
