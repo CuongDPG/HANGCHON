@@ -29,6 +29,7 @@ import {
   type Decision,
   type Stage,
 } from "@/lib/api/selection";
+import { BOARD_PAGE, pageOf } from "./board-paging";
 import { CandidateCard, ContentQuickLink } from "./candidate-card";
 import { NoteComposer } from "./note-composer";
 import { ReasonsCard } from "./reasons-card";
@@ -58,6 +59,9 @@ export function BoardScreen() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const [over, setOver] = useState<{ stage: Stage; index: number } | null>(null);
+  const [shown, setShown] = useState<Partial<Record<Stage, number>>>({});
+  const shownOf = (s: Stage) => shown[s] ?? BOARD_PAGE;
+  const showMore = (s: Stage) => setShown((v) => ({ ...v, [s]: (v[s] ?? BOARD_PAGE) + BOARD_PAGE }));
 
   function setTab(t: Stage) {
     router.replace(`${pathname}?tab=${t}`, { scroll: false });
@@ -95,6 +99,13 @@ export function BoardScreen() {
   function onDragOverColumn(e: DragEvent<HTMLElement>, stage: Stage) {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
+    // cột tự cuộn khi kéo thẻ tới gần mép trên/dưới (dragover bắn liên tục khi đang giữ chuột)
+    const list = e.currentTarget.querySelector<HTMLElement>("[data-column-list]");
+    if (list) {
+      const r = list.getBoundingClientRect();
+      if (e.clientY < r.top + 48) list.scrollTop -= 16;
+      else if (e.clientY > r.bottom - 48) list.scrollTop += 16;
+    }
     const cards = Array.from(e.currentTarget.querySelectorAll<HTMLElement>("[data-card-id]"));
     let index = cards.length;
     for (let i = 0; i < cards.length; i++) {
@@ -154,53 +165,60 @@ export function BoardScreen() {
               items={STAGES.map((s) => ({ value: s, label: STAGE_LABELS[s], count: data.counts[s] }))}
             />
             {tab === "rejected" ? <RejectionSummary /> : null}
-            <Column cards={data.columns[tab]} stage={tab} />
+            <Column cards={data.columns[tab]} total={data.counts[tab]} stage={tab} shown={shownOf(tab)} onMore={() => showMore(tab)} />
           </div>
 
           {/* Máy tính: kanban kéo thả */}
           <div className="-mx-4 overflow-x-auto px-4 max-md:hidden md:mx-0 md:px-0">
             <div className="grid min-w-[880px] grid-cols-5 gap-2">
-              {STAGES.map((s) => (
-                <section
-                  key={s}
-                  aria-label={STAGE_LABELS[s]}
-                  onDragOver={(e) => onDragOverColumn(e, s)}
-                  onDragLeave={(e) => {
-                    if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver(null);
-                  }}
-                  onDrop={(e) => onDrop(e, s)}
-                  className={cn(
-                    "flex min-h-80 min-w-0 flex-col gap-2 rounded-md bg-soft/60 p-1.5 transition-colors",
-                    over?.stage === s && dragId && "bg-accent-wash outline-2 outline-dashed outline-accent/40",
-                  )}
-                >
-                  <h2 className="flex items-center justify-between px-1 pt-1 font-sans text-[13px] font-semibold tracking-[0.06em] text-ink-2 uppercase">
-                    {STAGE_LABELS[s]}
-                    <span className="rounded-sm bg-surface px-1.5 text-[12px] tabular-nums">{data.counts[s]}</span>
-                  </h2>
-                  {s === "rejected" ? <RejectionSummary compact /> : null}
-                  {data.columns[s].map((c, i) => (
-                    <div key={c.id} className="relative">
-                      {over?.stage === s && over.index === i && dragId ? (
-                        <div aria-hidden className="absolute -top-1.5 right-1 left-1 h-0.5 rounded-full bg-accent" />
-                      ) : null}
-                      <CandidateCard
-                        card={c}
-                        compact
-                        draggable
-                        dragging={dragId === c.id}
-                        onDragStart={(e) => {
-                          e.dataTransfer.setData("text/hangchon-card", c.id);
-                          e.dataTransfer.effectAllowed = "move";
-                          setDragId(c.id);
-                        }}
-                      />
-                      <ContentQuickLink card={c} compact />
+              {STAGES.map((s) => {
+                const page = pageOf(data.columns[s], shownOf(s), data.counts[s]);
+                return (
+                  <section
+                    key={s}
+                    aria-label={STAGE_LABELS[s]}
+                    onDragOver={(e) => onDragOverColumn(e, s)}
+                    onDragLeave={(e) => {
+                      if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver(null);
+                    }}
+                    onDrop={(e) => onDrop(e, s)}
+                    className={cn(
+                      "flex min-h-80 min-w-0 flex-col gap-2 rounded-md bg-soft/60 p-1.5 transition-colors",
+                      over?.stage === s && dragId && "bg-accent-wash outline-2 outline-dashed outline-accent/40",
+                    )}
+                  >
+                    <h2 className="flex items-center justify-between px-1 pt-1 font-sans text-[13px] font-semibold tracking-[0.06em] text-ink-2 uppercase">
+                      {STAGE_LABELS[s]}
+                      <span className="rounded-sm bg-surface px-1.5 text-[12px] tabular-nums">{data.counts[s]}</span>
+                    </h2>
+                    {s === "rejected" ? <RejectionSummary compact /> : null}
+                    {/* tên cột + số luôn hiện; danh sách cuộn riêng trong cột */}
+                    <div data-column-list className="-mx-1.5 flex max-h-[calc(100dvh-15rem)] min-h-0 flex-col gap-2 overflow-y-auto overscroll-contain px-1.5 pt-1.5 pb-0.5">
+                      {page.visible.map((c, i) => (
+                        <div key={c.id} className="relative">
+                          {over?.stage === s && over.index === i && dragId ? (
+                            <div aria-hidden className="absolute -top-1.5 right-1 left-1 h-0.5 rounded-full bg-accent" />
+                          ) : null}
+                          <CandidateCard
+                            card={c}
+                            compact
+                            draggable
+                            dragging={dragId === c.id}
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData("text/hangchon-card", c.id);
+                              e.dataTransfer.effectAllowed = "move";
+                              setDragId(c.id);
+                            }}
+                          />
+                          <ContentQuickLink card={c} compact />
+                        </div>
+                      ))}
+                      {!data.columns[s].length ? <p className="px-1 py-4 text-[13px] text-ink-3">{EMPTY[s]}</p> : null}
+                      <MoreCards more={page.more} notLoaded={page.notLoaded} onMore={() => showMore(s)} compact />
                     </div>
-                  ))}
-                  {!data.columns[s].length ? <p className="px-1 py-4 text-[13px] text-ink-3">{EMPTY[s]}</p> : null}
-                </section>
-              ))}
+                  </section>
+                );
+              })}
             </div>
           </div>
         </>
@@ -228,17 +246,39 @@ export function BoardScreen() {
   );
 }
 
-function Column({ cards, stage }: { cards: BoardCard[]; stage: Stage }) {
+type ColumnProps = { cards: BoardCard[]; total: number; stage: Stage; shown: number; onMore: () => void };
+
+function Column({ cards, total, stage, shown, onMore }: ColumnProps) {
   if (!cards.length) return <EmptyState icon={<Stamp />} title={`Chưa có món nào ở «${STAGE_LABELS[stage]}»`} description={EMPTY[stage]} />;
+  const page = pageOf(cards, shown, total);
   return (
-    <ul className="flex flex-col gap-2">
-      {cards.map((c) => (
-        <li key={c.id} className="flex flex-col gap-1">
-          <CandidateCard card={c} />
-          <ContentQuickLink card={c} />
-        </li>
-      ))}
-    </ul>
+    <div className="flex flex-col gap-2">
+      <ul className="flex flex-col gap-2">
+        {page.visible.map((c) => (
+          <li key={c.id} className="flex flex-col gap-1">
+            <CandidateCard card={c} />
+            <ContentQuickLink card={c} />
+          </li>
+        ))}
+      </ul>
+      <MoreCards more={page.more} notLoaded={page.notLoaded} onMore={onMore} />
+    </div>
+  );
+}
+
+/** «Xem thêm (n)» cuối cột; cột vượt trần tải thì nói rõ còn bao nhiêu món chưa hiện. */
+function MoreCards({ more, notLoaded, onMore, compact = false }: { more: number; notLoaded: number; onMore: () => void; compact?: boolean }) {
+  return (
+    <>
+      {more > 0 ? (
+        <Button size="sm" variant="secondary" block={compact} className={compact ? undefined : "self-center"} onClick={onMore}>
+          Xem thêm ({more})
+        </Button>
+      ) : null}
+      {more === 0 && notLoaded > 0 ? (
+        <p className="px-1 text-[12.5px] text-ink-3">Còn {notLoaded} món cũ hơn chưa hiện trên bàn chọn.</p>
+      ) : null}
+    </>
   );
 }
 
