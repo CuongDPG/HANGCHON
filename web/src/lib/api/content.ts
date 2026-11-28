@@ -98,20 +98,53 @@ export type Draft = {
   updated_at: string;
 };
 
-export type StudioItem = {
+/** Kênh trên bảng Xưởng: Website (trang chính thức) rồi từng mạng xã hội. */
+export type BoardChannelKey = "website" | ContentChannel;
+/** na = kênh không dùng cho loại này (đợt không có Threads/TikTok). */
+export type BoardState = "na" | "none" | "drafting" | "pending" | "scheduled" | "published" | "failed" | "removed";
+export type BoardStage = "todo" | "review" | "scheduled" | "published";
+
+/** Số liệu bài đã đăng (lần đo mới nhất) + đơn gắn qua mã bài. */
+export type BoardKpi = {
+  posts: number;
+  reach: number;
+  interactions: number;
+  clicks: number;
+  orders: number;
+  revenue_vnd: number;
+  measured_at: string | null;
+};
+
+export type BoardChannel = {
+  channel: BoardChannelKey;
+  state: BoardState;
+  raw: string | null;
+  needs_fix: boolean;
+  draft_id: string | null;
+  post_id: string | null;
+  created_at: string | null;
+  approved_at: string | null;
+  scheduled_at: string | null;
+  published_at: string | null;
+  external_url: string | null;
+  error: string | null;
+  kpi: BoardKpi | null;
+};
+
+export type BoardRow = {
   kind: "product" | "drop";
   id: string;
   name: string;
   subtitle: string | null;
   image_url: string | null;
   status: string;
-  total: number;
-  approved: number;
-  drafting: number;
-  needs_fix: number;
-  pending: number;
+  stage: BoardStage;
+  channels: BoardChannel[];
+  kpi: BoardKpi;
   updated_at: string;
 };
+
+export type ContentBoard = Paginated<BoardRow> & { counts: Record<BoardStage | "all", number> };
 
 export type StudioDetail = {
   kind: "product" | "drop";
@@ -132,6 +165,8 @@ export type StudioDetail = {
   /** Trạng thái trang sản phẩm trên website (chỉ với `kind: "product"`). */
   page_status?: string | null;
   candidate_id?: string | null;
+  /** Dòng của bảng Xưởng cho món này: trạng thái, mốc thời gian, số liệu từng kênh. */
+  tracking?: BoardRow | null;
 };
 
 export type PostCard = {
@@ -264,7 +299,7 @@ const B = "/api/desk/content";
 
 export const contentKeys = {
   all: ["content"] as const,
-  studio: () => ["content", "studio"] as const,
+  board: (q: object) => ["content", "board", q] as const,
   detail: (kind: string, id: string) => ["content", "detail", kind, id] as const,
   calendar: (week?: string) => ["content", "calendar", week ?? "now"] as const,
   performance: () => ["content", "performance"] as const,
@@ -290,8 +325,12 @@ function useInvalidateContent() {
 
 // ---- xưởng ----------------------------------------------------------------------------------------------------
 
-export function useStudio() {
-  return useQuery({ queryKey: contentKeys.studio(), queryFn: () => api.get<Paginated<StudioItem>>(`${B}/studio`) });
+export function useContentBoard(query: { tab?: BoardStage | "all"; q?: string; channel?: BoardChannelKey | null; size?: number }) {
+  return useQuery({
+    queryKey: contentKeys.board(query),
+    queryFn: () => api.get<ContentBoard>(`${B}/board`, { query: { size: 200, ...query, channel: query.channel || undefined } }),
+    placeholderData: (prev) => prev,
+  });
 }
 
 export function useStudioDetail(kind: "product" | "drop", id: string) {

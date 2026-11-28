@@ -12,6 +12,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.enums import Channel
+from app.core.pagination import Paginated
 from app.modules.content.models import (
     CheckStatus,
     DraftFormat,
@@ -212,6 +213,60 @@ class StudioItem(BaseModel):
     updated_at: datetime
 
 
+BoardState = Literal["na", "none", "drafting", "pending", "scheduled", "published", "failed", "removed"]
+BoardStage = Literal["todo", "review", "scheduled", "published"]
+
+
+class BoardKpi(BaseModel):
+    """Số liệu bài đã đăng (lần đo mới nhất mỗi bài, `post_metrics`) + đơn gắn qua mã bài (`?src=`)."""
+
+    posts: int = 0
+    reach: int = 0
+    interactions: int = 0  # thích + bình luận + chia sẻ + lưu
+    clicks: int = 0
+    orders: int = 0
+    revenue_vnd: int = 0
+    measured_at: datetime | None = None
+
+
+class BoardChannel(BaseModel):
+    """Trạng thái nội dung một kênh của một món: bài hiện tại (bản nháp chưa lưu trữ mới nhất) + bài trên lịch."""
+
+    channel: str  # website | facebook | instagram | threads | tiktok | zalo_oa
+    state: BoardState
+    # trạng thái gốc (bản nháp / bài trên lịch / trang) để màn hình nói rõ hơn: draft_pushed, paused, hidden…
+    raw: str | None = None
+    needs_fix: bool = False
+    draft_id: uuid.UUID | None = None
+    post_id: uuid.UUID | None = None
+    created_at: datetime | None = None
+    approved_at: datetime | None = None
+    scheduled_at: datetime | None = None
+    published_at: datetime | None = None
+    external_url: str | None = None
+    error: str | None = None
+    kpi: BoardKpi | None = None
+
+
+class BoardRow(BaseModel):
+    kind: Literal["product", "drop"]
+    id: uuid.UUID
+    name: str
+    subtitle: str | None
+    image_url: str | None
+    status: str
+    stage: BoardStage
+    channels: list[BoardChannel]
+    kpi: BoardKpi
+    updated_at: datetime
+
+
+class ContentBoard(Paginated[BoardRow]):
+    """Bảng theo dõi nội dung theo món (Xưởng) + số món mỗi tab (trước khi lọc tab)."""
+
+    counts: dict[str, int]
+
+
 class StudioDropInfo(BaseModel):
     id: uuid.UUID
     code: str
@@ -239,6 +294,8 @@ class StudioDetail(BaseModel):
     page_status: str | None = None
     # ứng viên ở Bàn chọn (link «Hồ sơ chọn»)
     candidate_id: uuid.UUID | None = None
+    # dòng của bảng Xưởng cho món này: trạng thái, mốc thời gian và số liệu từng kênh (Hồ sơ nội dung)
+    tracking: BoardRow | None = None
 
 
 class ComposeBody(BaseModel):

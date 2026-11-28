@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
-from typing import Annotated
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, File, Form, Query, UploadFile, status
 from sqlalchemy import select
 
 from app import control
@@ -14,11 +14,11 @@ from app.core.db import DbSession
 from app.core.deps import CurrentUser, OwnerUser
 from app.core.errors import BadRequest, Conflict, NotFound
 from app.core.jobs import enqueue
-from app.core.pagination import Paginated
+from app.core.pagination import Page, Paginated
 from app.core.storage import get_storage
 from app.core.timeutil import now_utc
 from app.modules.catalog.models import Drop, DropStatus, Product, ProductStatus
-from app.modules.content import facts, livestream, planner, publishing, service, video, views, voice
+from app.modules.content import board, facts, livestream, planner, publishing, service, video, views, voice
 from app.modules.content.models import (
     ContentDraft,
     ContentInsight,
@@ -34,6 +34,7 @@ from app.modules.content.schemas import (
     ApproveDraftBody,
     CalendarOut,
     ComposeBody,
+    ContentBoard,
     ContentInsightOut,
     DraftPatch,
     DraftView,
@@ -107,6 +108,22 @@ async def _approve_pending(db: DbSession, action: str, dedupe_key: str, user, pa
 async def studio(_: CurrentUser, db: DbSession) -> Paginated[StudioItem]:
     items = [StudioItem.model_validate(i) for i in await service.studio_items(db)]
     return _list(items)
+
+
+@router.get("/board", response_model=ContentBoard)
+async def content_board(
+    _: CurrentUser,
+    db: DbSession,
+    page: Page,
+    tab: Annotated[Literal["todo", "review", "scheduled", "published", "all"], Query()] = "all",
+    q: Annotated[str | None, Query(max_length=100)] = None,
+    channel: Annotated[
+        str | None, Query(description="website | facebook | instagram | threads | tiktok | zalo_oa")
+    ] = None,
+) -> ContentBoard:
+    """Xưởng: mỗi món một dòng, trạng thái từng kênh + số liệu bài; `counts` là số món mỗi tab (sau tìm/lọc kênh)."""
+    out = await board.board(db, tab=tab, q=q, channel=channel, page=page.page, size=page.size)
+    return ContentBoard.model_validate(out)
 
 
 @router.get("/studio/{kind}/{ref_id}", response_model=StudioDetail)

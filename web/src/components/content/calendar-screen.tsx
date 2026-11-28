@@ -101,6 +101,7 @@ export function CalendarScreen() {
           </>
         }
       />
+      <TodayStrip onOpen={setOpen} />
       <div className="flex flex-wrap items-center gap-2">
         {(["published", "approved", "pending", "draft_pushed", "needs_fix", "failed"] as const).map((k) =>
           counts[k] || k === "published" || k === "approved" || k === "pending" ? (
@@ -188,6 +189,38 @@ export function CalendarScreen() {
       ) : null}
       <PostSheet post={open} onClose={() => setOpen(null)} />
     </div>
+  );
+}
+
+/** «Hôm nay đăng»: các bài của hôm nay (luôn theo tuần hiện tại), mỗi dòng bấm mở bài. */
+function TodayStrip({ onOpen }: { onOpen: (p: PostCard) => void }) {
+  const { data } = useCalendar();
+  const day = data?.days.find((d) => isToday(d.day));
+  if (!day?.posts.length) return null;
+  return (
+    <section aria-label="Hôm nay đăng" className="rounded-md border border-line bg-surface">
+      <p className="px-3 pt-1.5 text-[12px] font-semibold tracking-[0.06em] text-accent md:hidden">Hôm nay</p>
+      <ul className="flex flex-col divide-y divide-line">
+        {day.posts.map((p, i) => (
+          <li key={p.id}>
+            <button
+              type="button"
+              onClick={() => onOpen(p)}
+              className="flex w-full min-w-0 items-center gap-2 px-3 py-1.5 text-left text-[14px] hover:bg-soft"
+            >
+              <span aria-hidden className="hidden w-[4.5rem] shrink-0 text-[12px] md:block font-semibold tracking-[0.06em] text-accent">
+                {i === 0 ? "Hôm nay" : ""}
+              </span>
+              <span className="shrink-0 font-semibold tabular-nums">{formatTime(p.scheduled_at)}</span>
+              <ChannelMark channel={p.channel} className="size-5 text-[10px]" />
+              <span className="shrink-0 max-md:sr-only">{p.channel_label}</span>
+              <span className="min-w-0 flex-1 truncate text-ink-2">{p.name ?? p.title}</span>
+              <StatusBadge status={p.display_status} />
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

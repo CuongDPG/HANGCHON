@@ -38,8 +38,14 @@ test.describe.configure({ mode: "serial" });
 test("xưởng: viết lại, duyệt, xếp lịch", async ({ page }, info) => {
   await login(page);
   const main = page.getByRole("main");
+  // bảng theo dõi theo món: tab theo bước (URL), mỗi dòng có dải trạng thái từng kênh
+  await main.getByRole("tab", { name: /Chờ chị duyệt/ }).click();
+  await expect(page).toHaveURL(/\/desk\/noi-dung\?tab=review$/);
   await main.getByRole("tab", { name: /Tất cả/ }).click();
-  await expect(page).toHaveURL(/\/desk\/noi-dung\?tab=all$/);
+  await expect(page).toHaveURL(/\/desk\/noi-dung$/);
+  const row = main.getByRole("link", { name: /Móc dán tường/ }).first();
+  await expect(row.getByRole("list", { name: "Trạng thái từng kênh" }).getByRole("listitem")).toHaveCount(6);
+  await expect(row.getByText(/^Facebook: /)).toBeAttached();
   await shot(page, "noi-dung", info.project.name);
   await noOverflow(page);
 

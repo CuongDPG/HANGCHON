@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import NotFound
 from app.modules.catalog.models import Drop, Product
-from app.modules.content import facts, service
+from app.modules.content import board, facts, service
 from app.modules.content.channels import channel_label
 from app.modules.content.checks import can_approve
 from app.modules.content.models import ContentDraft, DraftStatus, LivestreamScript, MediaAsset, ScriptStatus
@@ -93,6 +93,7 @@ async def studio_detail(db: AsyncSession, kind: str, ref_id: uuid.UUID) -> Studi
             drop=StudioDropInfo(id=drop.id, code=drop.code, title=drop.title, closes_at=drop.closes_at),
             drafts=[await draft_view(db, d, keys) for d in drafts],
             compose_pending=any(d.status == DraftStatus.DRAFTING for d in drafts),
+            tracking=await board.one(db, "drop", drop.id),
         )
     product = await db.get(Product, ref_id)
     if product is None:
@@ -118,6 +119,7 @@ async def studio_detail(db: AsyncSession, kind: str, ref_id: uuid.UUID) -> Studi
         drop=StudioDropInfo(id=drop.id, code=drop.code, title=drop.title, closes_at=drop.closes_at) if drop else None,
         drafts=[await draft_view(db, d, keys) for d in drafts],
         compose_pending=any(d.status == DraftStatus.DRAFTING for d in drafts),
+        tracking=await board.one(db, "product", product.id),
     )
 
 

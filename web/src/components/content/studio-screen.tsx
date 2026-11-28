@@ -34,6 +34,7 @@ import {
   useOverrideCheck,
   useRewriteDraft,
   useStudioDetail,
+  type BoardChannel,
   type CheckFinding,
   type ContentChannel,
   type Draft,
@@ -41,10 +42,11 @@ import {
   type Scene,
   type StudioDetail,
 } from "@/lib/api/content";
-import { formatDateTime, formatDayMonth, formatTime, formatWeekday } from "@/lib/format";
+import { formatDateTime, formatDayMonth } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { CheckChips, ChannelMark, CHANNEL_LABEL, draftDisplay, isDone, localFile, MicButton, StatusBadge, toLocalInput, useSpeech } from "./shared";
 import { DeskMoreMenu } from "@/components/desk/desk-more-menu";
+import { ChannelState, KpiLine, STAGE, stateText } from "./board-parts";
 import { relatedItems } from "@/components/desk/related-links";
 import { useUrlParam } from "@/lib/use-url-param";
 
@@ -56,22 +58,23 @@ export function StudioScreen({ kind, id }: { kind: "product" | "drop"; id: strin
   // `?kenh=facebook` (từ Hồ sơ bán của sản phẩm) mở thẳng tab kênh đó
   const [tab, setTab] = useUrlParam<string>("kenh", "");
   const drafts = useMemo(() => [...(data?.drafts ?? [])].sort((a, b) => ORDER.indexOf(a.channel) - ORDER.indexOf(b.channel)), [data]);
-  const done = drafts.filter(isDone).length;
+  const stage = data?.tracking ? STAGE[data.tracking.stage] : null;
   const isProduct = kind === "product";
   // sản phẩm: Website là kênh đầu tiên (trang chính thức), rồi tới từng mạng xã hội — tab luôn đủ kênh
   const channels: string[] = isProduct ? [WEBSITE, ...ORDER] : drafts.map((d) => d.channel);
   const active = channels.includes(tab) ? tab : (channels[0] ?? "");
   const current = drafts.find((d) => d.channel === active);
+  const cell = data?.tracking?.channels.find((c) => c.channel === active);
   const live = data?.page_status === "published";
 
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
         backHref="/desk/noi-dung"
-        eyebrow={kind === "drop" ? "Đợt mở bán" : undefined}
-        title={data?.name ?? "Xưởng nội dung"}
+        eyebrow={kind === "drop" ? "Hồ sơ nội dung đợt" : "Hồ sơ nội dung"}
+        title={data?.name ?? "Hồ sơ nội dung"}
         loading={isPending}
-        badge={data && drafts.length ? <Badge tone={done === drafts.length ? "success" : "neutral"}>{done}/{drafts.length} bài đã duyệt</Badge> : undefined}
+        badge={stage ? <Badge tone={stage.tone}>{stage.label}</Badge> : undefined}
         actions={
           <DeskMoreMenu
             items={relatedItems(
@@ -104,6 +107,7 @@ export function StudioScreen({ kind, id }: { kind: "product" | "drop"; id: strin
                 return { value: ch, label: `${d?.channel_label ?? CHANNEL_LABEL[ch as ContentChannel] ?? ch}${d && isDone(d) ? " ✓" : ""}` };
               })}
             />
+            {cell ? <ChannelTracking cell={cell} /> : null}
             {active === WEBSITE ? (
               <PageContentEditor productId={id} />
             ) : current ? (
@@ -127,6 +131,39 @@ export function StudioScreen({ kind, id }: { kind: "product" | "drop"; id: strin
         </div>
       )}
     </div>
+  );
+}
+
+/** Dòng theo dõi bài của kênh đang mở: tạo → duyệt → hẹn giờ → đăng, link bài trên kênh, số liệu bài. */
+function ChannelTracking({ cell }: { cell: BoardChannel }) {
+  if (cell.state === "na") return null;
+  const web = cell.channel === "website";
+  const steps: [string, string | null][] = [
+    [web ? "Dựng trang" : "Soạn", cell.created_at],
+    ["Duyệt", cell.approved_at],
+    ["Hẹn đăng", cell.published_at ? null : cell.scheduled_at],
+    ["Đăng", cell.published_at],
+  ];
+  return (
+    <section aria-label="Theo dõi bài" className="flex flex-col gap-1.5 rounded-md border border-line bg-surface px-3 py-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-2">
+        <ChannelState cell={cell} />
+        <span className="text-ink">{stateText(cell)}</span>
+        {steps
+          .filter(([, at]) => at)
+          .map(([label, at]) => (
+            <span key={label} className="whitespace-nowrap tabular-nums">
+              {label} {formatDateTime(at!)}
+            </span>
+          ))}
+        {cell.external_url ? (
+          <a href={cell.external_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 whitespace-nowrap text-accent">
+            {web ? "Xem trên web" : "Xem bài trên kênh"} <ExternalLink className="size-3.5" aria-hidden />
+          </a>
+        ) : null}
+      </div>
+      {!web && cell.kpi ? <KpiLine kpi={cell.kpi} /> : null}
+    </section>
   );
 }
 
@@ -231,7 +268,6 @@ function DraftPanel({ draft, detail }: { draft: Draft; detail: StudioDetail }) {
           {status !== "pending" ? <StatusBadge status={status} /> : <LevelTag level="review" size="sm">Chờ chị duyệt</LevelTag>}
         </div>
         <Preview draft={draft} detail={detail} />
-        <ScheduleLine draft={draft} />
       </Card>
 
       <div className="flex flex-col gap-2">
@@ -281,10 +317,6 @@ function DraftPanel({ draft, detail }: { draft: Draft; detail: StudioDetail }) {
             <p className="flex-1 self-center text-[13px] text-ink-2">Chị là người duyệt bài.</p>
           )}
         </div>
-      ) : draft.post?.external_url ? (
-        <a href={draft.post.external_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[14px] text-accent">
-          Xem bài đã đăng <ExternalLink className="size-3.5" aria-hidden />
-        </a>
       ) : null}
       {!draft.can_approve && !locked && isOwner ? (
         <p className="-mt-2 text-[13px] text-seal">Còn mục soát chưa đạt — sửa bài hoặc bỏ qua có lý do thì mới duyệt được.</p>
@@ -359,19 +391,6 @@ function Preview({ draft, detail }: { draft: Draft; detail: StudioDetail }) {
       ) : null}
       {draft.ai_generated ? <p className="text-[12.5px] text-ink-3">Khi đăng sẽ kèm nhãn «Nội dung có sự hỗ trợ của AI».</p> : null}
     </div>
-  );
-}
-
-function ScheduleLine({ draft }: { draft: Draft }) {
-  if (!draft.post) return null;
-  const p = draft.post;
-  const when = `${formatWeekday(p.scheduled_at)} lúc ${formatTime(p.scheduled_at)}`;
-  return (
-    <p className="flex items-center gap-1.5 border-t border-line pt-2 text-[13px] text-ink-2">
-      <CalendarClock className="size-4 shrink-0" aria-hidden />
-      {p.status === "published" ? `Đã đăng ${formatDateTime(p.published_at ?? p.scheduled_at)}` : p.status === "draft_pushed" ? "Đã đẩy bản nháp vào TikTok" : `Dự kiến ${when}`}
-      {p.status === "failed" && p.error ? <span className="text-seal"> · lỗi: {p.error}</span> : null}
-    </p>
   );
 }
 
