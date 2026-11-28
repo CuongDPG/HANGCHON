@@ -36,6 +36,8 @@ from app.modules.sourcing.schemas import (
     CandidateCard,
     CandidateDetail,
     CandidateGallery,
+    ClipIn,
+    ClipMatch,
     DemandMentionOut,
     DemandSignalOut,
     DemandView,
@@ -218,6 +220,43 @@ async def import_link(body: ImportLinkIn, user: CurrentUser, db: DbSession) -> R
         await service.get_brief(db, body.brief_id)
     brief = await db.get(SourcingBrief, body.brief_id) if body.brief_id else None
     run = await service.start_run(db, RunKind.LINK_IMPORT, brief=brief, input={"url": url, "user_id": str(user.id)})
+    await db.commit()
+    await enqueue("sourcing.import_link", run_id=str(run.id))
+    await db.refresh(run)
+    return run_view(run)
+
+
+# ---- «Gửi sang Hàng Chọn»: trang sản phẩm chị mở trên trình duyệt (web/src/lib/clipper) --------------------------
+
+
+@router.get("/clip/match", response_model=ClipMatch)
+async def clip_match(_: CurrentUser, db: DbSession, url: Annotated[str, Query(max_length=2000)]) -> ClipMatch:
+    """Cửa sổ /desk/kep hỏi trước: trang này là món nào, đã có ứng viên chưa (cùng sàn + mã món)."""
+    if not url.startswith("https://"):
+        raise BadRequest("Link trang phải là https.")
+    platform, ext_id, canon = service.clip_identity(url)
+    c = await service.find_by_source(db, platform, ext_id)
+    return ClipMatch(
+        platform=platform,
+        platform_label=service.platform_label(platform),
+        external_id=ext_id,
+        canonical_url=canon,
+        candidate_id=c.id if c else None,
+        candidate_title=c.title_vi if c else None,
+        brief_id=c.brief_id if c else None,
+        thumb_url=c.thumb_url if c else None,
+    )
+
+
+@router.post("/clip", response_model=RunView)
+async def clip(body: ClipIn, user: CurrentUser, db: DbSession) -> RunView:
+    """Lưu trang chị gửi thành ứng viên (mới, hoặc cập nhật món cùng sàn + mã) — đi đường «dán link» không đọc trang."""
+    brief = await service.get_brief(db, body.brief_id) if body.brief_id else None
+    _, _, canon = service.clip_identity(body.url)
+    payload = body.model_dump(mode="json", exclude={"brief_id"})
+    run = await service.start_run(
+        db, RunKind.LINK_IMPORT, brief=brief, input={"url": canon, "clip": payload, "user_id": str(user.id)}
+    )
     await db.commit()
     await enqueue("sourcing.import_link", run_id=str(run.id))
     await db.refresh(run)

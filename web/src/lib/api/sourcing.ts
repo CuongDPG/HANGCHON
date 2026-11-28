@@ -140,6 +140,8 @@ export type DetailFetch = {
   image_count: number | null;
   cached: number | null;
   failed_images: number | null;
+  /** Máy chủ không đọc được trang (captcha, bắt đăng nhập) → chị mở trang và bấm «Gửi sang Hàng Chọn». */
+  blocked?: boolean;
 };
 
 export type CandidateGallery = {
@@ -342,6 +344,33 @@ export function useRunBrief(id: string) {
 export function useImportLink() {
   return useMutation({
     mutationFn: (body: { url: string; brief_id?: string }) => api.post<SourcingRun>(`${BASE}/import-link`, body),
+  });
+}
+
+/** Trang chị gửi bằng nút «Gửi sang Hàng Chọn» (web/src/lib/clipper) thuộc sàn nào, đã có ứng viên cùng món chưa. */
+export type ClipMatch = {
+  platform: string;
+  platform_label: string;
+  external_id: string;
+  canonical_url: string;
+  candidate_id: string | null;
+  candidate_title: string | null;
+  brief_id: string | null;
+  thumb_url: string | null;
+};
+
+export function useClipMatch(url: string | null) {
+  return useQuery({
+    queryKey: ["sourcing", "clip-match", url ?? ""],
+    queryFn: () => api.get<ClipMatch>(`${BASE}/clip/match`, { query: { url: url ?? "" } }),
+    enabled: !!url,
+  });
+}
+
+/** Lưu trang chị gửi thành ứng viên (mới, hoặc cập nhật món cùng sàn + mã món): một lượt `link_import`. */
+export function useClip() {
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) => api.post<SourcingRun>(`${BASE}/clip`, body),
   });
 }
 

@@ -248,6 +248,82 @@ class ImportLinkIn(BaseModel):
     brief_id: uuid.UUID | None = None
 
 
+def _https(v: str | None, what: str) -> str | None:
+    if v is None:
+        return None
+    v = v.strip()
+    if not v.startswith("https://") or any(ch in v for ch in " \n\r\t\"'<>"):
+        raise ValueError(f"{what} phải là link https.")
+    return v
+
+
+class ClipIn(BaseModel):
+    """«Gửi sang Hàng Chọn»: nút trên thanh dấu trang đọc trang sản phẩm chị đang mở (đã đăng nhập sàn) rồi gửi sang.
+    Toàn bộ là DỮ LIỆU từ trang ngoài: giới hạn cỡ từng trường, link (trang, ảnh, người bán) chỉ nhận https."""
+
+    url: str = Field(min_length=12, max_length=2000)
+    title: str = Field(min_length=1, max_length=500)
+    price: Decimal | None = Field(default=None, ge=0, le=10**9)
+    currency: str | None = Field(default=None, pattern=r"^[A-Za-z]{3}$")
+    images: list[str] = Field(default_factory=list, max_length=40)
+    description: str | None = Field(default=None, max_length=5000)
+    specs: dict[str, str] = Field(default_factory=dict, max_length=60)
+    variants: list[str] = Field(default_factory=list, max_length=60)
+    seller_name: str | None = Field(default=None, max_length=200)
+    seller_url: str | None = Field(default=None, max_length=2000)
+    rating: float | None = Field(default=None, ge=0, le=5)
+    review_count: int | None = Field(default=None, ge=0, le=10**9)
+    sales_count: int | None = Field(default=None, ge=0, le=10**9)
+    moq: int | None = Field(default=None, ge=0, le=10**9)
+    brief_id: uuid.UUID | None = None
+
+    @field_validator("url")
+    @classmethod
+    def _url(cls, v: str) -> str:
+        return _https(v, "Link trang") or v
+
+    @field_validator("seller_url")
+    @classmethod
+    def _seller(cls, v: str | None) -> str | None:
+        return _https(v, "Link người bán")
+
+    @field_validator("images")
+    @classmethod
+    def _images(cls, v: list[str]) -> list[str]:
+        for u in v:
+            if len(u) > 1000:
+                raise ValueError("Link ảnh dài quá 1000 ký tự.")
+            _https(u, "Ảnh")
+        return [u.strip() for u in v]
+
+    @field_validator("specs")
+    @classmethod
+    def _specs(cls, v: dict[str, str]) -> dict[str, str]:
+        if any(len(k) > 120 or len(x) > 500 for k, x in v.items()):
+            raise ValueError("Thông số dài quá (tên ≤ 120, giá trị ≤ 500 ký tự).")
+        return v
+
+    @field_validator("variants")
+    @classmethod
+    def _variants(cls, v: list[str]) -> list[str]:
+        if any(len(x) > 200 for x in v):
+            raise ValueError("Tên phân loại dài quá 200 ký tự.")
+        return v
+
+
+class ClipMatch(BaseModel):
+    """Trang chị đang gửi thuộc sàn nào, mã món, và ứng viên đã có cùng món (nếu có)."""
+
+    platform: SourcePlatform
+    platform_label: str
+    external_id: str
+    canonical_url: str
+    candidate_id: uuid.UUID | None = None
+    candidate_title: str | None = None
+    brief_id: uuid.UUID | None = None
+    thumb_url: str | None = None
+
+
 class Offer(BaseModel):
     platform: SourcePlatform
     url: str | None = None
@@ -278,6 +354,7 @@ class DetailFetch(BaseModel):
     image_count: int | None = None
     cached: int | None = None
     failed_images: int | None = None
+    blocked: bool = False  # máy chủ không đọc được trang (captcha, bắt đăng nhập) → chị gửi từ trình duyệt
 
 
 class CandidateGallery(BaseModel):

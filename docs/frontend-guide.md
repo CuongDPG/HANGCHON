@@ -252,6 +252,7 @@ Nguồn duy nhất: `src/lib/desk-nav.ts` (`DESK_PRIMARY_NAV`, `DESK_MORE_NAV`, 
 | `/desk/cai-dat` | Cài đặt *(menu tài khoản)* — chuyển tới tab đầu; tab tầng 2 theo URL (`SettingsHeader`): `cua-hang` · `mang-xa-hoi` · `nguon-hang` · `tich-hop` · `ai` · `nguoi-phu-giup` · `tai-khoan` (gồm chọn sáng/tối) · `sao-luu` | k4, f4, h1, g9 |
 | `/desk/dang-nhap` | Đăng nhập (ngoài khung, không cần đăng nhập) | — |
 | `/desk/kit` | Trưng bày hệ thiết kế (ngoài khung, không cần đăng nhập) | — |
+| `/desk/kep` | Cửa sổ nhỏ của nút «Gửi sang Hàng Chọn» (ngoài khung, tự kiểm đăng nhập; `lib/clipper`) | a2 |
 | `/desk/manifest.webmanifest` | Manifest PWA (phạm vi `/desk`) | — |
 
 PWA: manifest ở `src/app/desk/manifest.webmanifest/route.ts`, icon ở `public/desk/` và `src/app/apple-icon.png`, favicon `src/app/icon.svg`.

@@ -862,8 +862,9 @@ async def execute_import(db: AsyncSession, run_id: uuid.UUID) -> SourcingRun:
     run.started_at = now_utc()
     await _set_progress(db, run, step="fetch", done=0, total=2, note="Đang đọc trang sản phẩm")
     url = str(run.input.get("url"))
+    clip = run.input.get("clip")  # «Gửi sang Hàng Chọn»: trang đã đọc sẵn ở trình duyệt của chị
     try:
-        product = await sources().fetch_product(url)
+        product = clip_product(clip) if isinstance(clip, dict) else await sources().fetch_product(url)
         run.found_count = 1
         await _set_progress(db, run, step="translate", done=1, total=2, note="Đang dịch sang tiếng Việt")
         tr = await ai.run(
@@ -892,11 +893,13 @@ async def execute_import(db: AsyncSession, run_id: uuid.UUID) -> SourcingRun:
     fields["specs"] = {s.name: s.value for s in t.specs_vi}
     fields["variants"] = [{"name": v} for v in t.variants_vi]
     fields["rank_reason"] = "Chị dán link món này."
+    if isinstance(clip, dict):
+        clip_fields(fields, clip)
     await attach_image_hashes([fields])
     run.ai_run_id = tr.run_id
     out = await control.propose(
         "sourcing.import_link",
-        f"Lấy hồ sơ từ link: {t.title_vi}",
+        f"{'Nhận hồ sơ từ trang chị mở' if isinstance(clip, dict) else 'Lấy hồ sơ từ link'}: {t.title_vi}",
         {"run_id": str(run.id), "candidate": fields},
         {"title": t.title_vi, "url": url, "platform": platform_label(product.platform)},
         db=db,
@@ -924,6 +927,10 @@ async def save_imported(db: AsyncSession, run_id: str, data: dict[str, Any]) -> 
         )
     ).scalar_one_or_none()
     fields = _coerce(data)
+    if existing is not None and (data.get("raw") or {}).get("clip"):
+        merge_clip(existing, fields)
+        await db.flush()
+        return {"candidate_ids": [str(existing.id)], "new_ids": [], "created": False}
     if existing is not None:
         for k, v in fields.items():
             if k in ("brief_id", "origin", "category_id") and getattr(existing, k) is not None:
@@ -938,6 +945,143 @@ async def save_imported(db: AsyncSession, run_id: str, data: dict[str, Any]) -> 
     if run is not None:
         run.new_count = 1
     return {"candidate_ids": [str(cand.id)], "new_ids": [str(cand.id)], "created": True}
+
+
+# ---- «Gửi sang Hàng Chọn»: trang sản phẩm chị đang mở trên trình duyệt ----------------------------------------------
+#
+# Sàn chặn máy chủ (1688 bắt captcha, Amazon giấu ảnh) nhưng chị mở được vì đã đăng nhập. Nút trên thanh dấu trang
+# (web/src/lib/clipper) đọc trang ngay trong trình duyệt của chị rồi mở cửa sổ /desk/kep; cửa sổ gọi
+# `POST /api/desk/sourcing/clip`. Từ đó đi đúng đường «dán link» (lượt `link_import`, dịch, control.propose, lưu ảnh
+# về kho), chỉ khác là không đọc trang nữa. Món đã có (cùng sàn + mã món) thì cập nhật, giữ điểm và giai đoạn.
+
+CLIP_NOTE = "Lấy từ trang chị mở (nút «Gửi sang Hàng Chọn»)."
+
+
+def clip_identity(url: str) -> tuple[SourcePlatform, str, str]:
+    """(sàn, mã món, link chuẩn) theo hồ sơ nguồn: mã offer 1688, ASIN Amazon, id Taobao…; trang lạ → băm link."""
+    from app.integrations import source_profiles as sp
+    from app.integrations.sources.web import _ext_id, platform_of
+
+    prof = sp.detect(url)
+    canon = sp.canonical(url, prof)
+    pid, _ = sp.extract_id(url, prof)
+    return platform_of(canon), (pid or _ext_id(canon))[:120], canon
+
+
+async def find_by_source(db: AsyncSession, platform: SourcePlatform, external_id: str) -> Candidate | None:
+    return (
+        await db.execute(
+            select(Candidate).where(Candidate.source_platform == platform, Candidate.source_external_id == external_id)
+        )
+    ).scalar_one_or_none()
+
+
+def clip_product(clip: dict[str, Any]) -> SourceProduct:
+    from app.integrations import source_profiles as sp
+
+    platform, ext_id, canon = clip_identity(str(clip["url"]))
+    _, currency, lang = PLATFORMS.get(platform, ("", "USD", "en"))
+    images = sp.clean_images(list(clip.get("images") or []), sp.detect(canon))
+    return SourceProduct(
+        platform=platform,
+        external_id=ext_id,
+        url=canon,
+        title=str(clip["title"]),
+        language=Language(lang) if lang in Language._value2member_map_ else Language.OTHER,
+        price_amount=Decimal(str(clip.get("price") or 0)),
+        currency=(clip.get("currency") or currency).upper(),
+        image_url=images[0] if images else None,
+        seller_name=clip.get("seller_name"),
+        seller_url=clip.get("seller_url"),
+        rating=clip.get("rating"),
+        review_count=clip.get("review_count"),
+        sales_count=clip.get("sales_count"),
+        description=clip.get("description"),
+        images=images,
+        specs={str(k): str(v) for k, v in (clip.get("specs") or {}).items()},
+        variants=[{"name": str(v)} for v in clip.get("variants") or []],
+        moq=clip.get("moq"),
+    )
+
+
+def clip_fields(fields: dict[str, Any], clip: dict[str, Any]) -> None:
+    """Chỉnh trường ứng viên dựng từ trang chị gửi: không thấy giá thì để trống (không ghi 0), lưu nguyên bản gửi,
+    đánh dấu đã lấy chi tiết (xoá lỗi «Lần lấy gần nhất chưa được…»)."""
+    if clip.get("price") is None:
+        fields["price_amount"] = None
+        fields["price_vnd_estimate"] = None
+    fields["rank_reason"] = "Chị gửi từ trang sàn."
+    now = now_utc().isoformat()
+    fields["raw"]["clip"] = {**{k: v for k, v in clip.items() if k != "brief_id"}, "at": now}
+    fields["raw"]["detail"] = {"specs_original": clip.get("specs") or {}, "fetched_at": now}
+    fields["raw"]["detail_fetch"] = {
+        "status": "done",
+        "at": now,
+        "error": None,
+        "note": CLIP_NOTE,
+        "image_count": len(fields.get("images") or []),
+    }
+
+
+_CLIP_KEEP_IF_EMPTY = (
+    "title_original",
+    "description_original",
+    "description_vi",
+    "seller_name",
+    "seller_url",
+    "price_amount",
+    "price_currency",
+    "price_vnd_estimate",
+    "rating",
+    "review_count",
+    "sales_count",
+    "moq",
+)
+
+
+def merge_clip(c: Candidate, fields: dict[str, Any]) -> None:
+    """Cập nhật ứng viên đã có bằng trang chị gửi: số liệu mới thắng, ô trang không có thì giữ; ảnh mới lên trước;
+    giữ tên tiếng Việt, điểm, giai đoạn, đề, các shop cùng mẫu."""
+    for k in _CLIP_KEEP_IF_EMPTY:
+        if fields.get(k) is not None:
+            setattr(c, k, fields[k])
+    for k in ("specs", "variants"):
+        if fields.get(k):
+            setattr(c, k, fields[k])
+    if not c.title_vi:
+        c.title_vi = fields["title_vi"]
+    if fields.get("source_url"):
+        c.source_url = fields["source_url"]
+    if c.brief_id is None and fields.get("brief_id"):
+        c.brief_id = fields["brief_id"]
+        c.category_id = c.category_id or fields.get("category_id")
+    new = [u for u in fields.get("images") or [] if isinstance(u, str)]
+    if new:
+        c.images = list(dict.fromkeys([*new, *[u for u in (c.images or []) if isinstance(u, str)]]))
+        c.main_image_url = new[0]
+    if fields.get("image_hash") and not c.image_hash:
+        c.image_hash = fields["image_hash"]
+    raw = fields.get("raw") or {}
+    c.raw = {**(c.raw or {}), **{k: raw[k] for k in ("clip", "detail", "detail_fetch", "source") if k in raw}}
+    flag_modified(c, "raw")
+
+
+async def clip_cached_counts(db: AsyncSession, ids: list[uuid.UUID]) -> None:
+    """Sau khi lưu ảnh của trang chị gửi: ghi số ảnh đã lưu / lỗi vào trạng thái «Lấy ảnh và chi tiết»."""
+    from app.modules.sourcing import gallery
+
+    for cid in ids:
+        c = await db.get(Candidate, cid)
+        if c is None or (detail_state(c) or {}).get("note") != CLIP_NOTE:
+            continue
+        disp = gallery.display(c)
+        _set_detail_state(
+            c,
+            image_count=len(disp),
+            cached=sum(1 for g in disp if g["cached"]),
+            failed_images=sum(1 for g in disp if g["error"] and not g["cached"]),
+        )
+    await db.commit()
 
 
 # ---- a3: tìm bằng ảnh --------------------------------------------------------------------------------------------
@@ -1678,10 +1822,12 @@ async def execute_fetch_details(db: AsyncSession, candidate_id: uuid.UUID) -> Ca
     await db.commit()
     error: str | None = None
     note: str | None = None
+    blocked = False  # trang bị chặn / không đọc được → desk gợi ý mở trang và bấm «Gửi sang Hàng Chọn»
     try:
         product = await sources().fetch_product(c.source_url)
     except (IntegrationError, IntegrationNotConfigured, ai.AIError) as e:
         error = f"Không đọc được trang nguồn: {getattr(e, 'message', str(e))}"
+        blocked = True
     else:
         d = details_payload(product)
         out = await control.propose(
@@ -1711,6 +1857,7 @@ async def execute_fetch_details(db: AsyncSession, candidate_id: uuid.UUID) -> Ca
         at=now_utc().isoformat(),
         error=error,
         note=note,
+        blocked=blocked,
         image_count=n,
         cached=sum(1 for g in gallery.display(c) if g["cached"]),
         failed_images=counts["failed"],
@@ -1765,10 +1912,15 @@ async def after_save(db: AsyncSession, run: SourcingRun) -> None:
     """Sau khi lượt quét / dán link đã commit: lưu ảnh nguồn về kho, tự lấy chi tiết cho vài món điểm cao."""
     from app.core.jobs import enqueue
 
-    if not auto_followups_enabled():
+    clip = isinstance((run.input or {}).get("clip"), dict)  # chị tự gửi ảnh: luôn lưu (nếu kho ảnh đang bật)
+    if not auto_followups_enabled() and not clip:
         return
     ids = [str(i) for i in run_progress(run).get("candidate_ids") or []]
     if not ids:
+        return
+    if clip:
+        await cache_candidate_images(db, [uuid.UUID(i) for i in ids])
+        await clip_cached_counts(db, [uuid.UUID(i) for i in ids])
         return
     if run.kind in (RunKind.BRIEF_SCAN, RunKind.SCHEDULED_SCAN, RunKind.IMAGE_SEARCH):
         for cid in await auto_detail_ids(db, ids):

@@ -189,7 +189,44 @@ một dòng riêng (`url: …`). (3) Kể cả khi link hợp lệ, web_fetch v�
 không đọc được trang Amazon. Vì vậy ảnh Amazon lấy theo «Mẫu ảnh trong trang»: máy chủ tự đọc trang và lấy các ảnh
 `hiRes`, không tốn tiền AI. Cách này chạy được từ máy dev, chưa kiểm từ IP máy chủ thật (Amazon có thể bắt captcha). Thông
 số, giá và đánh giá Amazon vẫn chỉ lấy được từ đoạn trích trong kết quả tìm kiếm. Trang 1688 trả trang captcha
-(`_____tmd_____/punish`) cho web_fetch.
+(`_____tmd_____/punish`) cho web_fetch → dùng nút «Gửi sang Hàng Chọn» (mục dưới).
+
+## Nút «Gửi sang Hàng Chọn»
+
+Dùng khi máy chủ không đọc được trang (1688 bắt captcha, Taobao/Tmall bắt đăng nhập, Amazon không cho AI đọc): chị mở
+trang món trên trình duyệt **máy tính** đã đăng nhập sàn, bấm nút trên thanh dấu trang, trình duyệt của chị đọc trang và
+gửi sang. Không tốn lượt AI đọc trang; chỉ tốn một lượt dịch như «Dán link».
+
+**Cài một lần:** *Cài đặt → Nguồn hàng* → thẻ «Nút Gửi sang Hàng Chọn» → kéo nút lên thanh dấu trang (Chrome: bật thanh
+dấu trang bằng ⌘⇧B). Ở *Săn hàng*, menu «⋯» có lối tắt tới thẻ này. **Dùng:** mở trang món → bấm nút → cửa sổ nhỏ hiện tên,
+giá, ảnh, số thông số → «Cập nhật ứng viên» (đã có món cùng sàn + mã: mã offer 1688, id Taobao/Tmall, ASIN, mã Rakuten; trang
+lạ thì cùng link) hoặc chọn đề rồi «Thêm vào đề» / «Thêm ứng viên lẻ». Chưa đăng nhập bàn làm việc thì cửa sổ mời đăng nhập
+rồi quay lại, dữ liệu vẫn giữ.
+
+| Trang | Đọc được (khi trang có) |
+|---|---|
+| 1688 | tên, giá, ảnh chính (cbu01.alicdn.com, bỏ đuôi cỡ), thông số (bảng thuộc tính + `featureAttributes`), phân loại (`skuProps`), tên/link xưởng, số đã bán, số lượng tối thiểu, điểm sao |
+| Taobao, Tmall | tên, giá, ảnh thu nhỏ → ảnh gốc, thông số, phân loại, cửa hàng, «已售» |
+| Amazon Nhật / Mỹ | tên (`#productTitle`), giá khối mua, ảnh `hiRes` / `data-a-dynamic-image`, sao, số đánh giá, «đã mua tháng trước», người bán, bảng thông số, gạch đầu dòng, phân loại |
+| Rakuten | tên, giá, ảnh (bỏ `?_ex=`, `?fitin=`), cửa hàng (theo đường dẫn), sao, số đánh giá, bảng thông số |
+| Trang bất kỳ | JSON-LD `Product` (tên, ảnh, giá, tiền tệ, sao, đánh giá, thương hiệu), `og:*`, thêm ảnh to nhất đang hiện |
+
+**Cách chạy (cho người cài máy chủ).** Mã đọc trang nằm trọn trong nút (`web/src/lib/clipper/extract.ts`, dựng bằng
+`clipPage.toString()`), không tải script từ ngoài vì CSP của sàn hay chặn script lạ. Dữ liệu đi sang cửa sổ
+`/desk/kep` ở phần `#` của link (không qua máy chủ nào trước khi chị bấm lưu); không dùng `postMessage` vì sàn đặt
+Cross-Origin-Opener-Policy thì liên hệ giữa hai cửa sổ bị cắt. Cửa sổ cùng origin với bàn làm việc nên gọi API bằng phiên
+sẵn có (cookie SameSite=Lax; trang khác không gửi kèm được). `GET /api/desk/sourcing/clip/match?url=` (món đã có chưa),
+`POST /api/desk/sourcing/clip` (chị và người phụ): kiểm cỡ từng trường, link trang/ảnh/người bán chỉ nhận https, ≤ 40 link
+ảnh; ảnh qua hồ sơ nguồn (đổi cỡ lớn, chỉ máy chủ ảnh của sàn, ≤ 12) và tải về kho như «Lấy ảnh và chi tiết». Lượt là
+`link_import` có `input.clip`, ghi qua action `sourcing.import_link` (nhật ký AI «Nhận hồ sơ từ trang chị mở»); món đã có
+thì cập nhật số liệu mới, giữ tên tiếng Việt, điểm, giai đoạn, đề; `raw.clip` giữ nguyên bản gửi; trạng thái «Lấy ảnh và
+chi tiết» thành «xong» (xoá lỗi cũ). Khi «Lấy ảnh và chi tiết» không đọc được trang, trạng thái có `blocked` → hồ sơ hiện
+«Mở trang nguồn».
+
+**Giới hạn:** sàn đổi giao diện thì bộ đọc có thể sót trường (nhất là Taobao/Tmall: tên class có hậu tố băm, chọn theo
+tiền tố); trường nào không thấy thì để trống, không đoán; giá nhiều bậc lấy số đầu tiên thấy. Ảnh trong phần mô tả chi tiết
+(1688/Taobao tải chậm khi cuộn) không lấy. Điện thoại khó dùng bookmarklet. Một trang bất kỳ có thể tự mở
+`/desk/kep#…` với dữ liệu giả; chị vẫn phải bấm lưu, và dữ liệu chỉ thành một ứng viên.
 
 ## Lưu trữ và an toàn (cho người cài máy chủ)
 

@@ -72,7 +72,9 @@ _SYS_FETCH = (
     "số sao, số đánh giá, và tối đa 30 đánh giá người mua thấy trên trang (số sao, nội dung nguyên văn, ngày).\n"
     "Mở ĐÚNG `url` đã cho (đã rút gọn sẵn): web_fetch chỉ mở được link có trong cuộc trò chuyện, đừng tự dựng "
     "link khác.\n"
-    "Không đọc được trang (bị chặn, cần đăng nhập) thì đặt `readable=false` và ghi lý do ở `note`.\n" + _DATA_NOTE
+    "Không đọc được trang (bị chặn, cần đăng nhập) thì đặt `readable=false` và ghi lý do ở `note`: một câu ngắn chỉ "
+    "nêu lý do (vd «Trang bắt giải captcha.», «Trang bắt đăng nhập.»), không xưng hô, không đề nghị người dùng gửi gì "
+    "hay làm gì.\n" + _DATA_NOTE
 )
 _SYS_IMAGE = (
     "Vai trò: nhìn ảnh món hàng, nhận ra món (kiểu dáng, cơ chế, chất liệu thấy được), rồi dùng web_search với từ "

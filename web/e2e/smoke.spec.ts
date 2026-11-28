@@ -33,6 +33,7 @@ const PAGES = [
   { path: "/", name: "ke-hang", heading: /Ít nhưng mà chất/ },
   { path: "/desk/dang-nhap", name: "dang-nhap", heading: "Đăng nhập" },
   { path: "/desk/kit", name: "kit", heading: "Bộ giao diện «Chàm»" },
+  { path: "/desk/kep", name: "kep", heading: "Gửi sang Hàng Chọn" },
 ];
 
 for (const p of PAGES) {

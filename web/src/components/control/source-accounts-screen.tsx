@@ -13,6 +13,7 @@ import {
   type SourcePlatformCard,
   type SourceProfile,
 } from "@/lib/api/control";
+import { ClipperCard } from "@/components/sourcing/clipper-card";
 import { SettingsHeader } from "./settings-nav";
 import { SourceProfileSection } from "./source-profile-section";
 import { OwnerOnly } from "./settings-screens";
@@ -32,6 +33,7 @@ export function SourceAccountsScreen() {
   return (
     <div className="flex flex-col gap-4">
       <SettingsHeader />
+      <ClipperCard />
       {isPending ? (
         <SkeletonList rows={4} />
       ) : error ? (

@@ -84,7 +84,19 @@ function StatusLine({ gallery, notCached }: { gallery?: CandidateGallery; notCac
   if (st?.status === "queued" || st?.status === "running")
     return <p className="text-[13px] text-ink-2">Đang đọc trang nguồn và lưu ảnh về máy…</p>;
   if (st?.status === "failed")
-    return <p className="text-[13px] text-danger [text-wrap:pretty]">Lần lấy gần nhất chưa được: {st.error}</p>;
+    return (
+      <div className="flex flex-col gap-1.5">
+        <p className="text-[13px] text-danger [text-wrap:pretty]">Lần lấy gần nhất chưa được: {st.error}</p>
+        {(st.blocked || st.error?.startsWith("Không đọc được trang nguồn")) && gallery.source_url ? (
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-ink-2">
+            <a href={gallery.source_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-accent hover:underline">
+              Mở trang nguồn <ExternalLink className="size-3.5" aria-hidden />
+            </a>
+            rồi bấm «Gửi sang Hàng Chọn» trên thanh dấu trang.
+          </p>
+        ) : null}
+      </div>
+    );
   if (st?.note) return <p className="text-[13px] text-ink-2">{st.note}</p>;
   if (gallery.images.length && notCached)
     return (
