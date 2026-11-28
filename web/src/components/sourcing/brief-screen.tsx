@@ -20,6 +20,7 @@ import {
   notifyError,
   notifySuccess,
 } from "@/components/ui";
+import { AiActionButton } from "@/components/control/command-sheet";
 import { useComparisons, useCreateComparison } from "@/lib/api/assessment";
 import {
   isRunActive,
@@ -279,11 +280,11 @@ export function BriefScreen({ id }: { id: string }) {
       {brief.status !== "draft" ? <ScheduleCard brief={brief} saving={patch.isPending} onPatch={(p) => savePatch(p)} /> : null}
 
       {picking && picked.length ? (
-        <div className="sticky bottom-[calc(var(--spacing-tabbar)+env(safe-area-inset-bottom,0px)+72px)] z-10 md:bottom-24">
+        <div className="sticky bottom-[calc(var(--spacing-tabbar)+env(safe-area-inset-bottom,0px)+8px)] z-10 md:bottom-4 flex gap-2">
+          <AiActionButton className="size-13 shadow-pop" />
           <Button
-            block
             size="lg"
-            className="shadow-pop"
+            className="min-w-0 flex-1 shadow-pop"
             disabled={picked.length < 2}
             loading={compare.isPending}
             onClick={() =>

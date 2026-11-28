@@ -2,6 +2,7 @@
 
 import { Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { AiActionButton } from "@/components/control/command-sheet";
 import { Button } from "@/components/ui/button";
 import { SectionLabel } from "@/components/ui/card";
 import { IconButton } from "@/components/ui/icon-button";
@@ -33,12 +34,13 @@ export function Section({ title, children }: { title: string; children: React.Re
   );
 }
 
-/** Thanh «Có thay đổi chưa lưu» dính trên nút nổi «Nói với AI» (để nút nổi không che «Lưu»). */
+/** Thanh «Có thay đổi chưa lưu» dính đáy, ngay trên thanh điều hướng; «Nói với AI» (chỉ icon) ở đầu thanh thay cho nút nổi. */
 export function SaveBar({ saving, onReset, onSave }: { saving: boolean; onReset: () => void; onSave: () => void }) {
   return (
-    <div className="sticky bottom-[calc(var(--spacing-tabbar)+env(safe-area-inset-bottom,0px)+72px)] z-10 md:bottom-24">
-      <div className="flex items-center justify-between gap-3 rounded-md border border-line bg-surface p-2 pl-3 shadow-pop">
-        <span className="text-[14px] text-ink-2">Có thay đổi chưa lưu</span>
+    <div className="sticky bottom-[calc(var(--spacing-tabbar)+env(safe-area-inset-bottom,0px)+8px)] z-10 md:bottom-4">
+      <div className="flex items-center gap-2 rounded-md border border-line bg-surface p-2 shadow-pop">
+        <AiActionButton />
+        <span className="min-w-0 flex-1 text-[14px] text-ink-2">Có thay đổi chưa lưu</span>
         <div className="flex gap-2">
           <Button variant="ghost" onClick={onReset}>
             Bỏ

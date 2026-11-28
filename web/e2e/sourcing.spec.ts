@@ -52,6 +52,9 @@ test("ra đề → tìm → hồ sơ thẩm định", async ({ page }) => {
   }
   await expect(profile.getByText(/Giá vốn về tay/)).toBeVisible();
   for (const name of ["Loại", "Mua mẫu", "Chọn"]) await expect(profile.getByRole("button", { name, exact: true })).toBeVisible();
+  // «Nói với AI» nằm trong thanh quyết định (chỉ icon), nút nổi ẩn đi
+  await expect(page.getByRole("button", { name: "Nói với AI" })).toHaveCount(1);
+  await expect(profile.getByRole("button", { name: "Nói với AI" })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 

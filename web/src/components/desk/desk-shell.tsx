@@ -10,12 +10,13 @@ import { useSession } from "@/lib/api/auth";
 import { ApiError } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 import { DESK_MORE_NAV, DESK_PRIMARY_NAV, DESK_PUBLIC_ROUTES, findDeskNav } from "@/lib/desk-nav";
-import { CommandButton } from "./command-sheet";
+import { CommandProvider } from "./command-sheet";
 import { DESK_FRAME, DeskTopBar } from "./desk-topbar";
 import { MoreSheet } from "./more-sheet";
 
 /**
- * Khung bàn làm việc: chặn khi chưa đăng nhập, điều hướng dưới (điện thoại) / hàng menu trên (máy tính), nút «Nói với AI».
+ * Khung bàn làm việc: chặn khi chưa đăng nhập, điều hướng dưới (điện thoại) / hàng menu trên (máy tính), nút «Nói với AI»
+ * (nút nổi chỉ có icon; trang có thanh thao tác dính đáy thì nút nằm trong thanh — `AiActionButton`).
  * Trang con chỉ lo nội dung của mình; người dùng hiện tại lấy bằng `useSession().user`.
  */
 export function DeskShell({ children }: { children: ReactNode }) {
@@ -60,15 +61,16 @@ export function DeskShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-dvh">
-      <DeskTopBar activeKey={active?.key} user={user} ready={ready} />
-      <main id="noi-dung" data-desk className={MAIN_CLASS}>
-        {gate}
-        <div hidden={!ready} inert={!ready}>
-          {children}
-        </div>
-      </main>
-      <DeskTabBar activeKey={active?.key} onMore={() => setMoreOpen(true)} />
-      {status === "authenticated" ? <CommandButton /> : null}
+      <CommandProvider enabled={ready}>
+        <DeskTopBar activeKey={active?.key} user={user} ready={ready} />
+        <main id="noi-dung" data-desk className={MAIN_CLASS}>
+          {gate}
+          <div hidden={!ready} inert={!ready}>
+            {children}
+          </div>
+        </main>
+        <DeskTabBar activeKey={active?.key} onMore={() => setMoreOpen(true)} />
+      </CommandProvider>
       <MoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} activeKey={active?.key} user={user} />
     </div>
   );
@@ -76,11 +78,11 @@ export function DeskShell({ children }: { children: ReactNode }) {
 
 /**
  * Mọi màn bàn làm việc cùng một bề rộng (DESK_FRAME: hết bề ngang màn, thẳng mép với hàng menu trên) để chuyển màn không nhảy khung.
- * `data-desk` bật kiểu đầu trang gọn của PageHeader.
+ * `data-desk` bật kiểu đầu trang gọn của PageHeader. Đáy chừa chỗ cho nút nổi «Nói với AI» (44px) để nút không che dòng cuối.
  */
 const MAIN_CLASS = cn(
   DESK_FRAME,
-  "px-4 pt-[max(16px,env(safe-area-inset-top))] pb-[calc(var(--spacing-tabbar)+env(safe-area-inset-bottom,0px)+88px)] md:pt-5 md:pb-28",
+  "px-4 pt-[max(16px,env(safe-area-inset-top))] pb-[calc(var(--spacing-tabbar)+env(safe-area-inset-bottom,0px)+72px)] md:pt-5 md:pb-24",
 );
 
 function ContentLoading() {

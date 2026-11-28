@@ -2,7 +2,7 @@
 
 import { CircleAlert, CircleCheck, CircleHelp, Hourglass, Mic, Send, Sparkles, Square } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Button, ButtonLink, Chip, IconButton, Sheet, Textarea } from "@/components/ui";
 import { useCommand, useIntents, type CommandResult } from "@/lib/api/control";
 import { cn } from "@/lib/cn";
@@ -53,28 +53,48 @@ const SPEECH_ERRORS: Record<string, string> = {
   "audio-capture": "Không thấy micro trên máy.",
 };
 
+type CommandSlot = { openSheet: () => void; register: () => () => void };
+const CommandSlotContext = createContext<CommandSlot | null>(null);
+
 /**
- * Nút nổi «Nói với AI» + bảng giao việc (i6): gõ hoặc nói (vi-VN), gửi tới `POST /api/desk/control/command`,
- * hiện kết quả và đường dẫn tới việc vừa tạo.
+ * «Nói với AI» + bảng giao việc (i6): gõ hoặc nói (vi-VN), gửi tới `POST /api/desk/control/command`,
+ * hiện kết quả và đường dẫn tới việc vừa tạo. Khung giữ một bảng duy nhất; trang có thanh thao tác dính đáy
+ * đặt `<AiActionButton />` trong thanh — khi nút đó đang hiện thì nút nổi ẩn đi để không che nội dung.
  */
-export function CommandButton({ className }: { className?: string }) {
+export function CommandProvider({ enabled, children }: { enabled: boolean; children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const [slots, setSlots] = useState(0);
+  const register = useCallback(() => {
+    setSlots((n) => n + 1);
+    return () => setSlots((n) => n - 1);
+  }, []);
+  const value = useMemo<CommandSlot>(() => ({ openSheet: () => setOpen(true), register }), [register]);
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className={cn(
-          "fixed right-4 bottom-[calc(var(--spacing-tabbar)+env(safe-area-inset-bottom,0px)+14px)] z-20 inline-flex h-12 items-center gap-2 rounded-md bg-ink pr-4 pl-3.5 text-[15px] font-semibold text-paper shadow-pop transition-transform active:scale-[0.97] md:right-8 md:bottom-8",
-          className,
-        )}
-      >
-        <Sparkles className="size-[18px]" aria-hidden />
-        Nói với AI
-      </button>
-      <CommandSheet open={open} onClose={() => setOpen(false)} />
-    </>
+    <CommandSlotContext value={value}>
+      {children}
+      {enabled && slots === 0 ? (
+        <button
+          type="button"
+          aria-label="Nói với AI"
+          title="Nói với AI"
+          onClick={() => setOpen(true)}
+          className="fixed right-4 bottom-[calc(var(--spacing-tabbar)+env(safe-area-inset-bottom,0px)+14px)] z-20 grid size-11 place-items-center rounded-full bg-ink text-paper shadow-pop transition-transform active:scale-[0.95] md:right-8 md:bottom-8"
+        >
+          <Sparkles className="size-5" aria-hidden />
+        </button>
+      ) : null}
+      {enabled ? <CommandSheet open={open} onClose={() => setOpen(false)} /> : null}
+    </CommandSlotContext>
   );
+}
+
+/** Nút «Nói với AI» chỉ có icon, đặt đầu thanh thao tác dính đáy (cao bằng các nút cùng thanh). Ngoài khung desk thì không hiện. */
+export function AiActionButton({ className }: { className?: string }) {
+  const slot = useContext(CommandSlotContext);
+  const register = slot?.register;
+  useEffect(() => register?.(), [register]);
+  if (!slot) return null;
+  return <IconButton label="Nói với AI" icon={<Sparkles />} variant="secondary" onClick={slot.openSheet} className={className} />;
 }
 
 export function CommandSheet({ open, onClose }: { open: boolean; onClose: () => void }) {

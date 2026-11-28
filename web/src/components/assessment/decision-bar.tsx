@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button, Chip, Sheet, Textarea, notifyError, notifySuccess, useConfirm } from "@/components/ui";
+import { AiActionButton } from "@/components/control/command-sheet";
 import { useChangeStage, type StageTarget } from "@/lib/api/assessment";
 import type { CandidateStage } from "@/lib/api/sourcing";
 
@@ -42,8 +43,10 @@ export function DecisionBar({ candidateId, title, stage }: { candidateId: string
   const pending = change.isPending;
   return (
     <>
-      <div className="sticky bottom-[calc(var(--spacing-tabbar)+env(safe-area-inset-bottom,0px)+72px)] z-10 md:bottom-24">
-        <div className="grid grid-cols-3 gap-2 rounded-md border border-line bg-surface p-2 shadow-pop">
+      <div className="sticky bottom-[calc(var(--spacing-tabbar)+env(safe-area-inset-bottom,0px)+8px)] z-10 md:bottom-4">
+        {/* «Nói với AI» chỉ icon ở đầu thanh; ba nút quyết định chia đều phần còn lại (co lề ở 390px) */}
+        <div className="flex gap-2 rounded-md border border-line bg-surface p-2 shadow-pop [&>button:not(:first-child)]:min-w-0 [&>button:not(:first-child)]:flex-1 max-md:[&>button:not(:first-child)]:px-2">
+          <AiActionButton />
           <Button variant="secondary" disabled={pending || stage === "rejected"} onClick={() => setRejectOpen(true)}>
             Loại
           </Button>

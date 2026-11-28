@@ -204,7 +204,9 @@ Tiện ích (`src/lib`): `format.ts` (`formatVnd`, `formatVndCompact`, `formatNu
 `formatDateTime`, `formatWeekday`, `formatRelative`), `text.ts` (`normalizeVi`, `matchesVi`, `slugifyVi`), `cn.ts` (ghép className, lớp sau thắng).
 
 Khung: `components/layout/brand.tsx` (`Brand`, `BrandMark`), `components/store/*` (đầu trang, thanh dưới, chân trang, `StorePlaceholder`),
-`components/desk/*` (`DeskShell`, `DeskTopBar`, `MoreSheet`, `CommandButton`, `DeskMoreMenu` + `relatedItems()`, `DeskPageFallback`), menu thả xuống dùng chung `components/ui/menu.tsx`.
+`components/desk/*` (`DeskShell`, `DeskTopBar`, `MoreSheet`, `CommandProvider`, `DeskMoreMenu` + `relatedItems()`, `DeskPageFallback`), menu thả xuống dùng chung `components/ui/menu.tsx`.
+Thanh thao tác dính đáy trên desk (`sticky bottom-[calc(var(--spacing-tabbar)+env(safe-area-inset-bottom,0px)+8px)] md:bottom-4`) đặt `<AiActionButton />`
+(nút «Nói với AI» chỉ icon) ở đầu thanh; khi nút đó hiện, nút nổi tự ẩn. Thanh trong `Sheet` thì không đặt.
 Desk: `src/lib/desk-sections.ts` (mục tầng 1 từng khu), `src/lib/use-url-param.ts` (`useUrlParam`).
 
 ## 6. Bản đồ route
