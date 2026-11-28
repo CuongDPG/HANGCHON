@@ -173,3 +173,27 @@ async def test_board_query_count_does_not_grow_per_product(product_factory, owne
 
 async def test_board_requires_login(client):
     assert (await client.get(B)).status_code == 401
+
+
+async def test_board_tiktok_draft_pushed_counts_as_scheduled(product_factory, owner_client):
+    p = await product_factory()
+    detail = (await owner_client.post(f"/api/desk/content/studio/product/{p.id}/compose", json={})).json()
+    tt = next(d for d in detail["drafts"] if d["channel"] == "tiktok")
+    r = await owner_client.post(f"/api/desk/content/drafts/{tt['id']}/approve", json={})
+    assert r.status_code == 200, r.text
+    async with SessionLocal() as db:
+        x = await db.get(ScheduledPost, tt["post"]["id"])
+        x.status = PostStatus.DRAFT_PUSHED
+        await db.commit()
+
+    data = (await owner_client.get(B)).json()
+    cell = _cell(_row(data, p.id), "tiktok")
+    assert cell["state"] == "scheduled" and cell["raw"] == "draft_pushed" and cell["scheduled_at"]
+    tr = (await owner_client.get(f"/api/desk/content/studio/product/{p.id}")).json()["tracking"]
+    assert _cell(tr, "tiktok")["state"] == "scheduled"
+
+    async with SessionLocal() as db:
+        x = await db.get(ScheduledPost, tt["post"]["id"])
+        x.status, x.error = PostStatus.FAILED, "lỗi"
+        await db.commit()
+    assert _cell(_row((await owner_client.get(B)).json(), p.id), "tiktok")["state"] == "failed"

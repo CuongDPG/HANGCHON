@@ -37,7 +37,7 @@ const STATE: Record<BoardState, { label: string; icon: LucideIcon; tone: string 
 export function stateText(c: BoardChannel): string {
   const web = c.channel === "website";
   if (c.needs_fix) return "Chờ chị duyệt · còn mục soát cần sửa";
-  if (c.raw === "draft_pushed") return "Nháp đã nằm trong app TikTok, chờ chị bấm đăng";
+  if (c.raw === "draft_pushed") return "Nháp đã vào app, chờ chị bấm đăng";
   if (web && c.state === "drafting") return "Trang còn nháp";
   if (web && c.state === "pending") return "Trang chờ chị duyệt";
   if (web && c.state === "scheduled") return `Đợt mở lúc ${c.scheduled_at ? `${formatTime(c.scheduled_at)} ${formatDayMonth(c.scheduled_at)}` : "sắp tới"}`;

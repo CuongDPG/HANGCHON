@@ -72,7 +72,7 @@ def _social_cell(
     elif post is not None and post.status == PostStatus.PUBLISHED:
         state, raw = "published", post.status.value
     elif post is not None and post.status == PostStatus.DRAFT_PUSHED:
-        state, raw = "pending", post.status.value  # TikTok: nháp nằm trong app, chờ chị bấm đăng
+        state, raw = "scheduled", post.status.value  # TikTok: nháp đã vào app = đã hẹn giờ
     elif post is not None and post.status == PostStatus.FAILED:
         state, raw = "failed", post.status.value
     elif post is not None and post.status in (PostStatus.HIDDEN, PostStatus.REMOVED):
